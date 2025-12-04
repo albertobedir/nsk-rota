@@ -1,4 +1,10 @@
-import { FileText, Menu, ShoppingBasket } from "lucide-react";
+import {
+   FileText,
+   MailOpen,
+   Menu,
+   MoveRight,
+   ShoppingBasket,
+} from "lucide-react";
 import ChevronRight from "./chevron-right";
 import ExternalLink from "./external-link";
 import Eye from "./eye";
@@ -19,7 +25,9 @@ type IconName =
    | "x"
    | "file-text"
    | "menu"
-   | "shopping-basket";
+   | "shopping-basket"
+   | "mail-open"
+   | "move-right";
 
 interface Props extends React.ComponentProps<"svg"> {
    name: IconName;
@@ -60,6 +68,10 @@ export default function Icons({
          return <Menu {...iconProps} />;
       case "shopping-basket":
          return <ShoppingBasket {...iconProps} />;
+      case "mail-open":
+         return <MailOpen {...iconProps} />;
+      case "move-right":
+         return <MoveRight {...iconProps} />;
       default:
          return null;
    }

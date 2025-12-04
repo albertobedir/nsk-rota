@@ -1,12 +1,18 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 import Icons from "./icons";
 import Logo from "./logo";
+import NavbarModal from "./navbar-modal";
 import Search from "./search";
 
-export default function navbar() {
+export default function Navbar() {
+   const [isOpen, setIsOpen] = useState(false);
+
    return (
-      <nav className="relative flex flex-col gap-4 bg-white shadow shadow-accent">
+      <nav className="relative flex flex-col gap-4 bg-white shadow shadow-accent z-50">
          <div className="w-full">
             <div className="h-1.5 bg-primary w-full"></div>
             <div className="container relative flex items-center justify-end">
@@ -32,12 +38,12 @@ export default function navbar() {
                </Link>
             </div>
          </div>
-         <div className="pb-11">
-            <div className="container flex items-end justify-between gap-10">
+         <div className="pb-11 bg-white z-20">
+            <div className="container flex items-center justify-between gap-10">
                <Link className="cursor-pointer max-w-56 w-full" href="/">
-                  <Logo className="max-w-56 text-primary" />
+                  <Logo className="max-w-52 text-primary" />
                </Link>
-               <div className="grid grid-cols-6 flex-1 gap-6">
+               <div className="grid grid-cols-6 flex-1 gap-6 items-center">
                   <div className="col-span-4">
                      <Search />
                   </div>
@@ -79,12 +85,16 @@ export default function navbar() {
                      <option value="10">RO</option>
                      <option value="11">BG</option>
                   </select>
-                  <button className="cursor-pointer">
+                  <button
+                     className="cursor-pointer"
+                     onClick={() => setIsOpen(true)}
+                  >
                      <Icons name="menu" width={36} height={36} />
                   </button>
                </div>
             </div>
          </div>
+         <NavbarModal open={isOpen} setOpen={setIsOpen} />
       </nav>
    );
 }

@@ -7,9 +7,9 @@ interface Props {
 
 export default function layout({ children }: Props) {
    return (
-      <main>
+      <main className="h-full flex flex-col">
          <Navbar />
-         <div>{children}</div>
+         <div className="flex-1">{children}</div>
          <Footer />
       </main>
    );
