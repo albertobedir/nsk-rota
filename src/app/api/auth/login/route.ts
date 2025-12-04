@@ -1,27 +1,27 @@
 "use server";
 
-import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 
-import { shopifyFetch } from "@/lib/shopify/instance";
 import prisma from "@/lib/prisma/instance";
+import { shopifyFetch } from "@/lib/shopify/instance";
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET!;
 
 export async function POST(request: NextRequest) {
-  try {
-    const { email, password } = await request.json();
+   try {
+      const { email, password } = await request.json();
 
-    if (!email || !password) {
-      return NextResponse.json(
-        { message: "Email ve şifre gereklidir." },
-        { status: 400 }
-      );
-    }
+      if (!email || !password) {
+         return NextResponse.json(
+            { message: "Email ve şifre gereklidir." },
+            { status: 400 }
+         );
+      }
 
-    const loginQuery = `
+      const loginQuery = `
       mutation customerAccessTokenCreate($input: CustomerAccessTokenCreateInput!) {
         customerAccessTokenCreate(input: $input) {
           customerAccessToken {
@@ -36,21 +36,21 @@ export async function POST(request: NextRequest) {
         }
       }
     `;
-    const variables = { input: { email, password } };
-    const response = await shopifyFetch({ query: loginQuery, variables });
+      const variables = { input: { email, password } };
+      const response = await shopifyFetch({ query: loginQuery, variables });
 
-    const payload = response.data.customerAccessTokenCreate;
-    const shopifyToken = payload.customerAccessToken;
+      const payload = response.data.customerAccessTokenCreate;
+      const shopifyToken = payload.customerAccessToken;
 
-    if (!shopifyToken) {
-      const err = payload.customerUserErrors[0] ?? {
-        message: "Authentication failed.",
-      };
-      return NextResponse.json({ message: err.message }, { status: 401 });
-    }
+      if (!shopifyToken) {
+         const err = payload.customerUserErrors[0] ?? {
+            message: "Authentication failed.",
+         };
+         return NextResponse.json({ message: err.message }, { status: 401 });
+      }
 
-    // Shopify customer bilgilerini al
-    const customerQuery = `
+      // Shopify customer bilgilerini al
+      const customerQuery = `
       query getCustomer($customerAccessToken: String!) {
         customer(customerAccessToken: $customerAccessToken) {
           id
@@ -60,96 +60,96 @@ export async function POST(request: NextRequest) {
         }
       }
     `;
-    const customerResponse = await shopifyFetch({
-      query: customerQuery,
-      variables: { customerAccessToken: shopifyToken.accessToken },
-    });
+      const customerResponse = await shopifyFetch({
+         query: customerQuery,
+         variables: { customerAccessToken: shopifyToken.accessToken },
+      });
 
-    const shopifyCustomer = customerResponse.data.customer;
-    if (!shopifyCustomer) {
-      return NextResponse.json(
-        { message: "Customer found but data unavailable." },
-        { status: 404 }
+      const shopifyCustomer = customerResponse.data.customer;
+      if (!shopifyCustomer) {
+         return NextResponse.json(
+            { message: "Customer found but data unavailable." },
+            { status: 404 }
+         );
+      }
+
+      let user = await prisma.user.findUnique({
+         where: { email: shopifyCustomer.email },
+      });
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      if (!user) {
+         user = await prisma.user.create({
+            data: {
+               email: shopifyCustomer.email,
+               firstName: shopifyCustomer.firstName ?? "",
+               lastName: shopifyCustomer.lastName ?? "",
+               password: hashedPassword,
+               role: "user",
+            },
+         });
+      } else {
+         await prisma.user.update({
+            where: { id: user.id },
+            data: { password: hashedPassword },
+         });
+      }
+
+      const accessToken = jwt.sign(
+         { id: user.id, email: user.email },
+         ACCESS_TOKEN_SECRET,
+         { expiresIn: "1h" }
       );
-    }
+      const refreshToken = jwt.sign(
+         { id: user.id, email: user.email },
+         REFRESH_TOKEN_SECRET,
+         { expiresIn: "7d" }
+      );
 
-    let user = await prisma.user.findUnique({
-      where: { email: shopifyCustomer.email },
-    });
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: shopifyCustomer.email,
-          firstName: shopifyCustomer.firstName ?? "",
-          lastName: shopifyCustomer.lastName ?? "",
-          password: hashedPassword,
-          role: "user",
-        },
+      const res = NextResponse.json({
+         message: "Login successful",
+         user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+         },
       });
-    } else {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { password: hashedPassword },
+
+      res.cookies.set("access_token", accessToken, {
+         httpOnly: true,
+         secure: process.env.NODE_ENV === "production",
+         path: "/",
+         maxAge: 60 * 60,
+         sameSite: "lax",
       });
-    }
 
-    const accessToken = jwt.sign(
-      { id: user.id, email: user.email },
-      ACCESS_TOKEN_SECRET,
-      { expiresIn: "1h" }
-    );
-    const refreshToken = jwt.sign(
-      { id: user.id, email: user.email },
-      REFRESH_TOKEN_SECRET,
-      { expiresIn: "7d" }
-    );
+      res.cookies.set("refresh_token", refreshToken, {
+         httpOnly: true,
+         secure: process.env.NODE_ENV === "production",
+         path: "/",
+         maxAge: 60 * 60 * 24 * 7,
+         sameSite: "lax",
+      });
 
-    const res = NextResponse.json({
-      message: "Login successful",
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-      },
-    });
+      res.cookies.set("shopifyAccessToken", shopifyToken.accessToken, {
+         httpOnly: true,
+         secure: process.env.NODE_ENV === "production",
+         path: "/",
+         maxAge: 60 * 60 * 24 * 30, // örn: 30 gün
+         sameSite: "lax",
+      });
 
-    res.cookies.set("accessToken", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60,
-      sameSite: "lax",
-    });
-
-    res.cookies.set("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-      sameSite: "lax",
-    });
-
-    res.cookies.set("shopifyAccessToken", shopifyToken.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30, // örn: 30 gün
-      sameSite: "lax",
-    });
-
-    return res;
-  } catch (err) {
-    console.error("Login Error:", err);
-    return NextResponse.json(
-      {
-        message: "Bir hata oluştu.",
-        details: err instanceof Error ? err.message : JSON.stringify(err),
-      },
-      { status: 500 }
-    );
-  }
+      return res;
+   } catch (err) {
+      console.error("Login Error:", err);
+      return NextResponse.json(
+         {
+            message: "Bir hata oluştu.",
+            details: err instanceof Error ? err.message : JSON.stringify(err),
+         },
+         { status: 500 }
+      );
+   }
 }
