@@ -1,0 +1,43 @@
+
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+enum UserRole {
+  user
+  admin
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  firstName     String
+  lastName      String
+  password      String
+  role          UserRole  @default(user)
+  phone         String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+}
+
+model CustomerPricing {
+  id            String   @id @default(cuid())
+  metaobjectId  String   @unique // Shopify metaobject GID
+  customerId    String   // Shopify customer GID
+  price         Decimal  @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([metaobjectId])
+}
