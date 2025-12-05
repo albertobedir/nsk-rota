@@ -6,6 +6,7 @@ import prisma from "@/lib/prisma/instance";
 import { Resend } from "resend";
 import bcrypt from "bcrypt";
 import { shopifyFetch } from "@/lib/shopify/instance";
+import nodemailer from "nodemailer";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -89,6 +90,16 @@ export async function POST(req: Request) {
       },
     });
 
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST!,
+      port: Number(process.env.SMTP_PORT!),
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER!,
+        pass: process.env.SMTP_PASS || "",
+      },
+    });
+
     // -------------------------------
     // Mail gönderimi
     // -------------------------------
@@ -114,6 +125,13 @@ export async function POST(req: Request) {
       from: "Acme <onboarding@resend.dev>",
       // to: user.email,
       to: "phontemalberto@gmail.com",
+      subject: "Yeni Hesap Bilgileriniz",
+      html,
+    });
+
+    await transporter.sendMail({
+      from: process.env.MAIL_FROM,
+      to: user.email,
       subject: "Yeni Hesap Bilgileriniz",
       html,
     });

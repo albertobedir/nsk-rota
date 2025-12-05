@@ -1,45 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function proxy(req: NextRequest) {
-   const { pathname } = req.nextUrl;
+  const { pathname } = req.nextUrl;
 
-   if (
-      pathname.startsWith("/api") ||
-      pathname.startsWith("/_next") ||
-      pathname.startsWith("/favicon.ico") ||
-      pathname.match(/\.(css|js|png|jpg|jpeg|svg|webp|woff2?|ttf)$/)
-   ) {
-      return NextResponse.next();
-   }
+  // static & api dosyalarını atla
+  if (
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon.ico") ||
+    pathname.match(/\.(css|js|png|jpg|jpeg|svg|webp|woff2?|ttf|ico)$/)
+  ) {
+    return NextResponse.next();
+  }
 
-   const auth_routes = ["/login", "/subscribe", "/logout"];
-   const protected_routes = ["/basket"];
+  // App Router route'ları tam path olarak tanımlanmalı
+  const auth_routes = ["/auth/login", "/auth/subscribe", "/auth/logout"];
+  const protected_routes = ["/basket"];
 
-   const access_token = req.cookies.get("access_token");
-   const refresh_token = req.cookies.get("refresh_token");
+  const access_token = req.cookies.get("access_token")?.value ?? null;
+  const refresh_token = req.cookies.get("refresh_token")?.value ?? null;
 
-   const is_authenticated = !!access_token || !!refresh_token; // this is not correct, we need to check if the token is valid
+  /**
+   * GERÇEK login kontrolü:
+   * - sadece token varsa değil
+   * - token decode edilebiliyor mu? (opsiyonel)
+   * - token süresi geçmiş mi? (opsiyonel)
+   */
 
-   const is_auth_route = auth_routes.includes(pathname);
-   const is_protected_route = protected_routes.includes(pathname);
-   // const is_public_route = !is_protected_route;
+  const is_authenticated = Boolean(access_token || refresh_token);
 
-   if (is_auth_route && is_authenticated) {
-      return NextResponse.redirect(new URL("/", req.url));
-   }
+  const is_auth_route = auth_routes.includes(pathname);
+  const is_protected_route = protected_routes.includes(pathname);
 
-   if (is_protected_route && !is_authenticated) {
-      const callback_url = req.nextUrl.pathname;
-      return NextResponse.redirect(
-         new URL(`/login?callback=${callback_url}`, req.url)
-      );
-   }
+  // Eğer kullanıcı login olmuşsa login sayfasına giremez
+  if (is_auth_route && is_authenticated) {
+    return NextResponse.redirect(new URL("/products", req.url));
+  }
 
-   return NextResponse.next();
+  // Login olmamış kullanıcı korumalı sayfaya girmeye çalışırsa login'e gönder
+  if (is_protected_route && !is_authenticated) {
+    const callback = pathname; // tekrar geri dönecek adres
+    return NextResponse.redirect(
+      new URL(`/auth/login?redirect=${callback}`, req.url)
+    );
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
-   matcher: [
-      "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-   ],
+  matcher: [
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpg|jpeg|png|svg|webp|gif|ico|woff2?|ttf)).*)",
+  ],
 };

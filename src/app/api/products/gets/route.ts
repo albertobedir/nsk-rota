@@ -1,7 +1,6 @@
 import { connectDB } from "@/lib/mongoose/instance";
 import Product from "@/schemas/mongoose/product";
 import { NextRequest, NextResponse } from "next/server";
-import { FilterQuery } from "mongoose";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,10 +14,6 @@ interface MetafieldFilter {
     };
   };
 }
-
-type ProductQuery = FilterQuery<typeof Product> & {
-  $and?: MetafieldFilter[];
-};
 
 export async function GET(req: NextRequest) {
   try {
@@ -168,7 +163,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const query: ProductQuery =
+    const query =
       metafieldConditions.length > 0 ? { $and: metafieldConditions } : {};
 
     const batchResults = await Product.find(query)

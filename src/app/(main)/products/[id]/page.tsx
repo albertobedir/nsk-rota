@@ -1,0 +1,412 @@
+"use client";
+
+import Image from "next/image";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Star } from "lucide-react";
+import Icons from "@/components/icons";
+import useSessionStore from "@/store/session-store";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
+import { Switch } from "@/components/ui/switch";
+
+/* ---------------------- STATIC DATA ---------------------- */
+
+interface ShopifyImage {
+  src: string;
+  alt?: string | null;
+}
+interface ShopifyVariant {
+  id: number;
+  price: string;
+  sku?: string | null;
+}
+interface ShopifyMetafield {
+  namespace: string;
+  key: string;
+  value: string;
+  type: string;
+}
+export interface ShopifyRaw {
+  title: string;
+  handle: string;
+  images: ShopifyImage[];
+  variants: ShopifyVariant[];
+  metafields: ShopifyMetafield[];
+}
+interface IProduct {
+  _id: string;
+  shopifyId: number;
+  raw: ShopifyRaw;
+}
+
+interface TechInfoRow {
+  key: string;
+  label: string;
+  value_mm: string;
+  value_in: string;
+}
+
+interface SuitableModel {
+  brand: string;
+  model: string;
+  year: string;
+  kw: string;
+  hp: string;
+  className: string;
+  type: string;
+}
+
+const TECH_INFO: TechInfoRow[] = [
+  { key: "L1", label: "L1 Length", value_mm: "22.244 mm", value_in: '22 1/4"' },
+  {
+    key: "C1",
+    label: "C1 Hole Distance",
+    value_mm: "4.374 mm",
+    value_in: '4.374"',
+  },
+  { key: "E1", label: "E1 Hole Ø", value_mm: "0.65 mm", value_in: '0.65"' },
+  { key: "F1", label: "F1 Thickness", value_mm: "1 mm", value_in: '1"' },
+  {
+    key: "G1",
+    label: "G1 Pipe/Shaft Ø",
+    value_mm: "1.122 mm",
+    value_in: '1.122"',
+  },
+];
+
+const SUITABLE_MODELS: SuitableModel[] = [
+  {
+    brand: "HENDRICKSON",
+    model: "FIREMAAX EX – 240–480 AIR\nSUSPENSION",
+    year: "-",
+    kw: "-",
+    hp: "US",
+    className: "-",
+    type: "TRAILER",
+  },
+  {
+    brand: "HENDRICKSON",
+    model: "FIREMAAX EX – 270–540 AIR\nSUSPENSION",
+    year: "-",
+    kw: "-",
+    hp: "US",
+    className: "-",
+    type: "TRAILER",
+  },
+];
+
+/* ---------------------- MAIN PAGE ---------------------- */
+
+export default function ProductDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const addToCart = useSessionStore((s) => s.addToCart);
+
+  const [product, setProduct] = useState<IProduct | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [inchMode, setInchMode] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+
+    async function fetchProduct() {
+      const res = await fetch(`/api/products/gets?search=${id}`);
+      const json = await res.json();
+      setProduct(json.results?.[0] ?? null);
+      setLoading(false);
+    }
+
+    fetchProduct();
+  }, [id]);
+
+  if (loading) return <div className="p-10 text-2xl">Loading...</div>;
+  if (!product) return <div className="p-10 text-2xl">Product not found</div>;
+
+  const raw = product.raw;
+  const title = raw.title;
+  const price = raw.variants?.[0]?.price ?? "0";
+  const image = raw.images?.[0]?.src ?? "/placeholder.png";
+  const rotaNo = raw.metafields.find((m) => m.key === "rota_no")?.value ?? "-";
+
+  /* ---------------------- COMPONENTS ---------------------- */
+
+  /** MOBILE CAROUSEL - FIXED */
+  const MobileCarousel = (
+    <div className="lg:hidden mb-8">
+      <Carousel className="w-full">
+        <CarouselContent>
+          {(raw.images.length ? raw.images : [{ src: image }]).map((img, i) => (
+            <CarouselItem key={i} className="min-h-[300px] md:min-h-[450px]">
+              <div className="relative w-full h-[300px] md:h-[450px]">
+                <Image
+                  src={img.src}
+                  alt={title}
+                  fill
+                  className="object-contain"
+                />
+              </div>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        <CarouselPrevious className="left-2" />
+        <CarouselNext className="right-2" />
+      </Carousel>
+    </div>
+  );
+
+  /** TECHNICAL INFO */
+  const TechnicalInfo = (
+    <div className="md:p-6 rounded-xl mt-10">
+      <div className="flex justify-between items-center">
+        <h3 className="font-bold text-2xl inline-block">
+          Technical Information
+          <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
+        </h3>
+
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">mm</span>
+          <Switch
+            checked={inchMode}
+            onCheckedChange={(v) => setInchMode(v)}
+            className="scale-[1.2] md:scale-[1.5] data-[state=checked]:bg-secondary"
+          />
+          <span className="text-sm font-semibold text-secondary">inch</span>
+        </div>
+      </div>
+
+      <div className="mt-6 space-y-4 text-lg">
+        {TECH_INFO.map((row) => (
+          <div key={row.key} className="flex justify-between border-b pb-2">
+            <span className="font-semibold">{row.label}</span>
+
+            {inchMode ? (
+              <span>
+                {row.value_in}{" "}
+                <span className="text-gray-500">
+                  ({row.value_mm.replace(" mm", "")}&quot;)
+                </span>
+              </span>
+            ) : (
+              row.value_mm
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  /* ---------------------- HTML ---------------------- */
+
+  return (
+    <div className="w-full">
+      {/* PAGE TOP */}
+      <div className="bg-[#f3f3f3] hidden md:flex px-4 md:px-[3rem] py-10 md:py-20">
+        <h1 className="font-bold text-3xl md:text-5xl my-20">{id}</h1>
+      </div>
+
+      {/* MOBILE IMAGE FIRST */}
+      {MobileCarousel}
+
+      {/* MAIN GRID */}
+      <div className="container px-4 md:px-10 py-10 grid grid-cols-1 lg:grid-cols-2 gap-10">
+        {/* LEFT SIDE */}
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl md:text-3xl font-semibold">{rotaNo}</h2>
+          <h1 className="text-3xl md:text-6xl font-bold">{title}</h1>
+          <p className="text-3xl md:text-4xl font-bold">${price} USD</p>
+
+          {/* Rating */}
+          <div className="flex items-center gap-2 text-yellow-500 text-lg">
+            <Star />
+            <Star />
+            <Star />
+            <Star />
+            <Star />
+            <span className="text-black text-base">105</span>
+          </div>
+
+          {/* Badges */}
+          <div className="flex flex-wrap gap-3 mt-2">
+            <div className="flex items-center gap-1 text-blue-600 font-bold">
+              <Icons name="konum" />
+              CHICAGO
+            </div>
+            <div className="flex items-center gap-1 font-bold text-green-600">
+              <Icons name="stock" />
+              IN STOCK
+            </div>
+            <div className="flex items-center gap-1 font-bold text-orange-600">
+              <Icons name="teslim" />
+              3–4 DAYS
+            </div>
+          </div>
+
+          {/* Payment Icons */}
+          <div className="relative w-[400px] md:max-w-[40rem] h-[3rem] mt-4">
+            <Image
+              src="/cars.png"
+              fill
+              className="object-contain"
+              alt="payments"
+            />
+          </div>
+
+          {/* ADD TO CART */}
+          <Button
+            onClick={() =>
+              addToCart({
+                id: rotaNo || String(id),
+                title,
+                price: Number(price),
+                image,
+                quantity: 1,
+              })
+            }
+            className="w-full h-14 text-lg font-semibold bg-secondary hover:bg-secondary/80 mt-4"
+          >
+            ADD TO CART
+          </Button>
+
+          {/* Suitable for */}
+          <div className="mt-10">
+            <h3 className="font-bold text-2xl inline-block">
+              Suitable for
+              <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
+            </h3>
+            <p className="font-semibold text-black text-lg mt-3">HENDRICKSON</p>
+          </div>
+
+          {/* References */}
+          <div className="mt-10">
+            <h3 className="font-bold text-2xl inline-block">
+              References
+              <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
+            </h3>
+
+            <div className="mt-4 space-y-3 text-lg">
+              <div className="flex justify-between">
+                <span className="font-semibold">HENDRICKSON</span>
+                <span className="w-[50%] text-end">
+                  67428565 , 62000565 , 62011565
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold">ATRO</span>
+                <span>TR5042565</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold">AUTOMANN</span>
+                <span>TMRN841</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold">DAYTON PARTS</span>
+                <span>345943</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile tech info */}
+          <div className="lg:hidden">{TechnicalInfo}</div>
+        </div>
+
+        {/* RIGHT SIDE DESKTOP */}
+        <div className="hidden lg:flex flex-col gap-6">
+          {/* DESKTOP CAROUSEL — FIXED */}
+          <Carousel className="w-full">
+            <CarouselContent>
+              {(raw.images.length ? raw.images : [{ src: image }]).map(
+                (img, i) => (
+                  <CarouselItem key={i} className="min-h-[450px]">
+                    <div className="relative w-full h-[450px]">
+                      <Image
+                        src={img.src}
+                        alt={title}
+                        fill
+                        className="object-contain"
+                      />
+                    </div>
+                  </CarouselItem>
+                )
+              )}
+            </CarouselContent>
+            <CarouselPrevious className="left-2" />
+            <CarouselNext className="right-2" />
+          </Carousel>
+
+          {TechnicalInfo}
+        </div>
+      </div>
+
+      {/* SUITABLE MODELS */}
+      <div className="container px-4 md:px-10 mt-20 mb-[5rem] w-full">
+        <h3 className="font-bold text-2xl inline-block">
+          Suitable Models
+          <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
+        </h3>
+
+        {/* Desktop header */}
+        <div className="hidden md:flex border-b pb-3 text-sm font-semibold text-gray-700 mt-4">
+          <span className="flex-1">Brand</span>
+          <span className="flex-2">Model</span>
+          <span className="flex-[0.7]">Year</span>
+          <span className="flex-[0.7]">Kw</span>
+          <span className="flex-[0.7]">Hp</span>
+          <span className="flex-[0.8]">Class</span>
+          <span className="flex-1">Type</span>
+        </div>
+
+        {SUITABLE_MODELS.map((row, i) => (
+          <div key={i}>
+            {/* Desktop */}
+            <div className="hidden md:flex bg-gray-100 py-4 px-3 mt-3 rounded-md text-sm">
+              <span className="flex-1 font-semibold">{row.brand}</span>
+              <span className="flex-2 font-semibold whitespace-pre-line">
+                {row.model}
+              </span>
+              <span className="flex-[0.7]">{row.year}</span>
+              <span className="flex-[0.7]">{row.kw}</span>
+              <span className="flex-[0.7] font-semibold">{row.hp}</span>
+              <span className="flex-[0.8]">{row.className}</span>
+              <span className="flex-1 font-semibold">{row.type}</span>
+            </div>
+
+            {/* Mobile */}
+            <div className="md:hidden bg-gray-100 p-4 rounded-lg mt-4 text-sm space-y-2">
+              <div className="font-bold">{row.brand}</div>
+              <div className="font-semibold whitespace-pre-line leading-tight">
+                {row.model}
+              </div>
+
+              <div className="flex justify-between">
+                <b>Year</b>
+                <span>{row.year}</span>
+              </div>
+              <div className="flex justify-between">
+                <b>Kw</b>
+                <span>{row.kw}</span>
+              </div>
+              <div className="flex justify-between">
+                <b>Hp</b>
+                <span>{row.hp}</span>
+              </div>
+              <div className="flex justify-between">
+                <b>Class</b>
+                <span>{row.className}</span>
+              </div>
+              <div className="flex justify-between">
+                <b>Type</b>
+                <span>{row.type}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

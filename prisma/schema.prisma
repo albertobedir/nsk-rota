@@ -41,3 +41,9 @@ model CustomerPricing {
   @@index([customerId])
   @@index([metaobjectId])
 }
+
+
+
+//single prod detayi kisminii tasarla tekrar
+//filtre kisminda cikan itemlere yonlendiirme
+//speet kismini kodla user item sepet storeu ayarla
