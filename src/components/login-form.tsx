@@ -1,0 +1,132 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+   Form,
+   FormControl,
+   FormField,
+   FormItem,
+   FormLabel,
+   FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { auth } from "@/lib/axios";
+import { loginSchema } from "@/schemas/login.schema";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import z from "zod";
+
+interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
+   register: keyof z.infer<typeof loginSchema>;
+   label?: string;
+}
+
+const formFields: FormFieldProps[] = [
+   {
+      register: "email",
+      type: "email",
+      autoComplete: "email",
+      required: true,
+      label: "Email",
+      placeholder: "Email",
+   },
+   {
+      register: "password",
+      type: "password",
+      autoComplete: "password",
+      required: true,
+      label: "Password",
+      placeholder: "Password",
+   },
+];
+
+export default function LoginForm() {
+   const router = useRouter();
+   const searchParams = useSearchParams();
+
+   const form = useForm<z.infer<typeof loginSchema>>({
+      resolver: zodResolver(loginSchema),
+      defaultValues: {
+         email: "",
+         password: "",
+      },
+   });
+
+   const { mutate, isPending } = useMutation({
+      mutationFn: async (values: z.infer<typeof loginSchema>) => {
+         await auth.login(values);
+      },
+      onSuccess: () => {
+         const callback = searchParams.get("callback");
+         router.push(callback || "/");
+      },
+      onError: (error: unknown) => {
+         if (error instanceof Error) {
+            toast(error.message);
+         } else {
+            toast("Bir hata oluştu");
+         }
+      },
+   });
+
+   return (
+      <Card className="bg-white max-w-xl w-full px-12 py-24">
+         <CardContent className="h-full w-full flex flex-col p-0">
+            <Form {...form}>
+               <form
+                  onSubmit={form.handleSubmit(
+                     (values: z.infer<typeof loginSchema>) => {
+                        mutate(values);
+                     }
+                  )}
+                  className="flex flex-col gap-6 justify-center h-full w-full p-0"
+               >
+                  {formFields.map((field) => (
+                     <FormField
+                        key={field.register}
+                        control={form.control}
+                        name={field.register}
+                        render={({ field: innerField }) => (
+                           <FormItem className="gap-0.5">
+                              <FormLabel className="font-bold text-[0.95rem] mb-1">
+                                 {field.label}
+                              </FormLabel>
+                              <FormControl>
+                                 <Input
+                                    type={field.type || "text"}
+                                    className="w-full rounded-lg border border-muted-foreground/30"
+                                    {...innerField}
+                                    placeholder={field.placeholder}
+                                 />
+                              </FormControl>
+                              <FormMessage />
+                           </FormItem>
+                        )}
+                     />
+                  ))}
+                  <Button
+                     type="submit"
+                     disabled={isPending}
+                     size={"lg"}
+                     className="rounded-lg cursor-pointer py-6 font-medium text-base"
+                  >
+                     {isPending ? <Spinner /> : "Login"}
+                  </Button>
+               </form>
+            </Form>
+            <span className="text-center w-full mt-10 text-xl">
+               Are you new here?{" "}
+               <Link href={"/subscribe"} className="text-secondary">
+                  Subscribe now
+               </Link>
+            </span>
+         </CardContent>
+      </Card>
+   );
+}
