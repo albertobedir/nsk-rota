@@ -96,15 +96,15 @@ export default function Search({ isOpen, setIsOpen }: Props) {
          <div
             ref={modalRef}
             className={cn(
-               "shadow-[0px_0px_20px_0px_#000] shadow-muted-foreground/30 rounded-xl relative z-30 transition-transform duration-300 ease-in-out flex",
+               "shadow-[0px_0px_20px_0px_#000] shadow-muted-foreground/30 rounded-xl relative z-30 transition-transform duration-300 ease-in-out flex flex-col lg:flex-row",
                isOpen ? "flex" : "hidden",
-               "lg:flex"
+               "flex"
             )}
          >
-            <div className="grid grid-rows-2 -mr-5 relative z-0 bg-[#e8e8e8] rounded-xl h-18">
+            <div className="grid grid-rows-1 lg:grid-rows-2 grid-cols-2 lg:grid-cols-1 lg:-mr-5 relative z-0 bg-[#e8e8e8] lg:rounded-xl lg:h-18 h-12">
                <button
                   className={cn(
-                     "h-full w-full flex items-center gap-2 px-4 pr-8 py-1 rounded-xl cursor-pointer font-bold rounded-bl-none",
+                     "h-full w-full flex items-center gap-2 px-4 lg:pr-8 py-1 lg:rounded-xl cursor-pointer font-bold lg:rounded-bl-none",
                      type === "single" ? "bg-secondary text-white" : ""
                   )}
                   onClick={() => setType("single")}
@@ -120,7 +120,7 @@ export default function Search({ isOpen, setIsOpen }: Props) {
                </button>
                <button
                   className={cn(
-                     "h-full w-full flex items-center gap-2 px-4 pr-8 py-1 rounded-xl cursor-pointer font-bold rounded-tl-none",
+                     "h-full w-full flex items-center gap-2 px-4 lg:pr-8 py-1 lg:rounded-xl cursor-pointer font-bold lg:rounded-tl-none",
                      type === "multiple" ? "bg-secondary text-white" : ""
                   )}
                   onClick={() => setType("multiple")}
@@ -135,8 +135,8 @@ export default function Search({ isOpen, setIsOpen }: Props) {
                   />
                </button>
             </div>
-            <div className="flex-1 h-full relative z-10 bg-white rounded-xl">
-               <div className="flex items-center pr-6 h-full">
+            <div className="flex-1 h-full relative z-10 bg-white lg:rounded-xl">
+               <div className="flex items-center lg:pr-6 pr-4 h-full">
                   <form className="flex-1" onSubmit={handleSubmit}>
                      <input
                         type="text"
@@ -144,7 +144,7 @@ export default function Search({ isOpen, setIsOpen }: Props) {
                         name="search"
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
-                        className="w-full px-5 text-lg outline-none placeholder:text-xl h-18"
+                        className="w-full lg:px-5 px-4 text-lg outline-none placeholder:text-xl h-18"
                      />
                   </form>
                   <button className="p-2.5 bg-secondary rounded-full cursor-pointer">

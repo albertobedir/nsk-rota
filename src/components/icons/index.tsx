@@ -3,6 +3,7 @@ import {
    MailOpen,
    Menu,
    MoveRight,
+   Search,
    ShoppingBasket,
 } from "lucide-react";
 import ChevronRight from "./chevron-right";
@@ -10,7 +11,6 @@ import ExternalLink from "./external-link";
 import Eye from "./eye";
 import EyeOff from "./eye-off";
 import MultipleSearch from "./multiple-search";
-import Search from "./search";
 import SingleSearch from "./single-search";
 import X from "./x";
 

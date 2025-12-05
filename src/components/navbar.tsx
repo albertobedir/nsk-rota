@@ -40,14 +40,14 @@ export default function Navbar() {
                </Link>
             </div>
          </div>
-         <div className="pb-11 bg-white z-20">
-            <div className="container px-4 relative flex items-center justify-between gap-8 xl:gap-10">
+         <div className="md:pb-11 pb-6 bg-white z-20">
+            <div className="container px-4 flex items-center justify-between gap-8 xl:gap-10">
                <Link className="cursor-pointer max-w-56 w-full" href="/">
-                  <Logo className="max-w-52 text-primary" />
+                  <Logo className="lg:max-w-52 max-w-36 text-primary" />
                </Link>
                <div
                   className={cn(
-                     "lg:relative lg:px-0 px-4 absolute grid grid-cols-6 flex-1 gap-6 items-center justify-center w-full left-0 bottom-0 translate-y-[calc(100%+1.5rem)] lg:left-auto lg:bottom-auto lg:translate-y-0",
+                     "lg:relative sm:px-4 px-0 absolute grid grid-cols-6 flex-1 gap-6 items-center justify-center w-full left-0 bottom-0 translate-y-full lg:left-auto lg:bottom-auto lg:translate-y-0",
                      isSearchOpen ? "lg:grid grid" : "lg:grid hidden"
                   )}
                >
@@ -73,22 +73,30 @@ export default function Navbar() {
                      </div>
                   </div>
                </div>
-               <div className="flex items-center justify-between h-18 gap-5">
+               <div className="flex items-center justify-between h-18 lg:gap-5 gap-3">
                   <Link href="/basket" className="cursor-pointer">
                      <Icons
                         name="shopping-basket"
-                        strokeWidth={1.3}
+                        strokeWidth={1.4}
                         width={36}
                         height={36}
                      />
                   </Link>
                   <button
-                     className="cursor-pointer"
+                     className={cn(
+                        "cursor-pointer",
+                        isSearchOpen ? "text-secondary" : "text-black"
+                     )}
                      onClick={() => setIsSearchOpen(true)}
                   >
-                     <Icons name="search" width={22} height={22} />
+                     <Icons
+                        name="search"
+                        width={28}
+                        height={28}
+                        strokeWidth={1.6}
+                     />
                   </button>
-                  <select className="h-18 outline-none text-xl cursor-pointer">
+                  <select className="h-18 outline-none lg:text-xl text-lg cursor-pointer">
                      <option value="1">TR</option>
                      <option value="2">EN</option>
                      <option value="3">DE</option>
@@ -102,10 +110,18 @@ export default function Navbar() {
                      <option value="11">BG</option>
                   </select>
                   <button
-                     className="cursor-pointer"
+                     className={cn(
+                        "cursor-pointer",
+                        isMenuOpen ? "text-secondary" : "text-black"
+                     )}
                      onClick={() => setIsMenuOpen(true)}
                   >
-                     <Icons name="menu" width={36} height={36} />
+                     <Icons
+                        name="menu"
+                        width={36}
+                        height={36}
+                        strokeWidth={1.5}
+                     />
                   </button>
                </div>
             </div>
