@@ -70,7 +70,7 @@ export default function LoginForm() {
       if (error instanceof Error) {
         toast(error.message);
       } else {
-        toast("Bir hata oluştu");
+        toast("Something went wrong");
       }
     },
   });
@@ -128,6 +128,7 @@ export default function LoginForm() {
             </Button>
           </form>
         </Form>
+
         <span className="text-center w-full mt-10 text-xl">
           Are you new here?{" "}
           <Link href={"/auth/subscribe"} className="text-secondary">

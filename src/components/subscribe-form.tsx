@@ -68,16 +68,17 @@ export default function Page() {
     },
     onSuccess: () => {
       form.reset();
-      toast("hesap olusturma talebi gonderildi");
+      toast("Your account creation request has been submitted");
     },
     onError: (error: unknown) => {
       if (error instanceof Error) {
         toast(error.message);
       } else {
-        toast("Bir hata oluştu");
+        toast("Something went wrong");
       }
     },
   });
+
   return (
     <Card className="shadow-none border-none max-w-xl w-full px-12 py-24">
       <CardContent className="h-full w-full flex flex-col p-0">
@@ -124,6 +125,7 @@ export default function Page() {
             </Button>
           </form>
         </Form>
+
         <span className="text-center w-full mt-10 text-xl">
           Already have an Account?{" "}
           <Link href={"/auth/login"} className="text-secondary">

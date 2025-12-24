@@ -5,12 +5,17 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type MetafieldValue =
+  | RegExp
+  | { $regex: string; $options?: string }
+  | { $in: RegExp[] };
+
 interface MetafieldFilter {
   "raw.metafields": {
     $elemMatch: {
       namespace: string;
       key: string;
-      value: RegExp | { $in: RegExp[] };
+      value: MetafieldValue;
     };
   };
 }
@@ -26,10 +31,9 @@ export async function GET(req: NextRequest) {
       batchSize = "100",
       oem = "",
       brand = "",
-      model = "",
-      type = "",
-      description = "",
-      instock = "",
+      competitor = "",
+      stockStatus = "",
+      location = "",
     } = Object.fromEntries(req.nextUrl.searchParams);
 
     const pageNum = parseInt(page, 10);
@@ -41,6 +45,7 @@ export async function GET(req: NextRequest) {
 
     const metafieldConditions: MetafieldFilter[] = [];
 
+    // Rota No search (ana ürün kodu)
     if (search) {
       const searchValues = search
         .split(",")
@@ -59,105 +64,94 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // OEM search - JSON array içinde arama (oem_info metafield)
     if (oem) {
       const oemValues = oem
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-      const oemRegex = oemValues.map((v) => new RegExp(v, "i"));
 
       metafieldConditions.push({
         "raw.metafields": {
           $elemMatch: {
             namespace: "custom",
-            key: "oem_code",
-            value: { $in: oemRegex },
+            key: "oem_info",
+            value: {
+              $regex: oemValues.join("|"),
+              $options: "i",
+            },
           },
         },
       });
     }
 
+    // Brand search - JSON array içinde arama (brand_info metafield)
     if (brand) {
       const brandValues = brand
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-      const brandRegex = brandValues.map((v) => new RegExp(v, "i"));
 
       metafieldConditions.push({
         "raw.metafields": {
           $elemMatch: {
             namespace: "custom",
-            key: "brand",
-            value: { $in: brandRegex },
+            key: "brand_info",
+            value: {
+              $regex: brandValues.join("|"),
+              $options: "i",
+            },
           },
         },
       });
     }
 
-    if (model) {
-      const modelValues = model
+    // Competitor search - JSON array içinde arama (competitor_info metafield)
+    if (competitor) {
+      const competitorValues = competitor
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-      const modelRegex = modelValues.map((v) => new RegExp(v, "i"));
 
       metafieldConditions.push({
         "raw.metafields": {
           $elemMatch: {
             namespace: "custom",
-            key: "model",
-            value: { $in: modelRegex },
+            key: "competitor_info",
+            value: {
+              $regex: competitorValues.join("|"),
+              $options: "i",
+            },
           },
         },
       });
     }
 
-    if (type) {
-      const typeValues = type
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const typeRegex = typeValues.map((v) => new RegExp(v, "i"));
+    // Stock Status filter (stock_status metafield)
+    if (stockStatus) {
+      const statusRegex = new RegExp(stockStatus, "i");
 
       metafieldConditions.push({
         "raw.metafields": {
           $elemMatch: {
             namespace: "custom",
-            key: "type",
-            value: { $in: typeRegex },
+            key: "stock_status",
+            value: statusRegex,
           },
         },
       });
     }
 
-    if (description) {
-      const descValues = description
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const descRegex = descValues.map((v) => new RegExp(v, "i"));
+    // Location filter (stock_location metafield)
+    if (location) {
+      const locationRegex = new RegExp(location, "i");
 
       metafieldConditions.push({
         "raw.metafields": {
           $elemMatch: {
             namespace: "custom",
-            key: "description",
-            value: { $in: descRegex },
-          },
-        },
-      });
-    }
-
-    if (instock) {
-      const instockValue = instock.toLowerCase() === "true" || instock === "1";
-
-      metafieldConditions.push({
-        "raw.metafields": {
-          $elemMatch: {
-            namespace: "custom",
-            key: "instock",
-            value: instockValue ? /true|1|yes/i : /false|0|no/i,
+            key: "stock_location",
+            value: locationRegex,
           },
         },
       });
@@ -187,10 +181,9 @@ export async function GET(req: NextRequest) {
         search,
         oem,
         brand,
-        model,
-        type,
-        description,
-        instock,
+        competitor,
+        stockStatus,
+        location,
       },
       results,
     });

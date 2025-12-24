@@ -7,52 +7,52 @@ import Logo from "./logo";
 
 const categories = [
   {
-    name: "Kurumsal",
+    name: "Corporate",
     items: [
-      { name: "Hakkımızda", href: "/" },
-      { name: "Yönetim Ekibi", href: "/" },
-      { name: "Kariyer", href: "/" },
-      { name: "Sürdürülebilirlik", href: "/" },
-      { name: "Fuarlar", href: "/" },
-      { name: "Haberler", href: "/" },
-      { name: "Üyelikler", href: "/" },
-      { name: "Şirketler Ticari Sicil Bilgileri", href: "/" },
-      { name: "Politikalar", href: "/" },
+      { name: "About Us", href: "/" },
+      { name: "Management Team", href: "/" },
+      { name: "Careers", href: "/" },
+      { name: "Sustainability", href: "/" },
+      { name: "Trade Fairs", href: "/" },
+      { name: "News", href: "/" },
+      { name: "Memberships", href: "/" },
+      { name: "Company Trade Registry Information", href: "/" },
+      { name: "Policies", href: "/" },
     ],
   },
   {
-    name: "Ürünler",
+    name: "Products",
     items: [
-      { name: "Ürün Grupları", href: "/" },
-      { name: "Ürün Arama", href: "/" },
-      { name: "Katalog & Broşür", href: "/" },
+      { name: "Product Groups", href: "/" },
+      { name: "Product Search", href: "/" },
+      { name: "Catalog & Brochure", href: "/" },
     ],
   },
   {
-    name: "Üretim",
+    name: "Manufacturing",
     items: [
       {
-        name: "Direksiyon, Süspansiyon ve Hidrolik Parçalar Fabrikası",
+        name: "Steering, Suspension and Hydraulic Parts Plant",
         href: "/",
       },
-      { name: "Sıcak Metal Dövme Fabrikası", href: "/" },
-      { name: "Test Yetenekleri", href: "/" },
-      { name: "OEM / OES Referanslar", href: "/" },
+      { name: "Hot Forging Plant", href: "/" },
+      { name: "Testing Capabilities", href: "/" },
+      { name: "OEM / OES References", href: "/" },
     ],
   },
   {
-    name: "İletişim",
+    name: "Contact",
     items: [
-      { name: "Bize Ulaşın", href: "/" },
-      { name: "Adreslerimiz", href: "/" },
-      { name: "Yurtiçi Satış Bayileri", href: "/" },
+      { name: "Contact Us", href: "/" },
+      { name: "Our Addresses", href: "/" },
+      { name: "Domestic Sales Dealers", href: "/" },
     ],
   },
 ];
 
 export default function Footer() {
   return (
-    <footer className="bg-muted px-5 pt-10 mt-20">
+    <footer className="bg-[#f3f3f3] md:px-30 px-4 pt-10 mt-20">
       <div className="container">
         {/* MOBILE - LOGO */}
         <div className="flex justify-center mb-6 md:hidden">
@@ -74,17 +74,17 @@ export default function Footer() {
 
             <div className="flex-1">
               <h2 className="text-lg md:text-xl font-semibold">
-                E-Bülten Listemize{" "}
-                <span className="text-secondary">Kayıt Olun!</span>
+                Subscribe to our{" "}
+                <span className="text-secondary">Newsletter!</span>
               </h2>
               <p className="text-[#cfcfcf] text-sm md:text-base mt-1">
-                Yeni çıkan ürünler ve güncel haberler için e-posta listemize
-                kayıt olabilirsiniz.
+                You can subscribe to our email list for new products and the
+                latest news.
               </p>
             </div>
 
             <button className="flex items-center gap-2 text-white font-semibold whitespace-nowrap cursor-pointer">
-              <span>Kayıt Ol</span>
+              <span>Subscribe</span>
               <Icons
                 className="text-secondary"
                 name="move-right"
@@ -125,7 +125,7 @@ export default function Footer() {
 
         {/* BOTTOM COPYRIGHT */}
         <div className="pb-6 text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-3 text-muted-foreground">
-          <span>© 2022 NSK Group, tüm hakları saklıdır.</span>
+          <span>© 2022 NSK Group. All rights reserved.</span>
           <span>
             made by <b>BABEL</b>
           </span>

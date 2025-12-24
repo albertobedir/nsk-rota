@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Star } from "lucide-react";
 import Icons from "@/components/icons";
 import useSessionStore from "@/store/session-store";
 import {
@@ -111,6 +110,33 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<IProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [inchMode, setInchMode] = useState(true);
+  const [qty, setQty] = useState<number>(1);
+
+  const handleAddToCart = async () => {
+    setLoading(true);
+
+    try {
+      // Shopify variant ID'yi al (GID formatında olmalı)
+      const variantId = `gid://shopify/ProductVariant/${raw.variants[0].id}`;
+
+      await addToCart({
+        id: rotaNo || String(id),
+        title,
+        price: Number(price),
+        image,
+        variantId,
+        quantity: qty,
+      });
+
+      // Başarılı mesajı göster
+      alert("Product added to cart!");
+    } catch (error) {
+      console.error("Add to cart failed:", error);
+      alert("Failed to add to cart");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -169,14 +195,26 @@ export default function ProductDetailPage() {
           <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
         </h3>
 
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold">mm</span>
+        <div className="flex items-center gap-5">
+          <span
+            className={`text-sm font-semibold ${
+              inchMode ? "text-muted-foreground" : "text-secondary"
+            }`}
+          >
+            inch
+          </span>
           <Switch
             checked={inchMode}
             onCheckedChange={(v) => setInchMode(v)}
             className="scale-[1.2] md:scale-[1.5] data-[state=checked]:bg-secondary"
           />
-          <span className="text-sm font-semibold text-secondary">inch</span>
+          <span
+            className={`text-sm font-semibold ${
+              !inchMode ? "text-muted-foreground" : "text-secondary"
+            }`}
+          >
+            mm
+          </span>
         </div>
       </div>
 
@@ -188,12 +226,13 @@ export default function ProductDetailPage() {
             {inchMode ? (
               <span>
                 {row.value_in}{" "}
-                <span className="text-gray-500">
-                  ({row.value_mm.replace(" mm", "")}&quot;)
-                </span>
+                <span className="text-gray-500">({row.value_mm})</span>
               </span>
             ) : (
-              row.value_mm
+              <span>
+                {row.value_mm}{" "}
+                <span className="text-gray-500">({row.value_in})</span>
+              </span>
             )}
           </div>
         ))}
@@ -205,31 +244,36 @@ export default function ProductDetailPage() {
 
   return (
     <div className="w-full">
-      {/* PAGE TOP */}
-      <div className="bg-[#f3f3f3] hidden md:flex px-4 md:px-[3rem] py-10 md:py-20">
-        <h1 className="font-bold text-3xl md:text-5xl my-20">{id}</h1>
+      {/* PAGE TOP - smaller header */}
+      <div className="bg-[#f3f3f3] hidden md:flex">
+        <div className="w-full max-w-[1240px] px-6 mx-auto flex items-center justify-between py-20">
+          <div>
+            <h1 className="font-bold text-3xl md:text-4xl">Product Detail</h1>
+            <div className="mt-2 text-sm text-muted-foreground">
+              <span>Home</span>
+              <span className="px-2 opacity-60">/</span>
+              <span className="font-semibold">{rotaNo}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <Image src="/tecdoc.png" alt="TecDoc" width={160} height={44} />
+          </div>
+        </div>
       </div>
 
       {/* MOBILE IMAGE FIRST */}
       {MobileCarousel}
 
       {/* MAIN GRID */}
-      <div className="container px-4 md:px-10 py-10 grid grid-cols-1 lg:grid-cols-2 gap-10">
+      <div className="container px-4 md:px-30 py-12 grid grid-cols-1 lg:grid-cols-2 gap-10">
         {/* LEFT SIDE */}
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl md:text-3xl font-semibold">{rotaNo}</h2>
-          <h1 className="text-3xl md:text-6xl font-bold">{title}</h1>
-          <p className="text-3xl md:text-4xl font-bold">${price} USD</p>
-
-          {/* Rating */}
-          <div className="flex items-center gap-2 text-yellow-500 text-lg">
-            <Star />
-            <Star />
-            <Star />
-            <Star />
-            <Star />
-            <span className="text-black text-base">105</span>
-          </div>
+          <h1 className="text-3xl md:text-4xl font-bold">{title}</h1>
+          <h2 className="text-2xl md:text-6xl font-semibold text-gray-700">
+            {rotaNo}
+          </h2>
+          <p className="text-3xl md:text-3xl font-bold">${price} USD</p>
 
           {/* Badges */}
           <div className="flex flex-wrap gap-3 mt-2">
@@ -258,20 +302,27 @@ export default function ProductDetailPage() {
           </div>
 
           {/* ADD TO CART */}
-          <Button
-            onClick={() =>
-              addToCart({
-                id: rotaNo || String(id),
-                title,
-                price: Number(price),
-                image,
-                quantity: 1,
-              })
-            }
-            className="w-full h-14 text-lg font-semibold bg-secondary hover:bg-secondary/80 mt-4"
-          >
-            ADD TO CART
-          </Button>
+          <div className="mt-4">
+            <div className="flex w-full border-2 border-secondary rounded-md overflow-hidden">
+              <input
+                type="number"
+                min={1}
+                value={qty}
+                onChange={(e) =>
+                  setQty(Math.max(1, Number(e.target.value || 1)))
+                }
+                className="w-28 h-14 px-3 text-center bg-white border-none outline-none"
+                aria-label="Quantity"
+              />
+
+              <Button
+                onClick={handleAddToCart}
+                className="flex-1 bg-secondary text-white font-bold h-14"
+              >
+                ADD TO CART
+              </Button>
+            </div>
+          </div>
 
           {/* Suitable for */}
           <div className="mt-10">

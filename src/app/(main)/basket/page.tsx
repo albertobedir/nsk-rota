@@ -1,9 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
-import { Trash2 } from "lucide-react";
+import { Trash2, Send } from "lucide-react";
 import useSessionStore from "@/store/session-store";
-import { Suspense } from "react";
 import Hydrate from "@/store/hydrate";
 
 export default function BasketPage() {
@@ -11,115 +11,360 @@ export default function BasketPage() {
   const increase = useSessionStore((s) => s.increase);
   const decrease = useSessionStore((s) => s.decrease);
   const remove = useSessionStore((s) => s.removeFromCart);
-  const total = useSessionStore((s) => s.cartTotalPrice());
+
+  // inputta yazılan geçici değerler
+  const [qtyDraft, setQtyDraft] = useState<Record<string, string>>({});
+
+  // Store'da clearAll yoksa: tek tek sil
+  const clearAll = () => {
+    cart.forEach((i) => remove(i.id));
+  };
+
+  const handleGetOffer = () => {
+    // TODO: burada route / API / modal ne ise bağlarsın
+    console.log("Get an Offer clicked");
+  };
+
+  // elde yazılan quantity'yi store'a uygular
+  const setQuantity = (id: string | number, nextQty: number) => {
+    const item = cart.find((x) => x.id === id);
+    if (!item) return;
+
+    const normalized = Math.max(1, Math.floor(Number(nextQty) || 1));
+    const delta = normalized - item.quantity;
+
+    if (delta > 0) {
+      for (let i = 0; i < delta; i++) increase(id as string);
+    } else if (delta < 0) {
+      for (let i = 0; i < Math.abs(delta); i++) decrease(id as string);
+    }
+  };
 
   return (
     <Hydrate>
       {/* HEADER */}
-      <div className="bg-[#f3f3f3] py-20">
-        <div className="w-full max-w-[1200px] px-4">
-          <h1 className="font-bold text-4xl md:text-5xl">My Cart</h1>
+      <div className="bg-[#f3f3f3] py-14">
+        <div className="mx-auto w-full max-w-[1200px] px-4">
+          <h1 className="font-extrabold text-4xl md:text-5xl text-[#2b2b2b]">
+            Offer Cart
+          </h1>
+
+          <div className="mt-4 text-sm text-gray-500 flex items-center gap-2">
+            <span>Home</span>
+            <span>›</span>
+            <span>Products</span>
+            <span>›</span>
+            <span className="font-semibold text-gray-700">Offer Cart</span>
+          </div>
         </div>
       </div>
 
       {/* CONTENT */}
-      <div className="w-full bg-[#fafafa] py-12 mb-20">
-        <div className="container mx-auto px-4 flex flex-col gap-10 lg:flex-row">
-          {/* LEFT SIDE */}
-          <div className="flex-1">
-            {cart.length === 0 && (
-              <div className="flex items-center justify-center">
-                <p className="text-3xl font-bold text-muted-foreground">
-                  Your cart is empty.
-                </p>
-              </div>
-            )}
-
-            {cart.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white p-4 rounded-xl shadow-sm mb-4 border flex gap-4 items-start"
-              >
-                {/* IMAGE */}
-                <div className="relative w-[70px] h-[70px] min-w-[70px] min-h-[70px] sm:w-[90px] sm:h-[90px] sm:min-w-[90px] sm:min-h-[90px] shrink-0 rounded-lg border">
-                  <Image
-                    src={item.image}
-                    alt={item.title}
-                    fill
-                    className="object-cover"
-                  />
+      <div className="w-full bg-[#fafafa] py-10">
+        <div className="mx-auto w-full max-w-[1200px] px-4">
+          {/* Desktop header row (table head) */}
+          <div className="hidden lg:block">
+            <div className="bg-white border rounded-xl px-8 py-6">
+              <div className="grid grid-cols-[220px_220px_1fr_160px_190px_220px] items-center">
+                <div className="font-bold text-xl text-[#2b2b2b]">
+                  Matching Type
                 </div>
+                <div className="font-bold text-xl text-[#2b2b2b]">
+                  Searched Value
+                </div>
+                <div className="font-bold text-xl text-[#2b2b2b]">
+                  Product Name
+                </div>
+                <div className="font-bold text-xl text-[#2b2b2b]">ROTA No.</div>
 
-                {/* PRODUCT INFO */}
-                <div className="flex-1 flex flex-col">
-                  <p className="font-semibold text-lg">{item.title}</p>
+                <button
+                  onClick={clearAll}
+                  className="justify-self-end flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-gray-50 text-[#2b2b2b]"
+                >
+                  <Trash2 className="shrink-0" />
+                  <span className="text-sm font-semibold leading-4 text-left">
+                    Clear the <br /> Offer List
+                  </span>
+                </button>
 
-                  {item.subtitle && (
-                    <p className="text-sm text-gray-500">{item.subtitle}</p>
-                  )}
+                <button
+                  onClick={handleGetOffer}
+                  className="justify-self-end inline-flex min-w-[200px] items-center justify-center gap-3 rounded-lg bg-[#f59e0b] px-8 py-5 font-extrabold text-white text-lg hover:bg-[#e58f0a]"
+                >
+                  <Send className="shrink-0" />
+                  <span className="leading-5">Get an Offer</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
-                  {/* QUANTITY */}
-                  <div className="flex items-center gap-3 mt-3">
-                    <button
-                      className="w-8 h-8 rounded-full border flex justify-center items-center text-xl"
-                      onClick={() => decrease(item.id)}
-                    >
-                      -
-                    </button>
+          {/* Mobile top actions */}
+          <div className="lg:hidden bg-white border  rounded-xl p-4 flex items-center gap-3">
+            <button
+              onClick={clearAll}
+              className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center hover:bg-gray-200"
+              aria-label="Clear offer list"
+            >
+              <Trash2 />
+            </button>
 
-                    <span className="text-lg font-semibold">
-                      {item.quantity}
-                    </span>
+            <button
+              onClick={handleGetOffer}
+              className="flex-1 h-12 rounded-lg bg-[#f59e0b] text-white font-bold inline-flex items-center justify-center gap-2 hover:bg-[#e58f0a]"
+            >
+              <Send size={18} />
+              Get an Offer
+            </button>
+          </div>
 
-                    <button
-                      className="w-8 h-8 rounded-full border flex justify-center items-center text-xl"
-                      onClick={() => increase(item.id)}
-                    >
-                      +
-                    </button>
+          {/* Empty */}
+          {cart.length === 0 && (
+            <div className="mt-10 bg-white border rounded-xl p-10 text-center">
+              <p className="text-2xl font-bold text-gray-500">
+                Your cart is empty.
+              </p>
+            </div>
+          )}
+
+          {/* Items */}
+          <div className="mt-6 space-y-5">
+            {cart.map((item) => (
+              <div key={item.id}>
+                {/* Desktop row */}
+                <div className="hidden lg:block">
+                  <div className="bg-white border rounded-xl px-8 py-6">
+                    <div className="grid grid-cols-[220px_220px_1fr_160px_140px_180px] items-center gap-4">
+                      {/* Matching Type */}
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-white text-xs">
+                          ✓
+                        </span>
+                        <span className="font-semibold">Exact Match</span>
+                      </div>
+
+                      {/* Searched Value */}
+                      <div className="text-gray-500">
+                        {item.subtitle ?? '""'}
+                      </div>
+
+                      {/* Product */}
+                      <div className="flex items-center gap-4">
+                        <div className="relative h-16 w-16 rounded-lg border bg-white overflow-hidden">
+                          <Image
+                            src={item.image}
+                            alt={item.title}
+                            fill
+                            className="object-contain p-2"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-extrabold text-xl text-[#2b2b2b] truncate">
+                            {item.title}
+                          </p>
+                          <p className="text-gray-500 truncate">
+                            {item.subtitle ?? ""}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* ROTA No */}
+                      <div className="font-extrabold text-xl text-[#2b2b2b]">
+                        {String(item.id).slice(0, 8)}
+                      </div>
+
+                      {/* Qty (INPUT) */}
+                      <div className="justify-self-center flex items-center gap-5 text-gray-400">
+                        <button
+                          className="text-2xl leading-none hover:text-gray-700"
+                          onClick={() => decrease(item.id)}
+                        >
+                          –
+                        </button>
+
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          className="w-14 text-center text-lg font-bold text-gray-600 bg-transparent border-b border-transparent focus:border-gray-300 outline-none"
+                          value={
+                            qtyDraft[String(item.id)] ?? String(item.quantity)
+                          }
+                          onChange={(e) => {
+                            setQtyDraft((p) => ({
+                              ...p,
+                              [String(item.id)]: e.target.value,
+                            }));
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter")
+                              (e.target as HTMLInputElement).blur();
+                          }}
+                          onBlur={() => {
+                            const key = String(item.id);
+                            const raw = qtyDraft[key];
+                            if (raw === undefined) return;
+
+                            const parsed = Number(raw);
+                            setQuantity(item.id, parsed);
+
+                            setQtyDraft((p) => {
+                              const c = { ...p };
+                              delete c[key];
+                              return c;
+                            });
+                          }}
+                        />
+
+                        <button
+                          className="text-2xl leading-none hover:text-gray-700"
+                          onClick={() => increase(item.id)}
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {/* Delete */}
+                      <button
+                        onClick={() => remove(item.id)}
+                        className="justify-self-end text-gray-400 hover:text-red-600"
+                        aria-label="Remove item"
+                      >
+                        <Trash2 />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                {/* PRICE + DELETE */}
-                <div className="flex flex-col items-end gap-2">
-                  <button
-                    className="text-gray-500 hover:text-red-600"
-                    onClick={() => remove(item.id)}
-                  >
-                    <Trash2 size={22} />
-                  </button>
+                {/* Mobile card */}
+                <div className="lg:hidden bg-white border rounded-xl p-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-bold text-[#1f3b7b]">
+                        Eşleşme Türü:
+                      </p>
+                      <div className="mt-1 flex items-center gap-2 text-gray-600">
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-white text-xs">
+                          ✓
+                        </span>
+                        <span className="font-semibold">Exact Match</span>
+                      </div>
+                    </div>
 
-                  <p className="text-orange-600  text-sm font-bold md:text-xl">
-                    {(item.price * item.quantity).toLocaleString()} USD
-                  </p>
+                    <div>
+                      <p className="text-sm font-bold text-[#1f3b7b]">
+                        Aranan Değer:
+                      </p>
+                      <p className="mt-1 text-gray-500">
+                        {item.subtitle ?? '""'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="my-4 border-t" />
+
+                  <p className="text-sm font-bold text-[#1f3b7b]">Ürün Adı:</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="relative h-16 w-16 rounded-lg border bg-white overflow-hidden shrink-0">
+                      <Image
+                        src={item.image}
+                        alt={item.title}
+                        fill
+                        className="object-contain p-2"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-extrabold text-lg text-[#2b2b2b] truncate">
+                        {item.title}
+                      </p>
+                      <p className="text-gray-500 text-sm truncate">
+                        {item.subtitle ?? ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <p className="text-sm font-bold text-[#1f3b7b]">Rota No:</p>
+                    <p className="mt-1 font-extrabold text-lg text-[#2b2b2b]">
+                      {String(item.id).slice(0, 8)}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between">
+                    {/* Qty (INPUT) */}
+                    <div className="flex items-center gap-5 rounded-lg bg-gray-100 px-4 py-2 text-gray-500">
+                      <button
+                        className="text-2xl leading-none hover:text-gray-700"
+                        onClick={() => decrease(item.id)}
+                      >
+                        –
+                      </button>
+
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        className="w-14 text-center text-base font-bold text-gray-600 bg-transparent outline-none"
+                        value={
+                          qtyDraft[String(item.id)] ?? String(item.quantity)
+                        }
+                        onChange={(e) => {
+                          setQtyDraft((p) => ({
+                            ...p,
+                            [String(item.id)]: e.target.value,
+                          }));
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter")
+                            (e.target as HTMLInputElement).blur();
+                        }}
+                        onBlur={() => {
+                          const key = String(item.id);
+                          const raw = qtyDraft[key];
+                          if (raw === undefined) return;
+
+                          const parsed = Number(raw);
+                          setQuantity(item.id, parsed);
+
+                          setQtyDraft((p) => {
+                            const c = { ...p };
+                            delete c[key];
+                            return c;
+                          });
+                        }}
+                      />
+
+                      <button
+                        className="text-2xl leading-none hover:text-gray-700"
+                        onClick={() => increase(item.id)}
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => remove(item.id)}
+                      className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 hover:text-red-600"
+                      aria-label="Remove item"
+                    >
+                      <Trash2 />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* RIGHT SIDE SUMMARY */}
-          <div className="w-full lg:w-[350px] bg-white p-6 rounded-xl shadow border h-fit">
-            <h2 className="text-xl font-bold mb-4">Order Summary</h2>
-
-            <div className="flex justify-between text-gray-600 mb-2">
-              <span>Subtotal</span>
-              <span>{total.toLocaleString()} USD</span>
+          {/* Bottom centered button */}
+          {cart.length > 0 && (
+            <div className="mt-10 flex justify-center">
+              <button
+                onClick={handleGetOffer}
+                className="inline-flex items-center justify-center gap-3 rounded-lg bg-[#f59e0b] px-10 py-4 font-extrabold text-white text-lg hover:bg-[#e58f0a]"
+              >
+                Get an Offer <span aria-hidden>→</span>
+              </button>
             </div>
-
-            <div className="flex justify-between text-gray-600 mb-4">
-              <span>Shipping</span>
-              <span className="text-green-600 font-semibold">Free</span>
-            </div>
-
-            <div className="flex justify-between text-xl font-bold border-t pt-4 mb-6">
-              <span>Total</span>
-              <span>{total.toLocaleString()} USD</span>
-            </div>
-
-            <button className="w-full bg-secondary text-white py-3 rounded-lg font-semibold text-lg hover:bg-secondary/80">
-              Confirm Order
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </Hydrate>

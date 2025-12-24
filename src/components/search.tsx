@@ -77,12 +77,12 @@ export default function Search() {
   }, [type]);
 
   return (
-    <div className="shadow-[0px_0px_20px_0px_#000] shadow-muted-foreground/30 rounded-xl sm:flex-row flex flex-col">
+    <div className="shadow-[0px_0px_20px_0px_#000] shadow-muted-foreground/30 rounded-xl w-full sm:flex-row flex flex-col sm:items-start">
       {/* SOL BUTONLAR */}
-      <div className="flex sm:grid sm:grid-rows-2 sm:-mr-5 sm:pr-2 relative z-0 bg-[#e8e8e8] rounded-xl sm:h-18 h-13">
+      <div className="flex sm:grid sm:grid-rows-2 sm:-mr-5 sm:pr-2 relative z-0 bg-[#e8e8e8] rounded-l-xl sm:h-18 h-13 overflow-hidden">
         <button
           className={cn(
-            "h-full w-full flex sm:pl-0 items-center gap-2 sm:px-4 pr-8 py-1 rounded-xl cursor-pointer font-semibold pl-5 sm:rounded-bl-none rounded-b-none",
+            "h-full w-full flex sm:pl-0 items-center gap-2 sm:px-4 pr-8 py-1 rounded-none cursor-pointer font-semibold pl-5",
             type === "single" ? "bg-secondary text-white" : ""
           )}
           onClick={() => setType("single")}
@@ -99,7 +99,7 @@ export default function Search() {
 
         <button
           className={cn(
-            "h-full w-full pl-5 sm:pl-0 flex items-center gap-2 sm:px-4 pr-8 py-1 rounded-xl cursor-pointer font-semibold sm:rounded-bl-none rounded-b-none",
+            "h-full w-full pl-5 sm:pl-0 flex items-center gap-2 sm:px-4 pr-8 py-1 rounded-none cursor-pointer font-semibold",
             type === "multiple" ? "bg-secondary text-white" : ""
           )}
           onClick={() => setType("multiple")}
@@ -116,8 +116,8 @@ export default function Search() {
       </div>
 
       {/* INPUT + BUTTON */}
-      <div className="flex-1 h-full relative z-10 bg-white rounded-xl">
-        <div className="flex items-center pr-6 h-full">
+      <div className="flex-1 relative z-10 bg-white rounded-xl flex flex-col overflow-hidden">
+        <div className="flex items-center pr-6 sm:h-18 h-13">
           <form className="flex-1" onSubmit={handleSubmit}>
             <input
               type="text"
@@ -144,7 +144,7 @@ export default function Search() {
 
         {/* TAGS */}
         {tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto p-2">
+          <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto px-5 py-2">
             {tags.map((tag) => (
               <div
                 key={tag.id}

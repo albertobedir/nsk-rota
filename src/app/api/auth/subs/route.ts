@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma/instance";
 import { subscribeSchema } from "@/schemas/subscribe.schema";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-import nodemailer from "nodemailer";
+// import nodemailer from "nodemailer";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -100,22 +100,22 @@ export async function POST(req: Request) {
       html,
     });
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-      secure: false, // 587 için false olacak
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS || "",
-      },
-    });
+    // const transporter = nodemailer.createTransport({
+    //   host: process.env.SMTP_HOST,
+    //   port: Number(process.env.SMTP_PORT),
+    //   secure: false, // 587 için false olacak
+    //   auth: {
+    //     user: process.env.SMTP_USER,
+    //     pass: process.env.SMTP_PASS || "",
+    //   },
+    // });
 
-    await transporter.sendMail({
-      from: process.env.MAIL_FROM,
-      to: adminEmail,
-      subject: "Yeni Üyelik Başvurusu",
-      html,
-    });
+    // await transporter.sendMail({
+    //   from: process.env.MAIL_FROM,
+    //   to: adminEmail,
+    //   subject: "Yeni Üyelik Başvurusu",
+    //   html,
+    // });
 
     return NextResponse.json(
       { message: "Üyelik isteğiniz başarıyla iletildi." },

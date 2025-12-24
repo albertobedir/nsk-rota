@@ -26,6 +26,7 @@ const aeonik = localFont({
       style: "normal",
     },
   ],
+  display: "swap",
 });
 
 export default function RootLayout({

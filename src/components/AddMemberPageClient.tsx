@@ -20,7 +20,7 @@ export default function AddMemberPageClient() {
       const lastName = searchParams.get("lastName") || "";
 
       if (!email || !firstName || !lastName) {
-        setMessage("Eksik parametreler: email, firstName veya lastName yok");
+        setMessage("Missing parameters: email, firstName, or lastName");
         setLoading(false);
         return;
       }
@@ -37,12 +37,12 @@ export default function AddMemberPageClient() {
         const data = await response.json();
 
         if (!response.ok) {
-          setMessage(data.message || "Bir hata oluştu");
+          setMessage(data.message || "Something went wrong");
         } else {
-          setMessage(data.message || "Kullanıcı başarıyla oluşturuldu");
+          setMessage(data.message || "User created successfully");
         }
       } catch {
-        setMessage("Sunucu hatası oluştu");
+        setMessage("A server error occurred");
       } finally {
         setLoading(false);
       }
@@ -56,7 +56,7 @@ export default function AddMemberPageClient() {
       {loading ? (
         <div className="flex flex-col items-center gap-4">
           <Spinner />
-          <p>Üye oluşturuluyor...</p>
+          <p>Creating member...</p>
         </div>
       ) : (
         <div className="text-center p-5 rounded-lg flex items-center justify-center bg-[#e8e8e8]">

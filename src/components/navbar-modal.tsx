@@ -11,45 +11,22 @@ interface Props {
 
 const categories = [
   {
-    name: "Kurumsal",
+    name: "Profile",
     items: [
-      { name: "Hakkımızda", href: "/" },
-      { name: "Yönetim Ekibi", href: "/" },
-      { name: "Kariyer", href: "/" },
-      { name: "Sürdürülebilirlik", href: "/" },
-      { name: "Fuarlar", href: "/" },
-      { name: "Haberler", href: "/" },
-      { name: "Üyelikler", href: "/" },
-      { name: "Şirketler Ticari Sicil Bilgileri", href: "/" },
-      { name: "Politikalar", href: "/" },
+      { name: "My Account", href: "/profile/account" },
+      { name: "Open Orders", href: "/profile/open-orders" },
+      { name: "Order History", href: "/profile/order-history" },
+      { name: "Invoices", href: "/profile/invoices" },
+      { name: "Account Statement", href: "/profile/account-statement" },
+      { name: "Payment", href: "/profile/payment" },
+      { name: "Wire Transfer Information", href: "/profile/wire-transfer" },
     ],
   },
   {
-    name: "Ürünler",
+    name: "Products",
     items: [
-      { name: "Ürün Grupları", href: "/" },
-      { name: "Ürün Arama", href: "/" },
-      { name: "Katalog & Broşür", href: "/" },
-    ],
-  },
-  {
-    name: "Üretim",
-    items: [
-      {
-        name: "Direksiyon, Süspansiyon ve Hidrolik Parçalar Fabrikası",
-        href: "/",
-      },
-      { name: "Sıcak Metal Dövme Fabrikası", href: "/" },
-      { name: "Test Yetenekleri", href: "/" },
-      { name: "OEM / OES Referanslar", href: "/" },
-    ],
-  },
-  {
-    name: "İletişim",
-    items: [
-      { name: "Bize Ulaşın", href: "/" },
-      { name: "Adreslerimiz", href: "/" },
-      { name: "Yurtiçi Satış Bayileri", href: "/" },
+      { name: "Product Search", href: "/products" },
+      { name: "Order Again", href: "/products/order-again" },
     ],
   },
 ];
@@ -90,11 +67,11 @@ export default function NavbarModal({ open, setOpen }: Props) {
       <div
         ref={modalRef}
         className={cn(
-          "absolute bottom-0 w-full flex items-center justify-center  translate-y-full bg-white z-30 transition-transform duration-300 ease-in-out",
+          "absolute bottom-0 w-full flex items-start justify-center translate-y-full bg-white z-30 transition-transform duration-300 ease-in-out",
           open ? "flex" : "hidden"
         )}
       >
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-4 gap-4 items-start py-6 px-6 max-w-[1200px] w-full">
           {categories.map((category) => (
             <div key={category.name}>
               <h3 className="text-xl font-bold py-2">{category.name}</h3>

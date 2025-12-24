@@ -12,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import Image from "next/image";
 
 export default function ProductsPage() {
   const [page, setPage] = useState(1);
@@ -50,14 +52,34 @@ export default function ProductsPage() {
   return (
     <div className="w-full">
       {/* PAGE HEADER */}
-      <div className="bg-[#f3f3f3] py-20">
-        <div className="w-full max-w-[1200px] px-6">
-          <h1 className="font-bold text-4xl md:text-5xl">Product Search</h1>
+      <div className="bg-[#f3f3f3] py-16">
+        <div className="w-full max-w-[1240px] px-6 mx-auto">
+          <h1 className="font-bold text-4xl md:text-5xl text-[#1f1f1f]">
+            Product Search
+          </h1>
+
+          {/* breadcrumb + badge inside header */}
+          <div className="mt-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="text-[#1f1f1f] font-semibold">Home</span>
+              <span className="opacity-60">/</span>
+              <span className="text-[#1f1f1f] font-semibold">Products</span>
+              <span className="opacity-60">/</span>
+              <span className="text-[#1f1f1f]">Product Search</span>
+            </div>
+            <Image
+              src="/tecdoc.png"
+              alt="TecDoc Data Supplier"
+              width={180}
+              height={52}
+              priority
+            />
+          </div>
         </div>
       </div>
 
       {/* FILTER SECTION */}
-      <div className="mx-auto w-full max-w-[1300px] px-4 mt-12 mb-10 flex flex-col items-center">
+      <div className="mx-auto w-full max-w-[1240px] px-6 mt-4 mb-12 flex flex-col gap-8">
         {/* FILTER SELECTS */}
         <div
           className="
@@ -85,7 +107,6 @@ export default function ProductsPage() {
               label: "Description",
               options: ["STEERING", "ROD", "ARM"],
             },
-            { key: "stock", label: "Stock", options: ["IN", "OUT"] },
           ].map((f) => (
             <Select
               key={f.key}
@@ -94,7 +115,7 @@ export default function ProductsPage() {
               }
               value={filters[f.key as keyof typeof filters]}
             >
-              <SelectTrigger className="w-full h-[50px] bg-[#f7f7f7] text-[16px] rounded-md px-4">
+              <SelectTrigger className="w-full h-[52px] bg-[#f7f7f7] text-[16px] rounded-md px-4">
                 <SelectValue placeholder={f.label} />
               </SelectTrigger>
               <SelectContent>
@@ -110,6 +131,19 @@ export default function ProductsPage() {
               </SelectContent>
             </Select>
           ))}
+
+          {/* STOCK SWITCH (no card) */}
+          <div className="flex items-center justify-end gap-3">
+            <span className="hidden sm:inline text-[15px] text-[#6f6f6f] font-medium">
+              Stock
+            </span>
+            <Switch
+              checked={filters.stock === "IN"}
+              onCheckedChange={(checked) =>
+                setFilters((prev) => ({ ...prev, stock: checked ? "IN" : "" }))
+              }
+            />
+          </div>
         </div>
 
         {/* BUTTONS */}
@@ -120,23 +154,22 @@ export default function ProductsPage() {
           sm:grid-cols-2 
           md:grid-cols-3 
           gap-4 
-          mt-8 
-          w-full max-w-[800px]
+          w-full
         "
         >
-          <Button className="bg-secondary text-white font-semibold h-[48px] text-[16px] flex gap-2 justify-center">
+          <Button className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center">
             Find Product <Search size={18} />
           </Button>
 
           <Button
-            className="bg-secondary text-white font-semibold h-[48px] text-[16px] flex gap-2 justify-center"
+            className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center"
             onClick={clearAllFilters}
           >
             Clear Selections <X size={18} />
           </Button>
 
           <Button
-            className="bg-secondary text-white font-semibold h-[48px] text-[16px] flex gap-2 justify-center"
+            className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center"
             onClick={() => navigator.clipboard.writeText(window.location.href)}
           >
             Copy link to share <Share2 size={18} />
@@ -174,6 +207,8 @@ export default function ProductsPage() {
                 price={price}
                 image={image}
                 oems={[]}
+                location="CHICAGO"
+                inStock={true}
               />
             );
           })}
