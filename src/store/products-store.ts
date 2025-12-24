@@ -45,6 +45,7 @@ export interface Filters {
 interface ProductState {
   products: IProduct[];
   total: number;
+  searchTerm: string;
 
   fetchProducts: (
     page: number,
@@ -58,6 +59,7 @@ interface ProductState {
 export const useProductsStore = create<ProductState>((set) => ({
   products: [],
   total: 0,
+  searchTerm: "",
 
   /* -------------------------------------------------------
       UPDATED fetchProducts → frontend filters → API filters
@@ -89,6 +91,7 @@ export const useProductsStore = create<ProductState>((set) => ({
     set({
       products: json.results ?? [],
       total: json.total ?? 0,
+      searchTerm: "",
     });
   },
 
@@ -104,6 +107,7 @@ export const useProductsStore = create<ProductState>((set) => ({
       set({
         products: json.results ?? [],
         total: json.total ?? 0,
+        searchTerm: "",
       });
 
       return;
@@ -118,6 +122,7 @@ export const useProductsStore = create<ProductState>((set) => ({
     set({
       products: json.results ?? [],
       total: json.total ?? 0,
+      searchTerm: query,
     });
   },
 }));

@@ -32,7 +32,7 @@ export default function TopBanner() {
 
   return (
     <div className="bg-[#f3f3f3]  md:flex">
-      <div className="w-full max-w-[1240px] px-6 mx-auto flex items-center justify-between py-20">
+      <div className="w-full max-w-[1240px] flex-col md:flex-row gap-2  px-6 mx-auto flex items-center justify-between py-20">
         <div>
           <h1 className="font-bold text-3xl md:text-4xl">{title}</h1>
           <div className="mt-2 text-sm text-muted-foreground">

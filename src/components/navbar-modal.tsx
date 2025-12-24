@@ -17,17 +17,13 @@ const categories = [
       { name: "Open Orders", href: "/profile/open-orders" },
       { name: "Order History", href: "/profile/order-history" },
       { name: "Invoices", href: "/profile/invoices" },
-      { name: "Account Statement", href: "/profile/account-statement" },
+
       { name: "Payment", href: "/profile/payment" },
-      { name: "Wire Transfer Information", href: "/profile/wire-transfer" },
     ],
   },
   {
     name: "Products",
-    items: [
-      { name: "Product Search", href: "/products" },
-      { name: "Order Again", href: "/products/order-again" },
-    ],
+    items: [{ name: "Product Search", href: "/products" }],
   },
 ];
 

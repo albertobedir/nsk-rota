@@ -111,7 +111,13 @@ export default function SingleProdCard({
                   variantId: "",
                 })
               }
-              className="flex-1 bg-secondary text-white font-bold h-10"
+              className="
+    flex-1 bg-secondary text-white font-bold h-10
+    transition duration-150
+    hover:brightness-110
+    active:brightness-90 active:scale-[0.98]
+    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40
+  "
             >
               Add to cart
             </button>

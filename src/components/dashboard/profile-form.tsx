@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 type AccountState = {
   ad: string;
@@ -44,7 +45,7 @@ export default function ProfileForm() {
     try {
       // burada API'ne bağlayacaksın (fetch/axios)
       await new Promise((r) => setTimeout(r, 500));
-      alert("Kaydedildi ✅");
+      toast.success("Kaydedildi ✅");
     } finally {
       setSaving(false);
     }

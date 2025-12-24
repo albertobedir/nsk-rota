@@ -21,6 +21,13 @@ export default function Search() {
 
   const { searchProducts } = useProductsStore();
 
+  const handleSetType = (t: "single" | "multiple") => {
+    setType(t);
+    if (t === "single") {
+      setTags([]);
+    }
+  };
+
   // --- SEARCH BUTTON ---
   const handleSearch = async () => {
     if (type === "single") {
@@ -85,7 +92,7 @@ export default function Search() {
             "h-full w-full flex sm:pl-0 items-center gap-2 sm:px-4 pr-8 py-1 rounded-none cursor-pointer font-semibold pl-5",
             type === "single" ? "bg-secondary text-white" : ""
           )}
-          onClick={() => setType("single")}
+          onClick={() => handleSetType("single")}
         >
           <Icons name="single-search" width={28} height={28} />
           <span className="text-[0.7rem]">Single Search</span>
@@ -102,7 +109,7 @@ export default function Search() {
             "h-full w-full pl-5 sm:pl-0 flex items-center gap-2 sm:px-4 pr-8 py-1 rounded-none cursor-pointer font-semibold",
             type === "multiple" ? "bg-secondary text-white" : ""
           )}
-          onClick={() => setType("multiple")}
+          onClick={() => handleSetType("multiple")}
         >
           <Icons name="multiple-search" width={28} height={28} />
           <span className="text-[0.7rem]">Multiple Search</span>

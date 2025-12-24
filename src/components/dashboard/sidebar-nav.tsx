@@ -25,7 +25,6 @@ const nav = [
 
 const bottom = [
   { label: "Product Search", href: "/products", icon: ShoppingBag },
-  { label: "Order Again", href: "/order-again", icon: ShoppingCart },
 ];
 
 export default function SidebarNav({ onNavigate }: Props) {

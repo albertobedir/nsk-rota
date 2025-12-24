@@ -14,6 +14,7 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 
 /* ---------------------- STATIC DATA ---------------------- */
 
@@ -129,10 +130,10 @@ export default function ProductDetailPage() {
       });
 
       // Başarılı mesajı göster
-      alert("Product added to cart!");
+      toast.success("Product added to cart!");
     } catch (error) {
       console.error("Add to cart failed:", error);
-      alert("Failed to add to cart");
+      toast.error("Failed to add to cart");
     } finally {
       setLoading(false);
     }
@@ -246,7 +247,7 @@ export default function ProductDetailPage() {
     <div className="w-full">
       {/* PAGE TOP - smaller header */}
       <div className="bg-[#f3f3f3] hidden md:flex">
-        <div className="w-full max-w-[1240px] px-6 mx-auto flex items-center justify-between py-20">
+        <div className="w-full max-w-[1240px] flex-col md:flex-row gap-2  px-6 mx-auto flex items-center justify-between py-20">
           <div>
             <h1 className="font-bold text-3xl md:text-4xl">Product Detail</h1>
             <div className="mt-2 text-sm text-muted-foreground">

@@ -19,7 +19,7 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const perPage = 12;
 
-  const { products, total, fetchProducts } = useProductsStore();
+  const { products, total, fetchProducts, searchTerm } = useProductsStore();
 
   const [filters, setFilters] = useState({
     brand: "",
@@ -32,8 +32,22 @@ export default function ProductsPage() {
   const totalPages = Math.ceil(total / perPage);
 
   useEffect(() => {
+    // If there's an active searchTerm (coming from another page),
+    // don't override it by fetching the default product list on mount.
+    if (searchTerm && searchTerm.trim() !== "") return;
+
     fetchProducts(page, perPage, filters);
-  }, [page, filters]);
+    // Use individual filter fields in deps so the dependency array
+    // length/order stays constant between renders.
+  }, [
+    page,
+    filters.brand,
+    filters.model,
+    filters.type,
+    filters.desc,
+    filters.stock,
+    searchTerm,
+  ]);
 
   const clearFilter = (key: keyof typeof filters) => {
     setFilters((prev) => ({ ...prev, [key]: "" }));
@@ -59,7 +73,7 @@ export default function ProductsPage() {
           </h1>
 
           {/* breadcrumb + badge inside header */}
-          <div className="mt-4 flex items-center justify-between">
+          <div className="mt-4 flex flex-col md:flex-row gap-2 items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="text-[#1f1f1f] font-semibold">Home</span>
               <span className="opacity-60">/</span>
@@ -133,8 +147,8 @@ export default function ProductsPage() {
           ))}
 
           {/* STOCK SWITCH (no card) */}
-          <div className="flex items-center justify-end gap-3">
-            <span className="hidden sm:inline text-[15px] text-[#6f6f6f] font-medium">
+          <div className="flex items-center bg justify-start gap-3">
+            <span className="hidden sm:inline text-[15px] text-[#6f6f6f] font-medium scale-120">
               Stock
             </span>
             <Switch
@@ -176,11 +190,30 @@ export default function ProductsPage() {
           </Button>
         </div>
       </div>
+      <div className="flex justify-center items-center w-full">
+        {searchTerm ? (
+          <p className="text-lg font-medium">
+            search term: &quot;{searchTerm}&quot;
+          </p>
+        ) : (
+          <p className="text-lg font-medium text-muted-foreground">
+            All products
+          </p>
+        )}
+      </div>
 
       {/* PRODUCT GRID */}
       <div className="mx-auto w-full max-w-[1200px] px-4 py-12">
-        <div
-          className="
+        {searchTerm && products.length === 0 ? (
+          <div className="w-full py-24 flex flex-col items-center justify-center">
+            <p className="text-xl font-semibold">No results found</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              &quot;{searchTerm}&quot; No results found
+            </p>
+          </div>
+        ) : (
+          <div
+            className="
           grid 
           grid-cols-1 
           sm:grid-cols-2 
@@ -189,53 +222,54 @@ export default function ProductsPage() {
           gap-6 
           place-items-center
         "
+          >
+            {products.map((product) => {
+              const price = Number(product.raw.variants?.[0]?.price ?? "0");
+              const image = product.raw.images?.[0]?.src ?? "/placeholder.png";
+
+              const code =
+                product.raw.metafields.find((m) => m.key === "rota_no")
+                  ?.value ?? "Unknown";
+
+              return (
+                <SingleProdCard
+                  key={product._id}
+                  id={code}
+                  code={code}
+                  title={product.raw.title}
+                  price={price}
+                  image={image}
+                  oems={[]}
+                  location="CHICAGO"
+                  inStock={true}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* PAGINATION */}
+      <div className="flex justify-center items-center gap-4 mt-6">
+        <button
+          disabled={page === 1}
+          onClick={() => setPage((p) => p - 1)}
+          className="px-4 py-2 bg-muted rounded disabled:opacity-40"
         >
-          {products.map((product) => {
-            const price = Number(product.raw.variants?.[0]?.price ?? "0");
-            const image = product.raw.images?.[0]?.src ?? "/placeholder.png";
+          Prev
+        </button>
 
-            const code =
-              product.raw.metafields.find((m) => m.key === "rota_no")?.value ??
-              "Unknown";
+        <span>
+          {page} / {totalPages}
+        </span>
 
-            return (
-              <SingleProdCard
-                key={product._id}
-                id={code}
-                code={code}
-                title={product.raw.title}
-                price={price}
-                image={image}
-                oems={[]}
-                location="CHICAGO"
-                inStock={true}
-              />
-            );
-          })}
-        </div>
-
-        {/* PAGINATION */}
-        <div className="flex justify-center items-center gap-4 mt-6">
-          <button
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-            className="px-4 py-2 bg-muted rounded disabled:opacity-40"
-          >
-            Prev
-          </button>
-
-          <span>
-            {page} / {totalPages}
-          </span>
-
-          <button
-            disabled={page === totalPages}
-            onClick={() => setPage((p) => p + 1)}
-            className="px-4 py-2 bg-muted rounded disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
+        <button
+          disabled={page === totalPages}
+          onClick={() => setPage((p) => p + 1)}
+          className="px-4 py-2 bg-muted rounded disabled:opacity-40"
+        >
+          Next
+        </button>
       </div>
     </div>
   );
