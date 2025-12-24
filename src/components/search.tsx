@@ -17,25 +17,25 @@ export default function Search() {
   const [type, setType] = useState<"single" | "multiple">("single");
   const [value, setValue] = useState("");
   const [tags, setTags] = useState<Tag[]>([]);
-  const router = useRouter(); // ← EKLENDİ
+  const router = useRouter(); // ← ADDED
 
   const { searchProducts } = useProductsStore();
 
-  // --- ARAMA BUTONU ---
+  // --- SEARCH BUTTON ---
   const handleSearch = async () => {
     if (type === "single") {
       if (!value.trim()) return;
 
-      await searchProducts(value.trim()); // ✔️ string gider
+      await searchProducts(value.trim()); // ✔️ sends string
       setValue("");
       router.push(`/products`);
     } else {
       if (tags.length === 0) return;
 
-      const query = tags.map((t) => t.value).join(","); // ✔ string haline getir
+      const query = tags.map((t) => t.value).join(","); // ✔ convert to string
 
       router.push(`/products`);
-      await searchProducts(query); // ✔ string gönder
+      await searchProducts(query); // ✔ send string
     }
   };
 
@@ -72,13 +72,13 @@ export default function Search() {
 
   const placeholder = useMemo(() => {
     return type === "single"
-      ? "OEM veya ROTA No ile arayın."
-      : "Çoklu OEM Kodu ve ROTA Kodu ile arayın.";
+      ? "Search by OEM or ROTA No."
+      : "Search by multiple OEM and ROTA codes.";
   }, [type]);
 
   return (
     <div className="shadow-[0px_0px_20px_0px_#000] shadow-muted-foreground/30 rounded-xl w-full sm:flex-row flex flex-col sm:items-start">
-      {/* SOL BUTONLAR */}
+      {/* LEFT BUTTONS */}
       <div className="flex sm:grid sm:grid-rows-2 sm:-mr-5 sm:pr-2 relative z-0 bg-[#e8e8e8] rounded-l-xl sm:h-18 h-13 overflow-hidden">
         <button
           className={cn(
@@ -88,7 +88,7 @@ export default function Search() {
           onClick={() => setType("single")}
         >
           <Icons name="single-search" width={28} height={28} />
-          <span className="text-[0.7rem]">Tekil Arama</span>
+          <span className="text-[0.7rem]">Single Search</span>
           <Icons
             name="chevron-right"
             width={10}
@@ -105,7 +105,7 @@ export default function Search() {
           onClick={() => setType("multiple")}
         >
           <Icons name="multiple-search" width={28} height={28} />
-          <span className="text-[0.7rem]">Çoklu Arama</span>
+          <span className="text-[0.7rem]">Multiple Search</span>
           <Icons
             name="chevron-right"
             width={10}

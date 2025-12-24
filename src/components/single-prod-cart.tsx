@@ -5,6 +5,7 @@ import { Card } from "./ui/card";
 import Image from "next/image";
 import Link from "next/link";
 import useSessionStore from "@/store/session-store";
+import Icons from "./icons";
 
 interface ProductCardProps {
   id: string | number;
@@ -35,70 +36,7 @@ export default function SingleProdCard({
     <Card className="shadow-none flex flex-col gap-0 bg-transparent rounded-md w-52 p-0">
       <div className="relative w-52 rounded-t-[inherit] aspect-square">
         {/* TOP BADGES: icons only (pin + stock) */}
-        <div className="absolute left-3 top-3 flex items-center gap-2 z-10">
-          {location && (
-            <div className="w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm text-[#0b66ff]">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M12 2C8.134 2 5 5.134 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.866-3.134-7-7-7z"
-                  stroke="#0b66ff"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="12" cy="9" r="2" fill="#0b66ff" />
-              </svg>
-            </div>
-          )}
 
-          <div
-            className={`w-10 h-10 flex items-center justify-center rounded-full ${
-              inStock
-                ? "bg-green-50 text-green-700"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {inStock ? (
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M20 6L9 17l-5-5"
-                  stroke="#16a34a"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            ) : (
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M18 6L6 18M6 6l12 12"
-                  stroke="#6b7280"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            )}
-          </div>
-        </div>
         <Image
           alt={title}
           fill
@@ -136,6 +74,18 @@ export default function SingleProdCard({
           <p className="font-semibold">
             RENAULT : <span className="font-normal">7700312851</span>
           </p>
+        </div>
+
+        {/* Small static badges (location, stock qty, delivery) */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex items-center gap-1 text-blue-600 font-bold">
+            <Icons name="konum" />
+            CHICAGO
+          </div>
+          <div className="flex items-center gap-1 font-bold text-green-600">
+            <Icons name="stock" />
+            12
+          </div>
         </div>
 
         {/* Quantity + Add to cart (split control) */}

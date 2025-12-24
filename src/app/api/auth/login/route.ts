@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
 
     res.cookies.set("access_token", accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false,
       path: "/",
       maxAge: 60 * 60,
       sameSite: "lax",
@@ -127,7 +127,8 @@ export async function POST(request: NextRequest) {
 
     res.cookies.set("refresh_token", refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false,
+
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
       sameSite: "lax",
@@ -135,7 +136,8 @@ export async function POST(request: NextRequest) {
 
     res.cookies.set("shopifyAccessToken", shopifyToken.accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false,
+
       path: "/",
       maxAge: 60 * 60 * 24 * 30, // örn: 30 gün
       sameSite: "lax",

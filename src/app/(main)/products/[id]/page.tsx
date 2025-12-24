@@ -109,7 +109,7 @@ export default function ProductDetailPage() {
 
   const [product, setProduct] = useState<IProduct | null>(null);
   const [loading, setLoading] = useState(true);
-  const [inchMode, setInchMode] = useState(true);
+  const [inchMode, setInchMode] = useState(false);
   const [qty, setQty] = useState<number>(1);
 
   const handleAddToCart = async () => {
@@ -226,12 +226,12 @@ export default function ProductDetailPage() {
             {inchMode ? (
               <span>
                 {row.value_in}{" "}
-                <span className="text-gray-500">({row.value_mm})</span>
+                <span className="text-gray-500">({row.value_in})</span>
               </span>
             ) : (
               <span>
                 {row.value_mm}{" "}
-                <span className="text-gray-500">({row.value_in})</span>
+                <span className="text-gray-500">({row.value_mm})</span>
               </span>
             )}
           </div>

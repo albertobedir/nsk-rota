@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
         hostname: "cdn.shopify.com",
       },
     ],
+    dangerouslyAllowSVG: true,
   },
 };
 

@@ -19,17 +19,8 @@ const nav = [
   { label: "Open Orders", href: "/profile/open-orders", icon: ShoppingBag },
   { label: "Order History", href: "/profile/order-history", icon: Receipt },
   { label: "Invoices", href: "/profile/invoices", icon: Receipt },
-  {
-    label: "Account Statement",
-    href: "/profile/account-statement",
-    icon: Receipt,
-  },
+
   { label: "Payment", href: "/profile/payment", icon: ShoppingCart },
-  {
-    label: "Wire Transfer Information",
-    href: "/profile/wire-transfer",
-    icon: Heart,
-  },
 ];
 
 const bottom = [

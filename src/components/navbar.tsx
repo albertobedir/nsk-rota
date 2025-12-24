@@ -38,7 +38,7 @@ export default function Navbar() {
       right-1/2 translate-x-1/2 sm:translate-x-0 sm:right-[18%]
     "
           >
-            {/* Arka plan */}
+            {/* Background */}
             <div className="absolute inset-0">
               <Image
                 src="/header-upper-bg-primary.svg"
@@ -49,7 +49,7 @@ export default function Navbar() {
               />
             </div>
 
-            {/* İçerik */}
+            {/* Content */}
             <div className="relative z-10 flex items-center gap-1 px-3">
               <span className="text-sm leading-4 whitespace-nowrap">
                 Corporate Website
@@ -112,7 +112,7 @@ export default function Navbar() {
                       </div>
 
                       <div className="flex items-center justify-between text-sm text-slate-400">
-                        <span>Remaning</span>
+                        <span>Remaining</span>
                         <span className="text-slate-600 font-medium">
                           {fmt(creditRemaining)}
                         </span>
@@ -152,12 +152,11 @@ export default function Navbar() {
 
             {/* MOBILE SEARCH BUTTON */}
             <button
-              className="cursor-pointer"
+              className="cursor-pointer md:hidden"
               onClick={() => setIsSearchOpen(true)}
             >
               <Icons name="search" width={22} height={22} />
             </button>
-
             {/* MENU BUTTON */}
             <button
               className="cursor-pointer"

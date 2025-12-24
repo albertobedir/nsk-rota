@@ -11,10 +11,9 @@ export default function layout({ children }: Props) {
       <div className="relative h-full flex flex-col">
         <div className="absolute w-full h-full top-0 left-0">
           <Image
-            src="/Login_sayfas1_2.jpg"
+            src="/auth-bg.webp"
             alt="auth layout bg"
-            width={1000}
-            height={1000}
+            fill
             className="w-full h-full object-cover"
           />
           <div className="h-32 bg-muted absolute bottom-0 left-0 w-full"></div>
