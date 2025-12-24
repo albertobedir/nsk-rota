@@ -33,14 +33,14 @@ export default function SingleProdCard({
   const [qty, setQty] = useState<number>(1);
 
   return (
-    <Card className="shadow-none flex flex-col gap-0 bg-transparent rounded-md w-52 p-0">
-      <div className="relative w-52 rounded-t-[inherit] aspect-square">
+    <Card className="shadow-none flex flex-col gap-0 bg-transparent rounded-md w-60 p-0 border-2">
+      <div className="relative w-58 rounded-t-[inherit] aspect-square">
         {/* TOP BADGES: icons only (pin + stock) */}
 
         <Image
           alt={title}
           fill
-          className="rounded-[inherit] object-cover"
+          className="rounded-[inherit] object-contain"
           src={image}
         />
       </div>
@@ -49,8 +49,8 @@ export default function SingleProdCard({
         {/* Product Title */}
         <Link href={`/products/${id}`} className="hover:underline">
           <div>
-            <p className="font-semibold text-2xl">{code}</p>
-            <span className="font-medium">{title}</span>
+            <span className="font-semibold text-2xl">{title}</span>
+            <p className=" font-medium ">{code}</p>
           </div>
         </Link>
 
@@ -84,7 +84,7 @@ export default function SingleProdCard({
           </div>
           <div className="flex items-center gap-1 font-bold text-green-600">
             <Icons name="stock" />
-            12
+            20 in stock
           </div>
         </div>
 
