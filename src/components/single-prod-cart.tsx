@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import useSessionStore from "@/store/session-store";
 import Icons from "./icons";
+import { toast } from "sonner";
 
 interface ProductCardProps {
   id: string | number;
@@ -16,6 +17,7 @@ interface ProductCardProps {
   oems?: string[]; // OEM list
   location?: string;
   inStock?: boolean;
+  variantId?: string;
 }
 
 export default function SingleProdCard({
@@ -27,6 +29,7 @@ export default function SingleProdCard({
   oems = [],
   location = "",
   inStock = false,
+  variantId,
 }: ProductCardProps) {
   const addToCart = useSessionStore((s) => s.addToCart);
 
@@ -101,16 +104,40 @@ export default function SingleProdCard({
             />
 
             <button
-              onClick={() =>
-                addToCart({
-                  id: String(code),
-                  title,
-                  price: Number(price),
-                  image,
-                  quantity: qty,
-                  variantId: "",
-                })
-              }
+              onClick={async () => {
+                try {
+                  if (variantId) {
+                    const resp = await fetch("/api/cart/add", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        merchandiseId: variantId,
+                        quantity: qty,
+                      }),
+                    });
+
+                    if (!resp.ok) {
+                      const err = await resp.json().catch(() => null);
+                      throw new Error(err?.message || "Failed to add to cart");
+                    }
+                  }
+
+                  // Update local store regardless so UI updates immediately
+                  addToCart({
+                    id: String(code),
+                    title,
+                    price: Number(price),
+                    image,
+                    quantity: qty,
+                    variantId: variantId ?? "",
+                  });
+
+                  toast.success("Product added to cart!");
+                } catch (e) {
+                  console.error("Add to cart failed:", e);
+                  toast.error("Failed to add to cart");
+                }
+              }}
               className="
     flex-1 bg-secondary text-white font-bold h-10
     transition duration-150

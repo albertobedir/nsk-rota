@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
 import Image from "next/image";
-import { Trash2, Send } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import useSessionStore from "@/store/session-store";
+import { toast } from "sonner";
 import Hydrate from "@/store/hydrate";
 
 export default function BasketPage() {
@@ -15,18 +17,71 @@ export default function BasketPage() {
   // inputta yazılan geçici değerler
   const [qtyDraft, setQtyDraft] = useState<Record<string, string>>({});
 
-  // Store'da clearAll yoksa: tek tek sil
-  const clearAll = () => {
-    cart.forEach((i) => remove(i.id));
+  const clearCartStore = useSessionStore((s) => s.clearCart);
+
+  // Clear entire cart both locally and on server
+  const clearAll = async () => {
+    try {
+      const resp = await fetch("/api/cart/clear", { method: "POST" });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => null);
+        throw new Error(err?.message || "Failed to clear cart");
+      }
+      clearCartStore();
+      toast.success("Cart cleared");
+    } catch (e) {
+      console.error("Clear cart failed:", e);
+      toast.error("Failed to clear cart");
+    }
   };
 
   const handleGetOffer = () => {
-    // TODO: burada route / API / modal ne ise bağlarsın
-    console.log("Get an Offer clicked");
+    (async () => {
+      try {
+        const resp = await fetch("/api/cart/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lineItems: cart.map((i) => ({
+              merchandiseId: i.variantId,
+              quantity: i.quantity,
+              originalUnitPrice: i.price,
+              title: i.title,
+            })),
+          }),
+        });
+
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => null);
+          throw new Error(err?.message || "Failed to create draft");
+        }
+
+        const json = await resp.json();
+        const draft = json?.created?.draftOrder ?? null;
+        const invoiceUrl = draft?.invoiceUrl ?? null;
+
+        if (invoiceUrl) {
+          // open invoice (Shopify admin/customer invoice) in new tab
+          window.open(invoiceUrl, "_blank");
+          toast.success("Draft order created");
+        } else if (json?.created?.userErrors?.length) {
+          toast.error(
+            json.created.userErrors[0].message || "Draft created with errors"
+          );
+        } else {
+          toast.success("Draft created");
+        }
+      } catch (e) {
+        console.error("Get offer failed:", e);
+        toast.error("Failed to create order draft");
+      }
+    })();
   };
 
   // elde yazılan quantity'yi store'a uygular
-  const setQuantity = (id: string | number, nextQty: number) => {
+  // elde yazılan quantity'yi store'a uygular
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const setQuantity = async (id: string | number, nextQty: number) => {
     const item = cart.find((x) => x.id === id);
     if (!item) return;
 
@@ -37,6 +92,79 @@ export default function BasketPage() {
       for (let i = 0; i < delta; i++) increase(id as string);
     } else if (delta < 0) {
       for (let i = 0; i < Math.abs(delta); i++) decrease(id as string);
+    }
+
+    // fire update to server using merchandiseId (variantId)
+    try {
+      const merch = item.variantId;
+      if (!merch) return;
+
+      const resp = await fetch("/api/cart/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ merchandiseId: merch, quantity: normalized }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => null);
+        throw new Error(err?.message || "Failed to update cart quantity");
+      }
+    } catch (e) {
+      console.error("Set quantity failed:", e);
+      toast.error("Failed to sync quantity with server");
+    }
+  };
+
+  const handleIncrease = async (item: any) => {
+    const newQty = (item.quantity ?? 0) + 1;
+    increase(item.id);
+    try {
+      const merch = item.variantId;
+      if (!merch) return;
+      const resp = await fetch("/api/cart/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ merchandiseId: merch, quantity: newQty }),
+      });
+      if (!resp.ok) throw new Error("Failed to update server");
+    } catch (e) {
+      console.error("Increase failed:", e);
+      toast.error("Failed to sync quantity");
+    }
+  };
+
+  const handleDecrease = async (item: any) => {
+    const newQty = Math.max(1, (item.quantity ?? 1) - 1);
+    decrease(item.id);
+    try {
+      const merch = item.variantId;
+      if (!merch) return;
+      const resp = await fetch("/api/cart/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ merchandiseId: merch, quantity: newQty }),
+      });
+      if (!resp.ok) throw new Error("Failed to update server");
+    } catch (e) {
+      console.error("Decrease failed:", e);
+      toast.error("Failed to sync quantity");
+    }
+  };
+
+  const handleRemove = async (item: any) => {
+    remove(item.id);
+    try {
+      const merch = item.variantId;
+      if (!merch) return;
+      const resp = await fetch("/api/cart/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ merchandiseId: merch }),
+      });
+      if (!resp.ok) throw new Error("Failed to remove on server");
+    } catch (e) {
+      console.error("Remove failed:", e);
+      toast.error("Failed to remove from server");
     }
   };
 
@@ -180,7 +308,7 @@ export default function BasketPage() {
                           <div className="justify-self-center flex items-center gap-4 text-gray-400">
                             <button
                               className="text-xl leading-none hover:text-gray-700"
-                              onClick={() => decrease(item.id)}
+                              onClick={() => handleDecrease(item)}
                             >
                               –
                             </button>
@@ -222,7 +350,7 @@ export default function BasketPage() {
 
                             <button
                               className="text-xl leading-none hover:text-gray-700"
-                              onClick={() => increase(item.id)}
+                              onClick={() => handleIncrease(item)}
                             >
                               +
                             </button>
@@ -230,7 +358,7 @@ export default function BasketPage() {
 
                           {/* Delete */}
                           <button
-                            onClick={() => remove(item.id)}
+                            onClick={() => handleRemove(item)}
                             className="justify-self-end text-gray-400 hover:text-red-600"
                             aria-label="Remove item"
                           >
@@ -324,7 +452,7 @@ export default function BasketPage() {
                         <div className="flex items-center gap-5 rounded-lg bg-gray-100 px-4 py-2 text-gray-500">
                           <button
                             className="text-xl leading-none hover:text-gray-700"
-                            onClick={() => decrease(item.id)}
+                            onClick={() => handleDecrease(item)}
                           >
                             –
                           </button>
@@ -365,14 +493,14 @@ export default function BasketPage() {
 
                           <button
                             className="text-xl leading-none hover:text-gray-700"
-                            onClick={() => increase(item.id)}
+                            onClick={() => handleIncrease(item)}
                           >
                             +
                           </button>
                         </div>
 
                         <button
-                          onClick={() => remove(item.id)}
+                          onClick={() => handleRemove(item)}
                           className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 hover:text-red-600"
                           aria-label="Remove item"
                         >
@@ -388,7 +516,7 @@ export default function BasketPage() {
             </div>
 
             {/* Summary panel */}
-            <aside className="w-full lg:w-auto lg:max-w-[320px] order-last lg:order-none">
+            <aside className="w-full lg:w-auto lg:max-w-xs order-last lg:order-0">
               <div className="bg-white border rounded-xl p-5 lg:sticky lg:top-28">
                 <h3 className="font-bold text-lg">Cart Summary</h3>
                 <div className="mt-4 text-sm text-gray-600 flex items-center justify-between">

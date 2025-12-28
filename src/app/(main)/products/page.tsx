@@ -47,11 +47,9 @@ export default function ProductsPage() {
     filters.desc,
     filters.stock,
     searchTerm,
+    fetchProducts,
+    filters,
   ]);
-
-  const clearFilter = (key: keyof typeof filters) => {
-    setFilters((prev) => ({ ...prev, [key]: "" }));
-  };
 
   const clearAllFilters = () => {
     setFilters({
@@ -240,6 +238,7 @@ export default function ProductsPage() {
                   price={price}
                   image={image}
                   oems={[]}
+                  variantId={`gid://shopify/ProductVariant/${product.raw.variants?.[0]?.id}`}
                   location="CHICAGO"
                   inStock={true}
                 />

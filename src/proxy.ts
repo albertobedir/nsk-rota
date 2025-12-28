@@ -45,6 +45,27 @@ export function proxy(req: NextRequest) {
     );
   }
 
+  // --- User-specific Shopify metaobject sync (from middleware) ---
+  const shouldSync =
+    pathname.startsWith("/products/") ||
+    pathname === "/products" ||
+    pathname === "/cart";
+
+  if (shouldSync) {
+    const customerId = req.cookies.get("customer_id")?.value;
+    if (customerId) {
+      try {
+        void fetch(new URL("/api/sync/user", req.nextUrl).toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ customerId }),
+        });
+      } catch (e) {
+        console.error("proxy: failed to kick off user sync", e);
+      }
+    }
+  }
+
   return NextResponse.next();
 }
 

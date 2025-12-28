@@ -40,6 +40,9 @@ export async function GET(request: NextRequest) {
             }
           }
         }
+        creditLimit: metafield(namespace: "custom", key: "credit_limit") { value type }
+        creditUsed: metafield(namespace: "custom", key: "credit_used") { value type }
+        creditRemaining: metafield(namespace: "custom", key: "credit_remaining") { value type }
       }
     }
   `;

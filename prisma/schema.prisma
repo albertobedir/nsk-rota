@@ -61,5 +61,22 @@ model CustomerPricing {
 }
 
 
+model Customer {
+  id              String   @id @default(cuid())
+  shopifyId       String   @unique
+  email           String
+  firstName       String?
+  lastName        String?
+  phone           String?
+  creditLimit     Decimal? @db.Decimal(10, 2)
+  creditUsed      Decimal? @db.Decimal(10, 2)
+  creditRemaining Decimal? @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([shopifyId])
+}
+
+
 
 

@@ -9,6 +9,7 @@ import Logo from "./logo";
 import NavbarModal from "./navbar-modal";
 import Search from "./search";
 import useSessionStore from "@/store/session-store";
+import { auth } from "@/lib/axios/auth";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -23,6 +24,21 @@ export default function Navbar() {
   const [mounted, setMounted] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
+
+  // Refresh session on mount so credit values reflect latest server state
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        await auth.getSession();
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <nav className="relative  flex flex-col gap-4 bg-white shadow shadow-accent z-50">

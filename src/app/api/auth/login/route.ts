@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import bcrypt from "bcrypt";
@@ -6,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma/instance";
 import { shopifyFetch } from "@/lib/shopify/instance";
+import { createCart, getCart } from "@/lib/shopify/cart";
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET!;
@@ -142,6 +145,50 @@ export async function POST(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 30, // örn: 30 gün
       sameSite: "lax",
     });
+
+    // Store Shopify customer GID so middleware/proxy can run user-scoped sync
+    res.cookies.set("customer_id", shopifyCustomer.id, {
+      httpOnly: true,
+      secure: false,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+      sameSite: "lax",
+    });
+
+    // Ensure the user has a Shopify cart: reuse existing or create a new one
+    try {
+      const existingCartCookie = request.cookies.get("shopifyCartId");
+      const existingCartId = existingCartCookie?.value;
+
+      let cartObj: any = null;
+
+      if (existingCartId) {
+        try {
+          cartObj = await getCart(existingCartId);
+        } catch (e) {
+          cartObj = null;
+        }
+      }
+
+      if (!cartObj) {
+        // createCart returns the GraphQL payload (cartCreate)
+        const created = await createCart();
+        // created.cart should contain the cart object
+        const newCart = created?.cart ?? null;
+        if (newCart?.id) {
+          res.cookies.set("shopifyCartId", newCart.id, {
+            httpOnly: true,
+            secure: false,
+            path: "/",
+            maxAge: 60 * 60 * 24 * 30,
+            sameSite: "lax",
+          });
+        }
+      }
+    } catch (e) {
+      // non-fatal: continue login even if cart check/create fails
+      console.warn("Cart check/create failed:", e);
+    }
 
     return res;
   } catch (err) {

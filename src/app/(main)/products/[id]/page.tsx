@@ -120,6 +120,19 @@ export default function ProductDetailPage() {
       // Shopify variant ID'yi al (GID formatında olmalı)
       const variantId = `gid://shopify/ProductVariant/${raw.variants[0].id}`;
 
+      // Call server API to add to Shopify cart
+      const resp = await fetch("/api/cart/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ merchandiseId: variantId, quantity: qty }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => null);
+        throw new Error(err?.message || "Failed to add to cart");
+      }
+
+      // Update local session store for immediate UI feedback
       await addToCart({
         id: rotaNo || String(id),
         title,
@@ -129,7 +142,6 @@ export default function ProductDetailPage() {
         quantity: qty,
       });
 
-      // Başarılı mesajı göster
       toast.success("Product added to cart!");
     } catch (error) {
       console.error("Add to cart failed:", error);
