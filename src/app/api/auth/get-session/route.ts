@@ -23,7 +23,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({ where: { id: String(userId) } });
+    const user = await prisma.user.findUnique({
+      where: { id: String(userId) },
+    });
     if (!user) return NextResponse.json({ user: null });
 
     // format credit fields as numbers for client session
