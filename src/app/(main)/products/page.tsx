@@ -91,6 +91,28 @@ export default function ProductsPage() {
     });
   };
 
+  const applyFilters = async (pageNum = 1) => {
+    setPage(pageNum);
+
+    // update URL params so link/share reflects filters
+    try {
+      const params = new URLSearchParams();
+      if (filters.brand) params.set("brand", filters.brand);
+      if (filters.model) params.set("model", filters.model);
+      if (filters.type) params.set("type", filters.type);
+      if (filters.desc) params.set("desc", filters.desc);
+      if (filters.stock) params.set("stock", filters.stock);
+      params.set("page", String(pageNum));
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState({}, "", newUrl);
+    } catch (e) {
+      /* ignore */
+    }
+
+    // fetch with current filters
+    await fetchProducts(pageNum, perPage, filters);
+  };
+
   return (
     <div className="w-full">
       {/* PAGE HEADER */}
@@ -110,6 +132,7 @@ export default function ProductsPage() {
               <span className="text-[#1f1f1f]">Product Search</span>
             </div>
             <Image
+              className="-mt-[5rem]"
               src="/tecdoc.png"
               alt="TecDoc Data Supplier"
               width={180}
@@ -199,13 +222,20 @@ export default function ProductsPage() {
           w-full
         "
         >
-          <Button className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center">
+          <Button
+            className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center"
+            onClick={() => applyFilters(1)}
+          >
             Find Product <Search size={18} />
           </Button>
 
           <Button
             className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center"
-            onClick={clearAllFilters}
+            onClick={() => {
+              clearAllFilters();
+              // apply cleared filters immediately
+              setTimeout(() => applyFilters(1), 0);
+            }}
           >
             Clear Selections <X size={18} />
           </Button>
@@ -259,6 +289,21 @@ export default function ProductsPage() {
                 product.raw.metafields.find((m) => m.key === "rota_no")
                   ?.value ?? "Unknown";
 
+              // determine match type based on active searchTerm
+              const matchType = (() => {
+                const q = (searchTerm ?? "").toString().trim();
+                if (!q) return undefined;
+                const lowerQ = q.toLowerCase();
+                const codeStr = String(code ?? "").toLowerCase();
+                const titleStr = String(product.raw.title ?? "").toLowerCase();
+
+                if (codeStr === lowerQ || titleStr === lowerQ)
+                  return "exact" as const;
+                if (codeStr.includes(lowerQ) || titleStr.includes(lowerQ))
+                  return "partial" as const;
+                return undefined;
+              })();
+
               return (
                 <SingleProdCard
                   key={product._id}
@@ -271,6 +316,7 @@ export default function ProductsPage() {
                   variantId={`gid://shopify/ProductVariant/${product.raw.variants?.[0]?.id}`}
                   location="CHICAGO"
                   inStock={true}
+                  matchType={matchType}
                 />
               );
             })}
@@ -278,28 +324,30 @@ export default function ProductsPage() {
         )}
       </div>
 
-      {/* PAGINATION */}
-      <div className="flex justify-center items-center gap-4 mt-6">
-        <button
-          disabled={page === 1}
-          onClick={() => setPage((p) => p - 1)}
-          className="px-4 py-2 bg-muted rounded disabled:opacity-40"
-        >
-          Prev
-        </button>
+      {/* PAGINATION: hide when there are no products (prevents looping) */}
+      {products.length > 0 && totalPages > 1 && (
+        <div className="flex justify-center items-center gap-4 mt-6">
+          <button
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+            className="px-4 py-2 bg-muted rounded disabled:opacity-40"
+          >
+            Prev
+          </button>
 
-        <span>
-          {page} / {totalPages}
-        </span>
+          <span>
+            {page} / {totalPages}
+          </span>
 
-        <button
-          disabled={page === totalPages}
-          onClick={() => setPage((p) => p + 1)}
-          className="px-4 py-2 bg-muted rounded disabled:opacity-40"
-        >
-          Next
-        </button>
-      </div>
+          <button
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="px-4 py-2 bg-muted rounded disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 }

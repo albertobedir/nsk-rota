@@ -20,6 +20,7 @@ interface ProductCardProps {
   inStock?: boolean;
   stock?: number | string;
   variantId?: string;
+  matchType?: "exact" | "partial" | undefined;
 }
 
 export default function SingleProdCard({
@@ -33,15 +34,28 @@ export default function SingleProdCard({
   inStock = false,
   stock,
   variantId,
+  matchType,
 }: ProductCardProps) {
   const addToCart = useSessionStore((s) => s.addToCart);
 
-  const [qty, setQty] = useState<number>(1);
+  // use string so user can clear the field while typing (e.g. replace "1" with "300")
+  const [qty, setQty] = useState<string>("1");
 
   return (
     <Card className="shadow-none flex flex-col gap-0 bg-transparent rounded-md w-70 p-0 border-2">
       <div className="relative w-68 rounded-t-[inherit] aspect-square">
-        {/* TOP BADGES: icons only (pin + stock) */}
+        {/* Match badge overlay (top-left) */}
+        {matchType ? (
+          <div
+            className="absolute left-3 top-3 z-10 px-2 py-1 rounded text-sm font-semibold"
+            style={{
+              background: matchType === "exact" ? "#def7ec" : "#fff4e6",
+              color: matchType === "exact" ? "#065f46" : "#b45309",
+            }}
+          >
+            {matchType === "exact" ? "Exact match" : "Partial match"}
+          </div>
+        ) : null}
 
         <Image
           alt={title}
@@ -63,7 +77,11 @@ export default function SingleProdCard({
         {/* Price under title */}
         <div className="mt-1">
           <span className="text-lg font-bold text-secondary">
-            {price.toFixed(3)} USD
+            {Number(price).toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}{" "}
+            USD
           </span>
         </div>
 
@@ -109,7 +127,17 @@ export default function SingleProdCard({
               type="number"
               min={1}
               value={qty}
-              onChange={(e) => setQty(Math.max(1, Number(e.target.value || 1)))}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "") {
+                  // allow clearing the input
+                  setQty("");
+                  return;
+                }
+                // keep a numeric string with minimum 1
+                const n = Number(v);
+                setQty(String(Math.max(1, Number.isNaN(n) ? 1 : n)));
+              }}
               className="w-20 h-10 px-3 text-center bg-white border-none outline-none"
               aria-label="Quantity"
             />
@@ -123,7 +151,7 @@ export default function SingleProdCard({
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         merchandiseId: variantId,
-                        quantity: qty,
+                        quantity: Number(qty || 1),
                       }),
                     });
 
@@ -139,7 +167,7 @@ export default function SingleProdCard({
                     title,
                     price: Number(price),
                     image,
-                    quantity: qty,
+                    quantity: Number(qty || 1),
                     variantId: variantId ?? "",
                   });
 

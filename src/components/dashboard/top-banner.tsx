@@ -47,7 +47,13 @@ export default function TopBanner() {
         </div>
 
         <div className="flex items-center">
-          <Image src="/tecdoc.png" alt="TecDoc" width={160} height={44} />
+          <Image
+            className="-mt-[1rem]"
+            src="/tecdoc.png"
+            alt="TecDoc"
+            width={160}
+            height={44}
+          />
         </div>
       </div>
     </div>

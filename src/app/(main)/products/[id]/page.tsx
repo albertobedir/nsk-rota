@@ -111,10 +111,12 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<IProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [inchMode, setInchMode] = useState(false);
-  const [qty, setQty] = useState<number>(1);
+  const [addingToCart, setAddingToCart] = useState(false);
+  // use string so user can clear the input while typing (e.g. replace "1" with "300")
+  const [qty, setQty] = useState<string>("1");
 
   const handleAddToCart = async () => {
-    setLoading(true);
+    setAddingToCart(true);
 
     try {
       // Shopify variant ID'yi al (GID formatında olmalı)
@@ -124,7 +126,10 @@ export default function ProductDetailPage() {
       const resp = await fetch("/api/cart/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ merchandiseId: variantId, quantity: qty }),
+        body: JSON.stringify({
+          merchandiseId: variantId,
+          quantity: Number(qty || 1),
+        }),
       });
 
       if (!resp.ok) {
@@ -139,7 +144,7 @@ export default function ProductDetailPage() {
         price: Number(price),
         image,
         variantId,
-        quantity: qty,
+        quantity: Number(qty || 1),
       });
 
       toast.success("Product added to cart!");
@@ -147,7 +152,7 @@ export default function ProductDetailPage() {
       console.error("Add to cart failed:", error);
       toast.error("Failed to add to cart");
     } finally {
-      setLoading(false);
+      setAddingToCart(false);
     }
   };
 
@@ -170,6 +175,10 @@ export default function ProductDetailPage() {
   const raw = product.raw;
   const title = raw.title;
   const price = raw.variants?.[0]?.price ?? "0";
+  const formattedPrice = Number(price).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   const image = raw.images?.[0]?.src ?? "/placeholder.png";
   const rotaNo = raw.metafields.find((m) => m.key === "rota_no")?.value ?? "-";
 
@@ -260,7 +269,7 @@ export default function ProductDetailPage() {
     <div className="w-full">
       {/* PAGE TOP - smaller header */}
       <div className="bg-[#f3f3f3] hidden md:flex">
-        <div className="w-full max-w-[1540px] flex-col md:flex-row gap-2  px-6 mx-auto flex items-center justify-between py-10">
+        <div className="w-full max-w-[1500px] flex-col md:flex-row gap-2  px-6 mx-auto flex items-center justify-between py-10">
           <div>
             <h1 className="font-bold text-3xl md:text-4xl">Product Detail</h1>
             <div className="mt-2 text-sm text-muted-foreground">
@@ -271,7 +280,13 @@ export default function ProductDetailPage() {
           </div>
 
           <div className="flex items-center">
-            <Image src="/tecdoc.png" alt="TecDoc" width={160} height={44} />
+            <Image
+              className="-mt-[1rem]"
+              src="/tecdoc.png"
+              alt="TecDoc"
+              width={160}
+              height={44}
+            />
           </div>
         </div>
       </div>
@@ -280,14 +295,16 @@ export default function ProductDetailPage() {
       {MobileCarousel}
 
       {/* MAIN GRID */}
-      <div className="container px-4 md:px-30 py-12 grid grid-cols-1 lg:grid-cols-2 gap-10">
+      <div className="container px-0 md:px-10 py-12 grid grid-cols-1 lg:grid-cols-2 gap-10">
         {/* LEFT SIDE */}
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl md:text-4xl font-bold">{title}</h1>
           <h2 className="text-2xl md:text-6xl font-semibold text-gray-700">
             {rotaNo}
           </h2>
-          <p className="text-3xl md:text-3xl font-bold">${price} USD</p>
+          <p className="text-3xl md:text-3xl font-bold">
+            ${formattedPrice} USD
+          </p>
 
           {/* Badges */}
           <div className="flex flex-wrap gap-3 mt-2">
@@ -322,9 +339,12 @@ export default function ProductDetailPage() {
                 type="number"
                 min={1}
                 value={qty}
-                onChange={(e) =>
-                  setQty(Math.max(1, Number(e.target.value || 1)))
-                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "") return setQty("");
+                  const n = Number(v);
+                  setQty(String(Math.max(1, Number.isNaN(n) ? 1 : n)));
+                }}
                 className="w-28 h-14 px-3 text-center bg-white border-none outline-none"
                 aria-label="Quantity"
               />
@@ -332,8 +352,9 @@ export default function ProductDetailPage() {
               <Button
                 onClick={handleAddToCart}
                 className="flex-1 bg-secondary text-white font-bold h-14"
+                disabled={addingToCart}
               >
-                ADD TO CART
+                {addingToCart ? "Adding..." : "ADD TO CART"}
               </Button>
             </div>
           </div>
@@ -379,7 +400,6 @@ export default function ProductDetailPage() {
           {/* Mobile tech info */}
           <div className="lg:hidden">{TechnicalInfo}</div>
         </div>
-
         {/* RIGHT SIDE DESKTOP */}
         <div className="hidden lg:flex flex-col gap-6">
           {/* DESKTOP CAROUSEL — FIXED */}

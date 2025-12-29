@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import { Trash2 } from "lucide-react";
 import useSessionStore from "@/store/session-store";
@@ -18,6 +19,7 @@ export default function BasketPage() {
   const [qtyDraft, setQtyDraft] = useState<Record<string, string>>({});
 
   const clearCartStore = useSessionStore((s) => s.clearCart);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Clear entire cart both locally and on server
   const clearAll = async () => {
@@ -28,6 +30,7 @@ export default function BasketPage() {
         throw new Error(err?.message || "Failed to clear cart");
       }
       clearCartStore();
+      setShowClearConfirm(false);
       toast.success("Cart cleared");
     } catch (e) {
       console.error("Clear cart failed:", e);
@@ -177,7 +180,7 @@ export default function BasketPage() {
     <Hydrate>
       {/* HEADER */}
       <div className="bg-[#f3f3f3] py-14">
-        <div className="mx-auto w-full max-w-[1200px] px-4">
+        <div className="mx-auto w-full max-w-[1500px] px-4">
           <h1 className="font-extrabold text-4xl md:text-5xl text-[#2b2b2b]">
             Offer Cart
           </h1>
@@ -195,6 +198,36 @@ export default function BasketPage() {
       {/* CONTENT */}
       <div className="w-full bg-[#fafafa] py-10 px-4 md:px-8 lg:px-40">
         <div className="mx-auto w-full max-w-[1200px] px-4">
+          {/* Confirm Clear Modal */}
+          {showClearConfirm ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div
+                className="absolute inset-0 bg-black/40"
+                onClick={() => setShowClearConfirm(false)}
+              />
+              <div className="relative bg-white rounded-lg shadow-lg w-[90%] max-w-md p-6 z-10">
+                <h3 className="text-lg font-bold mb-2">Confirm clear</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Are you sure you want to clear the offer list? This will
+                  remove all items from your cart.
+                </p>
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowClearConfirm(false)}
+                    className="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => clearAll()}
+                    className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+                  >
+                    Yes, clear
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="flex md:flex-row flex-col justify-center gap-4 items-start w-full">
             <div>
               {/* Desktop header row (table head) */}
@@ -215,7 +248,7 @@ export default function BasketPage() {
                     </div>
 
                     <button
-                      onClick={clearAll}
+                      onClick={() => setShowClearConfirm(true)}
                       className="justify-self-end flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-gray-50 text-[#2b2b2b]"
                     >
                       <Trash2 className="shrink-0" />
@@ -231,7 +264,7 @@ export default function BasketPage() {
 
               {/* Empty */}
               {cart.length === 0 && (
-                <div className="mt-10 bg-white border rounded-xl p-10 text-center">
+                <div className="mt-10 w-[1200px] bg-white border rounded-xl p-10 text-center">
                   <p className="text-2xl font-bold text-gray-500">
                     Your cart is empty.
                   </p>
@@ -259,8 +292,11 @@ export default function BasketPage() {
                             {item.subtitle ?? '""'}
                           </div>
 
-                          {/* Product */}
-                          <div className="flex items-center gap-4">
+                          {/* Product (clickable) */}
+                          <Link
+                            href={`/products/${item.id}`}
+                            className="flex items-center gap-4 cursor-pointer"
+                          >
                             <div className="relative h-16 w-16 rounded-lg border bg-white overflow-hidden">
                               <Image
                                 src={item.image}
@@ -297,7 +333,7 @@ export default function BasketPage() {
                                 </span>
                               </div>
                             </div>
-                          </div>
+                          </Link>
 
                           {/* ROTA No */}
                           <div className="font-extrabold text-lg text-[#2b2b2b]">
@@ -398,7 +434,10 @@ export default function BasketPage() {
                       <p className="text-sm font-bold text-[#1f3b7b]">
                         Ürün Adı:
                       </p>
-                      <div className="mt-2 flex items-center gap-3">
+                      <Link
+                        href={`/products/${item.id}`}
+                        className="mt-2 flex items-center gap-3 cursor-pointer"
+                      >
                         <div className="relative h-16 w-16 rounded-lg border bg-white overflow-hidden shrink-0">
                           <Image
                             src={item.image}
@@ -436,7 +475,7 @@ export default function BasketPage() {
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </Link>
 
                       <div className="mt-4">
                         <p className="text-sm font-bold text-[#1f3b7b]">

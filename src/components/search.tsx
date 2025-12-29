@@ -86,7 +86,7 @@ export default function Search() {
   return (
     <div className="shadow-[0px_0px_20px_0px_#000] shadow-muted-foreground/30 rounded-xl w-full sm:flex-row flex flex-col sm:items-start">
       {/* LEFT BUTTONS */}
-      <div className="flex sm:grid sm:grid-rows-2 sm:-mr-5 sm:pr-2 relative z-0 bg-[#e8e8e8] rounded-l-xl sm:h-18 h-13 overflow-hidden">
+      <div className="flex sm:grid sm:grid-rows-2 sm:-mr-3 sm:pr-2 relative z-0 bg-[#e8e8e8] rounded-l-xl sm:h-18 h-13 overflow-hidden">
         <button
           className={cn(
             "h-full w-full flex sm:pl-0 items-center gap-2 sm:px-4 pr-8 py-1 rounded-none cursor-pointer font-semibold pl-5",
