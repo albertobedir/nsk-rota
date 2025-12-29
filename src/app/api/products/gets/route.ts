@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { connectDB } from "@/lib/mongoose/instance";
 import Product from "@/schemas/mongoose/product";
 import { NextRequest, NextResponse } from "next/server";
@@ -35,7 +37,7 @@ export async function GET(req: NextRequest) {
       competitor = "",
       stockStatus = "",
       location = "",
-    } = Object.fromEntries(req.nextUrl.searchParams);
+    } = Object.fromEntries(req.nextUrl.searchParams) as Record<string, string>;
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
@@ -161,14 +163,17 @@ export async function GET(req: NextRequest) {
     const query =
       metafieldConditions.length > 0 ? { $and: metafieldConditions } : {};
 
-    const batchResults = await Product.find(query)
+    const batchResults = (await Product.find(query)
       .sort({ createdAt: -1 })
       .skip(skipBatch)
       .limit(batchNum)
-      .lean();
+      .lean()) as any[];
 
     const sliceStart = ((pageNum - 1) * limitNum) % batchNum;
-    const results = batchResults.slice(sliceStart, sliceStart + limitNum);
+    const results = batchResults.slice(
+      sliceStart,
+      sliceStart + limitNum
+    ) as any[];
 
     const total = await Product.countDocuments(query);
 
@@ -213,13 +218,17 @@ export async function GET(req: NextRequest) {
         if (Object.keys(priceMap).length > 0) {
           for (const p of results) {
             try {
-              const shopifyId = String(p.shopifyId);
+              const shopifyId = String((p as any).shopifyId);
               const cp = priceMap[shopifyId];
-              if (cp != null && p.raw?.variants && p.raw.variants.length) {
+              if (
+                cp != null &&
+                Array.isArray((p as any).raw?.variants) &&
+                (p as any).raw.variants.length > 0
+              ) {
                 // override first variant price (string expected)
-                p.raw.variants[0].price = String(cp.toFixed(2));
+                (p as any).raw.variants[0].price = String(cp.toFixed(2));
                 // also expose a convenient currentPrice field
-                p.currentPrice = String(cp.toFixed(2));
+                (p as any).currentPrice = String(cp.toFixed(2));
               }
             } catch (e) {
               /* ignore per-item errors */

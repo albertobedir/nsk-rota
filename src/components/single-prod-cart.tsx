@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState } from "react";
@@ -17,6 +18,7 @@ interface ProductCardProps {
   oems?: string[]; // OEM list
   location?: string;
   inStock?: boolean;
+  stock?: number | string;
   variantId?: string;
 }
 
@@ -29,6 +31,7 @@ export default function SingleProdCard({
   oems = [],
   location = "",
   inStock = false,
+  stock,
   variantId,
 }: ProductCardProps) {
   const addToCart = useSessionStore((s) => s.addToCart);
@@ -36,8 +39,8 @@ export default function SingleProdCard({
   const [qty, setQty] = useState<number>(1);
 
   return (
-    <Card className="shadow-none flex flex-col gap-0 bg-transparent rounded-md w-60 p-0 border-2">
-      <div className="relative w-58 rounded-t-[inherit] aspect-square">
+    <Card className="shadow-none flex flex-col gap-0 bg-transparent rounded-md w-70 p-0 border-2">
+      <div className="relative w-68 rounded-t-[inherit] aspect-square">
         {/* TOP BADGES: icons only (pin + stock) */}
 
         <Image
@@ -64,30 +67,38 @@ export default function SingleProdCard({
           </span>
         </div>
 
-        {/* OEM STATIC DATA */}
-        <div className="relative h-[60px] overflow-hidden text-sm leading-[1.35] pr-3">
-          <div className="absolute right-0 top-0 w-[4px] h-full bg-[#f5a623] rounded-full"></div>
+        {/* OEM dynamic list (first 3) */}
+        {oems && oems.length > 0 ? (
+          <div className="relative h-[60px] overflow-hidden text-sm leading-[1.35] pr-3">
+            <div className="absolute right-0 top-0 w-[4px] h-full bg-[#f5a623] rounded-full"></div>
+            {oems.slice(0, 3).map((oem, i) => (
+              <p key={i} className="font-semibold">
+                <span className="font-normal">{oem}</span>
+              </p>
+            ))}
+          </div>
+        ) : null}
 
-          <p className="font-semibold">
-            NISSAN : <span className="font-normal">4016000QAB</span>
-          </p>
-          <p className="font-semibold">
-            OPEL : <span className="font-normal">45000254 9160554</span>
-          </p>
-          <p className="font-semibold">
-            RENAULT : <span className="font-normal">7700312851</span>
-          </p>
-        </div>
-
-        {/* Small static badges (location, stock qty, delivery) */}
+        {/* Dynamic badges (location, stock) */}
         <div className="flex flex-wrap gap-2 items-center">
           <div className="flex items-center gap-1 text-blue-600 font-bold">
             <Icons name="konum" />
-            CHICAGO
+            {location || "—"}
           </div>
-          <div className="flex items-center gap-1 font-bold text-green-600">
+          <div
+            className={`flex items-center gap-1 font-bold ${
+              inStock ? "text-green-600" : "text-red-600"
+            }`}
+          >
             <Icons name="stock" />
-            20 in stock
+            {stock !== undefined && stock !== null
+              ? (() => {
+                  const n = Number(stock as any);
+                  return !Number.isNaN(n) ? `${n} in stock` : String(stock);
+                })()
+              : inStock
+              ? "In stock"
+              : "Out of stock"}
           </div>
         </div>
 

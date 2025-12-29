@@ -15,7 +15,14 @@ export function proxy(req: NextRequest) {
 
   // App Router route'ları tam path olarak tanımlanmalı
   const auth_routes = ["/auth/login", "/auth/subscribe", "/auth/logout"];
-  const protected_routes = ["/basket"];
+  const protected_routes = [
+    "/basket",
+    "/profile",
+    "/orders",
+    "/order-history",
+    "/products",
+    "/cart",
+  ];
 
   const access_token = req.cookies.get("access_token")?.value ?? null;
   const refresh_token = req.cookies.get("refresh_token")?.value ?? null;

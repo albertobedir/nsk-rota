@@ -1,3 +1,6 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -29,27 +32,54 @@ export default function ProductsPage() {
     stock: "",
   });
 
+  const [options, setOptions] = useState<{
+    brand: string[];
+    model: string[];
+    type: string[];
+    desc: string[];
+    stock: string[];
+  }>({ brand: [], model: [], type: [], desc: [], stock: [] });
+
   const totalPages = Math.ceil(total / perPage);
 
   useEffect(() => {
+    // On mount: fetch dynamic filter options and restore any URL params.
+    const fetchOptions = async () => {
+      try {
+        const res = await fetch("/api/products/options");
+        const json = await res.json();
+        if (json?.ok && json.options) setOptions(json.options);
+      } catch (e) {
+        // ignore — we'll fall back to static lists below
+      }
+
+      // restore filters from URL if present
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const restore: any = {};
+        for (const k of ["brand", "model", "type", "desc", "stock"]) {
+          const v = params.get(k);
+          if (v) restore[k] = v;
+        }
+        const p = params.get("page");
+        if (Object.keys(restore).length)
+          setFilters((prev) => ({ ...prev, ...restore }));
+        if (p) setPage(Number(p));
+      } catch (e) {
+        /* ignore */
+      }
+    };
+
+    fetchOptions();
+
     // If there's an active searchTerm (coming from another page),
     // don't override it by fetching the default product list on mount.
     if (searchTerm && searchTerm.trim() !== "") return;
 
+    // initial load (no filter-auto-fetch): fetch current page with current filters
     fetchProducts(page, perPage, filters);
-    // Use individual filter fields in deps so the dependency array
-    // length/order stays constant between renders.
-  }, [
-    page,
-    filters.brand,
-    filters.model,
-    filters.type,
-    filters.desc,
-    filters.stock,
-    searchTerm,
-    fetchProducts,
-    filters,
-  ]);
+    // Only re-run when page or searchTerm changes — filters won't auto-trigger searches
+  }, [page, searchTerm, fetchProducts]);
 
   const clearAllFilters = () => {
     setFilters({
@@ -64,8 +94,8 @@ export default function ProductsPage() {
   return (
     <div className="w-full">
       {/* PAGE HEADER */}
-      <div className="bg-[#f3f3f3] py-16">
-        <div className="w-full max-w-[1240px] px-6 mx-auto">
+      <div className="bg-[#f3f3f3] py-10">
+        <div className="w-full max-w-[1540px] px-6 mx-auto">
           <h1 className="font-bold text-4xl md:text-5xl text-[#1f1f1f]">
             Product Search
           </h1>
@@ -91,7 +121,7 @@ export default function ProductsPage() {
       </div>
 
       {/* FILTER SECTION */}
-      <div className="mx-auto w-full max-w-[1240px] px-6 mt-4 mb-12 flex flex-col gap-8">
+      <div className="mx-auto w-full max-w-[1540px] px-6 mt-4 mb-12 flex flex-col gap-8">
         {/* FILTER SELECTS */}
         <div
           className="
@@ -201,7 +231,7 @@ export default function ProductsPage() {
       </div>
 
       {/* PRODUCT GRID */}
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-12">
+      <div className="mx-auto w-full max-w-[1540px] px-4 py-10">
         {searchTerm && products.length === 0 ? (
           <div className="w-full py-24 flex flex-col items-center justify-center">
             <p className="text-xl font-semibold">No results found</p>

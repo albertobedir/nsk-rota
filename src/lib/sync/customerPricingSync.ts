@@ -1,5 +1,5 @@
-import { getAllCustomerPricing } from "@/lib/shopify/customerPricing";
 import prisma from "@/lib/prisma/instance";
+import getAllCustomerPricing from "../shopify/customerPricing";
 
 export async function syncCustomerPricingToDatabase() {
   console.log("🔄 Starting customer pricing sync...");
@@ -15,7 +15,6 @@ export async function syncCustomerPricingToDatabase() {
         where: { metaobjectId: pricing.id },
         update: {
           customerId: pricing.customerId ?? "",
-          productId: pricing.productId ?? "",
           price: pricing.price ?? 0,
           updatedAt: pricing.updatedAt
             ? new Date(pricing.updatedAt)
@@ -24,7 +23,6 @@ export async function syncCustomerPricingToDatabase() {
         create: {
           metaobjectId: pricing.id,
           customerId: pricing.customerId ?? "",
-          productId: pricing.productId ?? "",
           price: pricing.price ?? 0,
           createdAt: pricing.updatedAt
             ? new Date(pricing.updatedAt)
@@ -41,18 +39,16 @@ export async function syncCustomerPricingToDatabase() {
     }
   }
 
-  // Soft-delete any DB entries that no longer exist in Shopify metaobjects
+  // Remove any DB entries that no longer exist in Shopify metaobjects
   const shopifyIds = metaobjects.map((m) => m.id);
   try {
-    await prisma.customerPricing.updateMany({
+    await prisma.customerPricing.deleteMany({
       where: {
         metaobjectId: { notIn: shopifyIds },
-        deletedAt: null,
       },
-      data: { deletedAt: new Date() },
     });
   } catch (e) {
-    console.warn("Failed to mark deleted metaobjects:", e);
+    console.warn("Failed to remove deleted metaobjects:", e);
   }
 
   console.log(

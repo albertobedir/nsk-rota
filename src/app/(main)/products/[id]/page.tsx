@@ -254,12 +254,13 @@ export default function ProductDetailPage() {
   );
 
   /* ---------------------- HTML ---------------------- */
+  console.log(product);
 
   return (
     <div className="w-full">
       {/* PAGE TOP - smaller header */}
       <div className="bg-[#f3f3f3] hidden md:flex">
-        <div className="w-full max-w-[1240px] flex-col md:flex-row gap-2  px-6 mx-auto flex items-center justify-between py-20">
+        <div className="w-full max-w-[1540px] flex-col md:flex-row gap-2  px-6 mx-auto flex items-center justify-between py-10">
           <div>
             <h1 className="font-bold text-3xl md:text-4xl">Product Detail</h1>
             <div className="mt-2 text-sm text-muted-foreground">

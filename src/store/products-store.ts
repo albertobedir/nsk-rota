@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { create } from "zustand";
 
 interface ShopifyImage {
@@ -6,6 +7,7 @@ interface ShopifyImage {
 }
 
 interface ShopifyVariant {
+  inventory_quantity: any;
   id: number;
   price: string;
   sku?: string | null;
