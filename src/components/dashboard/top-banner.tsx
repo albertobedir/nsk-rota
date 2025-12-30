@@ -22,6 +22,8 @@ export default function TopBanner() {
       return { title: "Wire Transfer Information", rotaNo: "" };
     if (p.startsWith("/profile/order-history/"))
       return { title: "Order", rotaNo: p.split("/").pop() || "" };
+    if (p.startsWith("/profile/orders/"))
+      return { title: "Order Detail", rotaNo: p.split("/").pop() || "" };
     // fallback for product detail like pages
     if (p.startsWith("/products/") || p.startsWith("/product/"))
       return { title: "Product Detail", rotaNo: p.split("/").pop() || "" };

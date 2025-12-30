@@ -276,9 +276,9 @@ export default function BasketPage() {
                 {cart.map((item) => (
                   <div key={item.id}>
                     {/* Desktop row */}
-                    <div className="hidden lg:block">
-                      <div className="bg-white border rounded-xl px-8 py-6 overflow-hidden">
-                        <div className="grid grid-cols-[140px_140px_1fr_120px_120px_80px] items-center gap-4">
+                    <div className="hidden lg:block w-[1200px]">
+                      <div className="bg-white  border rounded-xl px-8 py-6 overflow-hidden">
+                        <div className="grid grid-cols-[140px_260px_1fr_120px_120px_80px] items-center gap-4">
                           {/* Matching Type */}
                           <div className="flex items-center gap-2 text-gray-600">
                             <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-white text-xs">
@@ -314,22 +314,18 @@ export default function BasketPage() {
                               </p>
 
                               <div className="mt-1 text-sm text-gray-700 flex items-center gap-4">
-                                <span className="text-gray-500">Quantity:</span>
-                                <span className="font-semibold">
-                                  {(item.price ?? 0).toLocaleString("en-US", {
-                                    style: "currency",
-                                    currency: "USD",
-                                  })}
-                                </span>
-                                <span className="text-gray-400">•</span>
-                                <span className="text-gray-500">Total:</span>
                                 <span className="font-semibold">
                                   {(
                                     (item.price ?? 0) * (item.quantity ?? 0)
                                   ).toLocaleString("en-US", {
                                     style: "currency",
                                     currency: "USD",
-                                  })}
+                                  })}{" "}
+                                  (
+                                  <span className="font-normal">
+                                    {item.quantity ?? 0}
+                                  </span>
+                                  )
                                 </span>
                               </div>
                             </div>
@@ -454,25 +450,20 @@ export default function BasketPage() {
                             {item.subtitle ?? ""}
                           </p>
 
-                          <div className="mt-1 text-sm text-gray-700 flex flex-col sm:flex-row items-start gap-0 sm:gap-3">
-                            <div>
-                              <span className="text-gray-500">Quantity:</span>
-                              <span className="font-semibold">
-                                {(item.price ?? 0).toLocaleString("en-US", {
-                                  style: "currency",
-                                  currency: "USD",
-                                })}
+                          <div className="mt-1 text-sm text-gray-700">
+                            <span className="font-semibold">
+                              {(
+                                (item.price ?? 0) * (item.quantity ?? 0)
+                              ).toLocaleString("en-US", {
+                                style: "currency",
+                                currency: "USD",
+                              })}{" "}
+                              (
+                              <span className="font-normal">
+                                {item.quantity ?? 0}
                               </span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Total:</span>
-                              <span className="font-semibold">
-                                {(item.price ?? 0).toLocaleString("en-US", {
-                                  style: "currency",
-                                  currency: "USD",
-                                })}
-                              </span>
-                            </div>
+                              )
+                            </span>
                           </div>
                         </div>
                       </Link>

@@ -6,6 +6,7 @@ import useSessionStore from "@/store/session-store";
 
 type Order = {
   orderNo: string;
+  id?: string;
   invoiceNo?: string;
   b2bNo?: string;
   packing?: boolean;
@@ -19,6 +20,8 @@ type Order = {
   productCode?: string;
   deliveryNote?: string;
 };
+
+import Link from "next/link";
 
 export default function OpenOrdersPage() {
   const [productCode, setProductCode] = useState("");
@@ -70,6 +73,7 @@ export default function OpenOrdersPage() {
 
       const mapped: Order[] = (data.orders || []).map((o: any) => {
         const orderNo = o.name || o.order_number || o.id || "";
+        const id = o.id || "";
         const orderDate = o.createdAt || o.created_at || "";
         const total = o.totalPriceSet?.shopMoney
           ? `${o.totalPriceSet.shopMoney.amount} ${o.totalPriceSet.shopMoney.currencyCode}`
@@ -88,6 +92,7 @@ export default function OpenOrdersPage() {
           o.financial_status ||
           "";
         return {
+          id,
           orderNo,
           orderDate: orderDate?.slice?.(0, 10) || orderDate,
           total,
@@ -284,7 +289,16 @@ export default function OpenOrdersPage() {
                   className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}
                 >
                   <td className="px-6 py-4 text-sm text-slate-800">
-                    {r.orderNo}
+                    {r.id ? (
+                      <Link
+                        href={`/profile/orders/${encodeURIComponent(r.id)}`}
+                        className="text-blue-600 underline"
+                      >
+                        {r.orderNo}
+                      </Link>
+                    ) : (
+                      r.orderNo
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">
                     {r.invoiceNo || "-"}

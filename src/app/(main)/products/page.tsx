@@ -144,7 +144,7 @@ export default function ProductsPage() {
       </div>
 
       {/* FILTER SECTION */}
-      <div className="mx-auto w-full max-w-[1540px] px-6 mt-4 mb-12 flex flex-col gap-8">
+      <div className="mx-auto w-full sm:w-[50%] max-w-[1540px] px-6 mt-20 mb-12 flex flex-col gap-8">
         {/* FILTER SELECTS */}
         <div
           className="

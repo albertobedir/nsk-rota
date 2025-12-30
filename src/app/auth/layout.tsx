@@ -30,7 +30,7 @@ export default function layout({ children }: Props) {
     leading-tight
   "
             >
-              ROTA North America B2B
+              ROTA North America <span className="text-secondary">B2B</span>
             </h1>
 
             <p
@@ -40,11 +40,36 @@ export default function layout({ children }: Props) {
     leading-relaxed
   "
             >
-              This platform is designated for orders shipped directly from our
-              U.S. warehouse. If you already have an account, please “log in”
-              using your e-mail and password. If you are new to our system,
-              please click “Subscribe now” to complete your registration and
-              request access.
+              This platform is designated for{" "}
+              <span className="font-bold">
+                orders shipped directly from our U.S. warehouse.
+              </span>
+            </p>
+            <p
+              className="
+    text-base sm:text-lg md:text-lg 
+    max-w-md sm:max-w-xl md:max-w-2xl 
+    leading-relaxed
+  "
+            >
+              If you already have an account, please
+              <span className="font-bold">
+                {" "}
+                “log in” using your e-mail and password.
+              </span>
+            </p>
+            <p
+              className="
+    text-base sm:text-lg md:text-lg 
+    max-w-md sm:max-w-xl md:max-w-2xl 
+    leading-relaxed
+  "
+            >
+              If you are new to our system, please click
+              <span className="font-bold">
+                “Subscribe now” to complete your registration and request
+                access.
+              </span>
             </p>
           </header>
 

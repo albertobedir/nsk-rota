@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { shopifyAdminFetch } from "@/lib/shopify/instance";
+import { connectDB } from "@/lib/mongoose/instance";
+import Order from "@/schemas/mongoose/order";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +43,45 @@ export async function GET(req: NextRequest) {
       });
       const edges = resp?.data?.customer?.orders?.edges ?? [];
       const orders = edges.map((e: any) => e.node);
+      // persist to Mongo
+      try {
+        await connectDB();
+        for (const o of orders) {
+          let shopifyId = "";
+          if (typeof o.id === "string") shopifyId = String(o.id).split("?")[0];
+          else if (typeof o.admin_graphql_api_id === "string")
+            shopifyId = String(o.admin_graphql_api_id).split("?")[0];
+
+          const orderNumber = o.orderNumber
+            ? Number(o.orderNumber)
+            : o.name
+            ? Number(String(o.name).replace(/^#/, ""))
+            : undefined;
+
+          if (!shopifyId && o.id) shopifyId = String(o.id);
+
+          if (shopifyId) {
+            try {
+              await Order.findOneAndUpdate(
+                { shopifyId },
+                {
+                  $set: {
+                    shopifyId,
+                    orderNumber: orderNumber ?? undefined,
+                    name: o.name ?? undefined,
+                    raw: o,
+                  },
+                },
+                { upsert: true, new: true }
+              );
+            } catch (e) {
+              console.error("Order upsert error", e);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Mongo persist error:", e);
+      }
       return NextResponse.json({ ok: true, orders });
     }
 
@@ -57,7 +98,46 @@ export async function GET(req: NextRequest) {
     );
     if (!r.ok) throw new Error("Shopify REST request failed");
     const data = await r.json();
-    return NextResponse.json({ ok: true, orders: data.orders ?? [] });
+    const orders = data.orders ?? [];
+
+    // persist REST orders to Mongo
+    try {
+      await connectDB();
+      for (const o of orders) {
+        let shopifyId = "";
+        if (typeof o.id === "number" || typeof o.id === "string")
+          shopifyId = String(o.id);
+        else if (o.admin_graphql_api_id)
+          shopifyId = String(o.admin_graphql_api_id).split("?")[0];
+
+        const orderNumber =
+          o.order_number ??
+          (o.name ? Number(String(o.name).replace(/^#/, "")) : undefined);
+
+        if (shopifyId) {
+          try {
+            await Order.findOneAndUpdate(
+              { shopifyId },
+              {
+                $set: {
+                  shopifyId,
+                  orderNumber: orderNumber ?? undefined,
+                  name: o.name ?? undefined,
+                  raw: o,
+                },
+              },
+              { upsert: true, new: true }
+            );
+          } catch (e) {
+            console.error("Order upsert error", e);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Mongo persist error:", e);
+    }
+
+    return NextResponse.json({ ok: true, orders });
   } catch (err) {
     console.error("orders route error:", err);
     return NextResponse.json(
