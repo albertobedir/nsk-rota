@@ -1,10 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useState } from "react";
-import SingleProdCard from "@/components/single-prod-cart";
+import Link from "next/link";
+import SingleProdCard from "./single-prod-cart";
+import { useEffect, useState } from "react";
 
-type Prod = {
-  id: string;
+type Product = {
+  id: string | number;
   code: string;
   title: string;
   price: number;
@@ -12,93 +14,156 @@ type Prod = {
   oems?: string[];
   location?: string;
   inStock?: boolean;
+  stock?: number | string;
+  variantId?: string;
+  matchType?: "exact" | "partial" | undefined;
 };
 
 export default function MiniPaginationGroup({
   title,
-  items,
-  perPage = 4,
+  products,
+  pageSize = 5,
 }: {
   title: string;
-  items?: Prod[];
-  perPage?: number;
+  products?: Product[];
+  pageSize?: number;
 }) {
-  // generate sample items when none provided (dev-friendly)
-  const sample = React.useMemo(() => {
-    if (items && items.length) return items;
-    const arr: Prod[] = [];
-    for (let i = 1; i <= 12; i++) {
-      arr.push({
-        id: `s-${i}`,
-        code: `CODE-${i}`,
-        title: `Sample Product ${i}`,
-        // eslint-disable-next-line react-hooks/purity
-        price: Number((Math.random() * 200 + 10).toFixed(3)),
-        image: "/placeholder.png",
-        oems: [],
-        location: i % 2 === 0 ? "Istanbul" : "Ankara",
-        inStock: i % 3 !== 0,
-      });
+  const [fetched, setFetched] = useState<Product[] | null>(null);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadAll() {
+      try {
+        // fetch many items for now — adjust limit as needed
+        const res = await fetch(`/api/products/gets?page=1&limit=10000`);
+        const json = await res.json();
+        if (!mounted) return;
+
+        if (json?.ok && Array.isArray(json.results)) {
+          const mapped: Product[] = json.results.map((r: any, i: number) => {
+            const raw = r.raw ?? {};
+            const image =
+              (raw?.images && raw.images[0] && raw.images[0].src) ||
+              raw?.image ||
+              "/cr2.jfif";
+            const priceStr =
+              r.currentPrice ??
+              raw?.variants?.[0]?.price ??
+              raw?.variants?.[0]?.price_amount ??
+              0;
+            const price =
+              typeof priceStr === "string"
+                ? parseFloat(priceStr) || 0
+                : Number(priceStr) || 0;
+
+            return {
+              id: r.shopifyId ?? r._id ?? `p-${i}`,
+              code: raw?.handle ?? String(r.shopifyId ?? r._id ?? `p-${i}`),
+              title: raw?.title ?? raw?.name ?? `Product ${i + 1}`,
+              price,
+              image,
+              oems: [],
+              location: "",
+              inStock: true,
+              stock: 0,
+              variantId: raw?.variants?.[0]?.id ?? undefined,
+            } as Product;
+          });
+
+          setFetched(mapped);
+        } else {
+          setFetched([]);
+        }
+      } catch (e) {
+        console.error("Failed to fetch products for MiniPaginationGroup", e);
+        if (mounted) setFetched([]);
+      }
     }
-    return arr;
-  }, [items]);
 
-  const [page, setPage] = useState(0);
-  const pages = Math.max(1, Math.ceil(sample.length / perPage));
-  const start = page * perPage;
-  const pageItems = sample.slice(start, start + perPage);
+    loadAll();
 
-  function prev() {
-    setPage((p) => Math.max(0, p - 1));
-  }
-  function next() {
-    setPage((p) => Math.min(p + 1, pages - 1));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const allProducts =
+    products && products.length > 0 ? products : fetched ?? [];
+  const total = allProducts.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const pageItems = allProducts.slice((page - 1) * pageSize, page * pageSize);
+
+  function goto(p: number) {
+    setPage(Math.min(Math.max(1, p), totalPages));
   }
 
   return (
-    <section className="py-6 w-full">
-      <div className="container">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">{title}</h3>
+    <section className="w-full px-4 md:px-6 lg:px-12 py-6">
+      <div className="flex items-center justify-between mb-4 w-full">
+        <h3 className="text-xl font-semibold">{title}</h3>
+        <Link href="#" className="text-sm text-primary hover:underline">
+          See All
+        </Link>
+      </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={prev}
-              className="px-3 py-2 rounded-md bg-white border text-sm text-slate-700 disabled:opacity-40"
-              disabled={page === 0}
-              aria-label="Previous"
-            >
-              ‹
-            </button>
-            <span className="text-sm text-slate-500">
-              {page + 1} / {pages}
-            </span>
-            <button
-              onClick={next}
-              className="px-3 py-2 rounded-md bg-white border text-sm text-slate-700 disabled:opacity-40"
-              disabled={page >= pages - 1}
-              aria-label="Next"
-            >
-              ›
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {pageItems.map((it) => (
+      <div className="flex flex-row gap-3 sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 sm:gap-4 overflow-x-auto sm:overflow-visible snap-x snap-mandatory py-2">
+        {pageItems.map((p) => (
+          <div
+            key={String(p.id)}
+            className="snap-start shrink-0 w-[60%] sm:w-auto"
+          >
             <SingleProdCard
-              key={it.id}
-              id={it.id}
-              code={it.code}
-              title={it.title}
-              price={it.price}
-              image={it.image}
-              oems={it.oems}
-              location={it.location}
-              inStock={it.inStock}
+              id={p.id}
+              code={p.code}
+              title={p.title}
+              price={p.price}
+              image={p.image}
+              oems={p.oems}
+              location={p.location}
+              inStock={p.inStock}
+              stock={p.stock}
+              variantId={p.variantId}
+              matchType={p.matchType}
             />
-          ))}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex items-center justify-center gap-3">
+        <button
+          onClick={() => goto(page - 1)}
+          disabled={page <= 1}
+          className="px-3 py-1 rounded-md bg-white border shadow-sm disabled:opacity-50"
+        >
+          Prev
+        </button>
+
+        <div className="flex items-center gap-2">
+          {Array.from({ length: totalPages }).map((_, i) => {
+            const p = i + 1;
+            return (
+              <button
+                key={p}
+                onClick={() => goto(p)}
+                className={`px-3 py-1 rounded-md ${
+                  p === page ? "bg-secondary text-white" : "bg-white border"
+                }`}
+              >
+                {p}
+              </button>
+            );
+          })}
         </div>
+
+        <button
+          onClick={() => goto(page + 1)}
+          disabled={page >= totalPages}
+          className="px-3 py-1 rounded-md bg-white border shadow-sm disabled:opacity-50"
+        >
+          Next
+        </button>
       </div>
     </section>
   );

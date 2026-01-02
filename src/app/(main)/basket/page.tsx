@@ -548,8 +548,10 @@ export default function BasketPage() {
             {/* Summary panel */}
             <aside className="w-full lg:w-auto lg:max-w-xs order-last lg:order-0">
               <div className="bg-white border rounded-xl p-5 lg:sticky lg:top-28">
-                <h3 className="font-bold text-lg">Cart Summary</h3>
-                <div className="mt-4 text-sm text-gray-600 flex items-center justify-between">
+                <h3 className="font-bold text-lg translate-y-5">
+                  Cart Summary
+                </h3>
+                <div className="mt-4 text-sm text-gray-600 translate-y-5 flex items-center justify-between">
                   <span>Subtotal</span>
                   <span className="font-semibold">
                     {cartTotalPrice().toLocaleString("en-US", {
@@ -559,16 +561,17 @@ export default function BasketPage() {
                   </span>
                 </div>
 
-                <div className="mt-2 text-sm text-gray-600 flex items-center justify-between">
+                <div className="mt-2 text-sm text-gray-600 translate-y-5 flex items-center justify-between">
                   <span>Shipping</span>
                   <span className="text-sm text-green-600 font-semibold">
                     Free
                   </span>
                 </div>
 
-                <div className="mt-4">
+                <div className="mt-4 opacity-0">
                   <div className="flex gap-2">
                     <input
+                      disabled
                       placeholder="Discount code"
                       className="flex-1 rounded-md border px-3 py-2 text-sm"
                     />

@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import Icons from "./icons";
 import Logo from "./logo";
 import NavbarModal from "./navbar-modal";
@@ -14,6 +16,7 @@ import { auth } from "@/lib/axios/auth";
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
 
   // Zustand cart
   const totalItems = useSessionStore((s) => s.cartTotalItems());
@@ -40,8 +43,33 @@ export default function Navbar() {
     };
   }, []);
 
+  // hide on scroll: when user scrolls down hide navbar, show when scrolling up
+  useEffect(() => {
+    let lastY = typeof window !== "undefined" ? window.scrollY : 0;
+    const onScroll = () => {
+      const current = window.scrollY;
+      if (current > lastY && current > 80) {
+        setHidden(true);
+      } else if (current < lastY) {
+        setHidden(false);
+      }
+      lastY = current;
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <nav className="relative  flex flex-col gap-4 bg-white shadow shadow-accent z-50">
+    <motion.nav
+      initial={false}
+      animate={{ y: hidden ? "-100%" : 0 }}
+      transition={{ duration: 0.42, ease: [0.2, 0.85, 0.25, 1] }}
+      className={cn(
+        "sticky top-0 z-50",
+        "flex flex-col gap-4 bg-white shadow shadow-accent"
+      )}
+    >
       <div className="w-full">
         <div className="h-1.5 bg-primary w-full"></div>
         <div className="container relative flex items-center justify-end">
@@ -51,7 +79,7 @@ export default function Navbar() {
       relative flex items-center justify-center
       rounded-b-md text-white px-30 text-xs font-medium
       max-w-[9.5rem] h-9
-      right-1/2 translate-x-1/2 sm:translate-x-0 sm:right-[18%]
+      right-1/2 translate-x-1/2 sm:translate-x-0 sm:right-[8%]
     "
           >
             {/* Background */}
@@ -79,8 +107,11 @@ export default function Navbar() {
       <div className="pb-11 md:px-20 bg-white z-20">
         <div className="container px-4 relative flex items-center justify-between gap-8 xl:gap-10">
           {/* LOGO */}
-          <Link className="cursor-pointer max-w-56 w-full" href="/">
-            <Logo className="max-w-52 md:-mt-6 text-primary" />
+          <Link
+            className="cursor-pointer w-[110px] sm:w-[140px] md:w-[180px]"
+            href="/"
+          >
+            <Logo className="w-full h-auto md:-mt-4 text-primary" />
           </Link>
 
           {/* RESPONSIVE SEARCH + CREDIT BAR */}
@@ -90,11 +121,19 @@ export default function Navbar() {
               isSearchOpen ? "lg:grid grid" : "lg:grid hidden"
             )}
           >
-            <div className="col-span-6  xl:col-span-4 xl:max-w-full w-full  justify-center flex">
+            <div className="col-span-6 xl:col-span-5 xl:max-w-full w-full justify-center flex relative">
               <Search />
+
+              <button
+                className="absolute top-3 right-3 md:hidden p-2"
+                onClick={() => setIsSearchOpen(false)}
+                aria-label="Close search"
+              >
+                <Icons name="x" width={20} height={20} />
+              </button>
             </div>
 
-            <div className="hidden xl:flex col-span-2 w-full justify-end">
+            <div className="hidden xl:flex col-span-1 w-full justify-end">
               <div className="bg-white p-1   rounded-xl shadow-md w-[220px]">
                 {(() => {
                   const creditLimit = Number(user?.creditLimit ?? 0);
@@ -169,7 +208,9 @@ export default function Navbar() {
             {/* MOBILE SEARCH BUTTON */}
             <button
               className="cursor-pointer md:hidden"
-              onClick={() => setIsSearchOpen(true)}
+              onClick={() => setIsSearchOpen((s) => !s)}
+              aria-expanded={isSearchOpen}
+              aria-label={isSearchOpen ? "Close search" : "Open search"}
             >
               <Icons name="search" width={22} height={22} />
             </button>
@@ -185,6 +226,6 @@ export default function Navbar() {
       </div>
 
       <NavbarModal open={isMenuOpen} setOpen={setIsMenuOpen} />
-    </nav>
+    </motion.nav>
   );
 }

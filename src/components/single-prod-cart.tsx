@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import useSessionStore from "@/store/session-store";
 import Icons from "./icons";
+import { Check } from "lucide-react";
 import { toast } from "sonner";
 
 interface ProductCardProps {
@@ -21,6 +22,7 @@ interface ProductCardProps {
   stock?: number | string;
   variantId?: string;
   matchType?: "exact" | "partial" | undefined;
+  searchTerm?: string;
 }
 
 export default function SingleProdCard({
@@ -35,25 +37,55 @@ export default function SingleProdCard({
   stock,
   variantId,
   matchType,
+  searchTerm,
 }: ProductCardProps) {
   const addToCart = useSessionStore((s) => s.addToCart);
 
   // use string so user can clear the field while typing (e.g. replace "1" with "300")
   const [qty, setQty] = useState<string>("1");
 
+  const isExact = matchType === "exact";
+  const isPartial = matchType === "partial";
+
   return (
-    <Card className="shadow-none flex flex-col gap-0 bg-transparent rounded-md w-70 p-0 border-2">
-      <div className="relative w-68 rounded-t-[inherit] aspect-square">
+    <Card className="shadow-none bg-white flex flex-col gap-0 rounded-md w-full p-0 border-2">
+      <div className="relative w-full rounded-t-[inherit] aspect-square">
         {/* Match badge overlay (top-left) */}
         {matchType ? (
           <div
-            className="absolute left-3 top-3 z-10 px-2 py-1 rounded text-sm font-semibold"
-            style={{
-              background: matchType === "exact" ? "#def7ec" : "#fff4e6",
-              color: matchType === "exact" ? "#065f46" : "#b45309",
-            }}
+            className={`absolute left-3 top-3 z-10 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-2 ${
+              isExact
+                ? " text-green-700"
+                : isPartial
+                ? " text-yellow-700"
+                : " text-orange-700"
+            }`}
           >
-            {matchType === "exact" ? "Exact match" : "Partial match"}
+            <span
+              className={`inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold ${
+                isExact
+                  ? "bg-green-600 text-white"
+                  : isPartial
+                  ? "bg-yellow-500 text-white"
+                  : "bg-orange-500 text-white"
+              }`}
+            >
+              {isExact ? (
+                <span className="flex items-center gap-0">
+                  <Check size={12} className="text-white" />
+                  <Check size={10} className="-ml-1 text-white" />
+                </span>
+              ) : (
+                <Check size={14} className="text-white" />
+              )}
+            </span>
+            <span className="text-[1rem]">
+              {isExact
+                ? "Exact match"
+                : isPartial
+                ? "Partial match"
+                : "Partial match"}
+            </span>
           </div>
         ) : null}
 
@@ -69,14 +101,45 @@ export default function SingleProdCard({
         {/* Product Title */}
         <Link href={`/products/${id}`} className="hover:underline">
           <div>
-            <span className="font-semibold text-2xl">{title}</span>
-            <p className=" font-medium ">{code}</p>
+            {/* Prominent code (styled for exact/partial matches) */}
+            <p
+              className={`font-extrabold text-2xl md:text-3xl leading-none mb-1 ${
+                isExact ? "text-[#1f1f1f]" : "text-[#1f1f1f]"
+              }`}
+            >
+              {isExact ? (
+                <span className="bg-green-200 inline-block px-2 py-0.5 rounded ">
+                  {code}
+                </span>
+              ) : isPartial && searchTerm ? (
+                // highlight only matching substrings for partial match
+                (() => {
+                  const q = String(searchTerm).trim();
+                  if (!q) return code;
+                  const esc = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                  const parts = code.split(new RegExp(`(${esc})`, "gi"));
+                  return parts.map((part, idx) =>
+                    part.toLowerCase() === q.toLowerCase() ? (
+                      <span key={idx} className="bg-yellow-200  px-1 rounded">
+                        {part}
+                      </span>
+                    ) : (
+                      <span key={idx}>{part}</span>
+                    )
+                  );
+                })()
+              ) : (
+                <span>{code}</span>
+              )}
+            </p>
+
+            <p className="text-sm font-medium text-gray-700">{title}</p>
           </div>
         </Link>
 
         {/* Price under title */}
         <div className="mt-1">
-          <span className="text-lg font-bold text-secondary">
+          <span className="text-base md:text-lg font-bold text-secondary">
             {Number(price).toLocaleString("en-US", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,

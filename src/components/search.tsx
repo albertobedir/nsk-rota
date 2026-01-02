@@ -31,18 +31,19 @@ export default function Search() {
   // --- SEARCH BUTTON ---
   const handleSearch = async () => {
     if (type === "single") {
-      if (!value.trim()) return;
+      const val = value.trim();
+      if (val.length < 4) return; // require min 4 chars
 
-      await searchProducts(value.trim()); // ✔️ sends string
+      await searchProducts(val);
       setValue("");
       router.push(`/products`);
     } else {
       if (tags.length === 0) return;
 
-      const query = tags.map((t) => t.value).join(","); // ✔ convert to string
+      const query = tags.map((t) => t.value).join(",");
 
       router.push(`/products`);
-      await searchProducts(query); // ✔ send string
+      await searchProducts(query);
     }
   };
 
@@ -86,7 +87,7 @@ export default function Search() {
   return (
     <div className="shadow-[0px_0px_20px_0px_#000] shadow-muted-foreground/30 rounded-xl w-full sm:flex-row flex flex-col sm:items-start">
       {/* LEFT BUTTONS */}
-      <div className="flex sm:grid sm:grid-rows-2 sm:-mr-3 sm:pr-2 relative z-0 bg-[#e8e8e8] rounded-l-xl sm:h-18 h-13 overflow-hidden">
+      <div className="flex sm:grid sm:grid-rows-2 sm:-mr-3 sm:pr-2 relative z-0 bg-[#e8e8e8] rounded-l-xl sm:h-[72px] h-10 overflow-hidden">
         <button
           className={cn(
             "h-full w-full flex sm:pl-0 items-center gap-2 sm:px-4 pr-8 py-1 rounded-none cursor-pointer font-semibold pl-5",
@@ -95,7 +96,9 @@ export default function Search() {
           onClick={() => handleSetType("single")}
         >
           <Icons name="single-search" width={28} height={28} />
-          <span className="text-[0.7rem]">Single Search</span>
+          <span className="sm:text-[1rem] text-[0.8rem] sm:font-bold">
+            Single Search
+          </span>
           <Icons
             name="chevron-right"
             width={10}
@@ -112,7 +115,9 @@ export default function Search() {
           onClick={() => handleSetType("multiple")}
         >
           <Icons name="multiple-search" width={28} height={28} />
-          <span className="text-[0.7rem]">Multiple Search</span>
+          <span className="sm:text-[1rem] text-[0.7rem] sm:font-bold">
+            Multiple Search
+          </span>
           <Icons
             name="chevron-right"
             width={10}
@@ -132,13 +137,19 @@ export default function Search() {
               name="search"
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              className="w-full px-5 text-lg outline-none placeholder:text-xl h-18"
+              className="w-full px-5 text-lg outline-none placeholder:text-lg h-12"
             />
           </form>
 
           <button
             onClick={handleSearch}
-            className="p-2.5 bg-secondary rounded-full cursor-pointer"
+            className={cn(
+              "p-2 bg-secondary rounded-full",
+              type === "single" && value.trim().length < 4
+                ? "opacity-50 pointer-events-none"
+                : "cursor-pointer"
+            )}
+            aria-disabled={type === "single" && value.trim().length < 4}
           >
             <Icons
               className="text-white"

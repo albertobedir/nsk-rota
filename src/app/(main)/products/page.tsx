@@ -317,6 +317,7 @@ export default function ProductsPage() {
                   location="CHICAGO"
                   inStock={true}
                   matchType={matchType}
+                  searchTerm={searchTerm}
                 />
               );
             })}
