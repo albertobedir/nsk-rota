@@ -7,10 +7,16 @@ import Order from "@/schemas/mongoose/order";
 
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
-  // prefer route params, but fall back to parsing the id from the request URL
-  let id = params?.id;
+  // prefer route params (which may be a Promise), but fall back to parsing the id from the request URL
+  let resolvedParams: { id: string } | undefined = undefined;
+  if (params) {
+    // handle case where params is a Promise (Next.js types can surface this)
+    const p: any = params;
+    resolvedParams = typeof p.then === "function" ? await p : p;
+  }
+  let id = resolvedParams?.id;
   if (!id) {
     try {
       const url = new URL(_req.url);

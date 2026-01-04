@@ -180,24 +180,37 @@ export default function BasketPage() {
     <Hydrate>
       {/* HEADER */}
       <div className="bg-[#f3f3f3] py-14">
-        <div className="mx-auto w-full max-w-[1500px] px-4">
-          <h1 className="font-extrabold text-4xl md:text-5xl text-[#2b2b2b]">
-            Offer Cart
-          </h1>
+        <div className="bg-[#f3f3f3] py-10">
+          <div className="w-full max-w-[1540px]  px-6 md:px-27 mx-auto">
+            <h1 className="font-bold text-center sm:text-start text-4xl md:text-5xl text-[#1f1f1f]">
+              Offer Cart
+            </h1>
 
-          <div className="mt-4 text-sm text-gray-500 flex items-center gap-2">
-            <span>Home</span>
-            <span>›</span>
-            <span>Products</span>
-            <span>›</span>
-            <span className="font-semibold text-gray-700">Offer Cart</span>
+            {/* breadcrumb + badge inside header */}
+            <div className=" flex flex-col md:flex-row gap-2 items-center justify-between">
+              <div className="mt-4 text-sm text-gray-500 flex items-center gap-2">
+                <span>Home</span>
+                <span>›</span>
+                <span>Products</span>
+                <span>›</span>
+                <span className="font-semibold text-gray-700">Offer Cart</span>
+              </div>
+              <Image
+                className="sm:-mt-[5rem] mt-5"
+                src="/tecdoc.png"
+                alt="TecDoc Data Supplier"
+                width={180}
+                height={52}
+                priority
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* CONTENT */}
-      <div className="w-full bg-[#fafafa] py-10 px-4 md:px-8 lg:px-40">
-        <div className="mx-auto w-full max-w-[1200px] px-4">
+      <div className="w-full bg-[#fafafa] py-10 px-4 md:px-8 lg:px-40 ">
+        <div className="mx-auto sm:px-27 w-full max-w-[1200px] px-4">
           {/* Confirm Clear Modal */}
           {showClearConfirm ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center">

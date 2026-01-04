@@ -44,6 +44,12 @@ export default function MiniPaginationGroup({
         if (json?.ok && Array.isArray(json.results)) {
           const mapped: Product[] = json.results.map((r: any, i: number) => {
             const raw = r.raw ?? {};
+            const rotaNo =
+              raw?.metafields && Array.isArray(raw.metafields)
+                ? raw.metafields.find((m: any) => m.key === "rota_no")?.value
+                : undefined;
+            const codeVal =
+              rotaNo ?? raw?.handle ?? String(r.shopifyId ?? r._id ?? `p-${i}`);
             const image =
               (raw?.images && raw.images[0] && raw.images[0].src) ||
               raw?.image ||
@@ -59,8 +65,8 @@ export default function MiniPaginationGroup({
                 : Number(priceStr) || 0;
 
             return {
-              id: r.shopifyId ?? r._id ?? `p-${i}`,
-              code: raw?.handle ?? String(r.shopifyId ?? r._id ?? `p-${i}`),
+              id: codeVal,
+              code: codeVal,
               title: raw?.title ?? raw?.name ?? `Product ${i + 1}`,
               price,
               image,

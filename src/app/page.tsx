@@ -24,8 +24,8 @@ export default function Page() {
           </div>
         </div>
         <InstagramStories />
-        <section className="w-full bg-white mt-10 py-20">
-          <div className="max-w-screen-2xl mx-auto px-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <section className="w-full bg-white mt-10  py-20">
+          <div className="max-w-screen-2xl mx-auto sm:px-27 px-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             <div className="pr-6">
               <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold mb-4">
                 Our Power Being Global

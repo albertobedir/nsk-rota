@@ -32,30 +32,18 @@ const categories = [
 export default function NavbarModal({ open, setOpen }: Props) {
   const modalRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        modalRef.current &&
-        !modalRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-
-    if (open) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [open, setOpen]);
+  // No document-level outside-click listener: we only close the menu
+  // when a menu item is clicked (per requested behavior).
 
   return (
     <>
       {/* Mobile: use shadcn Sheet for better responsive UX */}
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="sm:hidden" overlayClassName="sm:hidden">
+        <SheetContent
+          side="right"
+          className="sm:hidden"
+          overlayClassName="hidden"
+        >
           <SheetHeader>
             <SheetTitle>Menu</SheetTitle>
           </SheetHeader>
@@ -70,6 +58,7 @@ export default function NavbarModal({ open, setOpen }: Props) {
                       <Link
                         className="hover:text-secondary transition-colors"
                         href={item.href}
+                        onClick={() => setOpen(false)}
                       >
                         {item.name}
                       </Link>
@@ -87,9 +76,12 @@ export default function NavbarModal({ open, setOpen }: Props) {
       {/* Desktop/tablet: keep animated panel but hide on small screens */}
       <AnimatePresence>
         {open && (
-          <>
-            {/* no overlay on desktop: click-outside is handled via document listener */}
-
+          <div
+            className="hidden sm:block"
+            onClickCapture={(e) => e.stopPropagation()}
+            onMouseDownCapture={(e) => e.stopPropagation()}
+            onPointerDownCapture={(e) => e.stopPropagation()}
+          >
             <motion.div
               key="panel"
               ref={modalRef}
@@ -98,8 +90,9 @@ export default function NavbarModal({ open, setOpen }: Props) {
               exit={{ y: "20%", opacity: 0 }}
               transition={{ duration: 0.36, ease: [0.2, 0.8, 0.2, 1] }}
               className={cn(
-                "hidden sm:flex absolute bottom-0 w-full items-start justify-center bg-white z-30",
-                "sm:bottom-auto sm:top-[170px]"
+                "absolute bottom-0 w-full items-start justify-center bg-white z-30 pointer-events-auto",
+                "sm:bottom-auto sm:top-[170px]",
+                "hidden sm:flex"
               )}
             >
               <div className="grid grid-cols-4 gap-4 items-start py-6 px-6 max-w-[1200px] w-full">
@@ -112,6 +105,7 @@ export default function NavbarModal({ open, setOpen }: Props) {
                           <Link
                             className="hover:text-secondary transition-colors"
                             href={item.href}
+                            // burada setOpen(false) YOK
                           >
                             {item.name}
                           </Link>
@@ -122,7 +116,7 @@ export default function NavbarModal({ open, setOpen }: Props) {
                 ))}
               </div>
             </motion.div>
-          </>
+          </div>
         )}
       </AnimatePresence>
     </>

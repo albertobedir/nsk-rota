@@ -117,13 +117,13 @@ export default function ProductsPage() {
     <div className="w-full">
       {/* PAGE HEADER */}
       <div className="bg-[#f3f3f3] py-10">
-        <div className="w-full max-w-[1540px] px-6 mx-auto">
-          <h1 className="font-bold text-4xl md:text-5xl text-[#1f1f1f]">
+        <div className="w-full max-w-[1540px]  px-6 md:px-27 mx-auto">
+          <h1 className="font-bold text-center sm:text-start text-4xl md:text-5xl text-[#1f1f1f]">
             Product Search
           </h1>
 
           {/* breadcrumb + badge inside header */}
-          <div className="mt-4 flex flex-col md:flex-row gap-2 items-center justify-between">
+          <div className="flex flex-col md:flex-row gap-2 items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="text-[#1f1f1f] font-semibold">Home</span>
               <span className="opacity-60">/</span>
@@ -132,7 +132,7 @@ export default function ProductsPage() {
               <span className="text-[#1f1f1f]">Product Search</span>
             </div>
             <Image
-              className="-mt-[5rem]"
+              className="sm:-mt-[5rem] mt-5"
               src="/tecdoc.png"
               alt="TecDoc Data Supplier"
               width={180}
@@ -261,7 +261,7 @@ export default function ProductsPage() {
       </div>
 
       {/* PRODUCT GRID */}
-      <div className="mx-auto w-full max-w-[1540px] px-4 py-10">
+      <div className="mx-auto sm:px-27 w-full max-w-[1540px] px-4 py-10">
         {searchTerm && products.length === 0 ? (
           <div className="w-full py-24 flex flex-col items-center justify-center">
             <p className="text-xl font-semibold">No results found</p>

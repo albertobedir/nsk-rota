@@ -16,7 +16,6 @@ const sample: Item[] = [
   { id: "2", videoUrl: "/homevideo2.mp4" },
   { id: "3", videoUrl: "/homevideo3.mp4" },
   { id: "4", videoUrl: "/homevideo4.mp4" },
-  { id: "5", videoUrl: "/homevideo5.mp4" },
 ];
 
 export default function InstagramStories({
@@ -54,7 +53,7 @@ export default function InstagramStories({
 
   return (
     <section className="w-full py-12 bg-primary">
-      <div className="max-w-screen-2xl mx-auto px-6 flex flex-col items-center gap-5">
+      <div className="max-w-screen-2xl mx-auto px-6 flex flex-col items-center gap-6">
         <h3 className="font-extrabold text-white text-6xl mb-6">
           <a
             href="https://www.instagram.com/nskgrouprota/"
@@ -68,7 +67,7 @@ export default function InstagramStories({
 
         <div
           ref={containerRef}
-          className="flex flex-row gap-4 sm:gap-8 overflow-hidden py-1 px-1 justify-center items-center w-full"
+          className="flex flex-row gap-4 sm:gap-10 overflow-hidden py-1 px-1 justify-center items-center w-full"
         >
           <motion.div
             ref={innerRef}

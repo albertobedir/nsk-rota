@@ -34,7 +34,7 @@ export default function TopBanner() {
 
   return (
     <div className="bg-[#f3f3f3]  md:flex">
-      <div className="w-full max-w-[1540px] flex-col md:flex-row gap-2  px-6 mx-auto flex items-center justify-between py-10">
+      <div className="w-full max-w-[1540px] flex-col md:flex-row gap-10 sm:gap-2  px-6 mx-auto flex items-center justify-between py-10 sm:px-27">
         <div>
           <h1 className="font-bold text-3xl md:text-4xl">{title}</h1>
           <div className="mt-2 text-sm text-muted-foreground">
@@ -50,7 +50,7 @@ export default function TopBanner() {
 
         <div className="flex items-center">
           <Image
-            className="-mt-[1rem]"
+            className="sm:-mt-[1rem] mt-1"
             src="/tecdoc.png"
             alt="TecDoc"
             width={160}

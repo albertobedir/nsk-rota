@@ -29,6 +29,8 @@ export async function GET(req: NextRequest) {
 
     const {
       search = "",
+      shopifyId = "",
+      variantId = "",
       page = "1",
       limit = "50",
       batchSize = "100",
@@ -47,6 +49,25 @@ export async function GET(req: NextRequest) {
       Math.floor(((pageNum - 1) * limitNum) / batchNum) * batchNum;
 
     const metafieldConditions: MetafieldFilter[] = [];
+    // baseQuery holds explicit id-based filters (shopifyId / variant id)
+    const baseQuery: Record<string, any> = {};
+
+    // If a specific Shopify product id is provided, search by it
+    if (shopifyId) {
+      const num = Number(shopifyId);
+      if (!Number.isNaN(num)) {
+        // Exact match on numeric shopifyId
+        Object.assign(baseQuery, { shopifyId: num });
+      }
+    }
+
+    // If a specific variant id is provided, search by variant id inside raw.variants
+    if (!shopifyId && variantId) {
+      const vnum = Number(variantId);
+      if (!Number.isNaN(vnum)) {
+        Object.assign(baseQuery, { "raw.variants.id": vnum });
+      }
+    }
 
     // Rota No search (ana ürün kodu)
     if (search) {
@@ -160,10 +181,25 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const query =
-      metafieldConditions.length > 0 ? { $and: metafieldConditions } : {};
+    // Merge metafield conditions with any explicit id-based query above
+    const metaQuery =
+      metafieldConditions.length > 0 ? { $and: metafieldConditions } : null;
 
-    const batchResults = (await Product.find(query)
+    let finalQuery: Record<string, any> = {};
+    const hasBase = Object.keys(baseQuery).length > 0;
+    const hasMeta = metaQuery != null;
+
+    if (hasBase && hasMeta) {
+      finalQuery = { $and: [baseQuery, metaQuery] };
+    } else if (hasBase) {
+      finalQuery = baseQuery;
+    } else if (hasMeta) {
+      finalQuery = metaQuery as Record<string, any>;
+    } else {
+      finalQuery = {};
+    }
+
+    const batchResults = (await Product.find(finalQuery)
       .sort({ createdAt: -1 })
       .skip(skipBatch)
       .limit(batchNum)
@@ -175,7 +211,7 @@ export async function GET(req: NextRequest) {
       sliceStart + limitNum
     ) as any[];
 
-    const total = await Product.countDocuments(query);
+    const total = await Product.countDocuments(finalQuery);
 
     // If a customer is logged in, try to fetch customer-specific pricing
     // from Shopify metaobjects and override product prices in the results.

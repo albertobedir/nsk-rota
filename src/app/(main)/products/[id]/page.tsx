@@ -160,9 +160,30 @@ export default function ProductDetailPage() {
     if (!id) return;
 
     async function fetchProduct() {
-      const res = await fetch(`/api/products/gets?search=${id}`);
-      const json = await res.json();
-      setProduct(json.results?.[0] ?? null);
+      // Try treat the route param as a Shopify product id first
+      const attemptByShopify = await fetch(
+        `/api/products/gets?shopifyId=${id}`
+      );
+      const shopifyJson = await attemptByShopify.json().catch(() => null);
+      let found = shopifyJson?.results?.[0] ?? null;
+
+      // Fallback: if not found, treat param as variant id and try that
+      if (!found) {
+        const attemptByVariant = await fetch(
+          `/api/products/gets?variantId=${id}`
+        );
+        const variantJson = await attemptByVariant.json().catch(() => null);
+        found = variantJson?.results?.[0] ?? null;
+      }
+
+      // Final fallback: keep old behavior and search rota_no
+      if (!found) {
+        const attemptByRota = await fetch(`/api/products/gets?search=${id}`);
+        const rotaJson = await attemptByRota.json().catch(() => null);
+        found = rotaJson?.results?.[0] ?? null;
+      }
+
+      setProduct(found);
       setLoading(false);
     }
 
@@ -220,7 +241,7 @@ export default function ProductDetailPage() {
         <div className="flex items-center gap-5">
           <span
             className={`text-sm font-semibold ${
-              inchMode ? "text-muted-foreground" : "text-secondary"
+              inchMode ? " text-muted-foreground" : "text-secondary"
             }`}
           >
             inch
@@ -232,7 +253,7 @@ export default function ProductDetailPage() {
           />
           <span
             className={`text-sm font-semibold ${
-              !inchMode ? "text-muted-foreground" : "text-secondary"
+              !inchMode ? " text-muted-foreground" : "text-secondary"
             }`}
           >
             mm
@@ -247,12 +268,12 @@ export default function ProductDetailPage() {
 
             {inchMode ? (
               <span>
-                {row.value_in}{" "}
+                {row.value_mm}{" "}
                 <span className="text-gray-500">({row.value_in})</span>
               </span>
             ) : (
               <span>
-                {row.value_mm}{" "}
+                {row.value_in}{" "}
                 <span className="text-gray-500">({row.value_mm})</span>
               </span>
             )}
@@ -269,7 +290,7 @@ export default function ProductDetailPage() {
     <div className="w-full">
       {/* PAGE TOP - smaller header */}
       <div className="bg-[#f3f3f3] hidden md:flex">
-        <div className="w-full max-w-[1500px] flex-col md:flex-row gap-2  px-6 mx-auto flex items-center justify-between py-10">
+        <div className="w-full max-w-[1500px] flex-col md:flex-row gap-2  px-6 sm:px-25 mx-auto flex items-center justify-between py-10">
           <div>
             <h1 className="font-bold text-3xl md:text-4xl">Product Detail</h1>
             <div className="mt-2 text-sm text-muted-foreground">
@@ -281,7 +302,7 @@ export default function ProductDetailPage() {
 
           <div className="flex items-center">
             <Image
-              className="-mt-[1rem]"
+              className="sm:-mt-[1rem] mt-1"
               src="/tecdoc.png"
               alt="TecDoc"
               width={160}
@@ -295,7 +316,7 @@ export default function ProductDetailPage() {
       {MobileCarousel}
 
       {/* MAIN GRID */}
-      <div className="container px-0 md:px-10 py-12 grid grid-cols-1 lg:grid-cols-2 gap-10">
+      <div className="container px-2 md:px-25 py-12 grid grid-cols-1 lg:grid-cols-2 gap-10">
         {/* LEFT SIDE */}
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl md:text-4xl font-bold">{title}</h1>
@@ -429,7 +450,7 @@ export default function ProductDetailPage() {
       </div>
 
       {/* SUITABLE MODELS */}
-      <div className="container px-4 md:px-10 mt-20 mb-[5rem] w-full">
+      <div className="container px-4 md:px-25 mt-20 mb-[5rem] w-full">
         <h3 className="font-bold text-2xl inline-block">
           Suitable Models
           <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
