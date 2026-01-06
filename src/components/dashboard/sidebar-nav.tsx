@@ -2,14 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  User,
-  ShoppingBag,
-  Receipt,
-  Heart,
-  ShoppingCart,
-  ChevronRight,
-} from "lucide-react";
+import { User, ShoppingBag, Receipt, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Props = { onNavigate?: () => void };

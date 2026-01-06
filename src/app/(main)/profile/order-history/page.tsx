@@ -196,7 +196,7 @@ export default function OrderHistoryPage() {
             <tbody>
               {rows.map((r, i) => (
                 <tr
-                  key={(r.orderNo || r.id) + i}
+                  key={`${r.orderNo ?? r.id ?? ""}-${i}`}
                   className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}
                 >
                   <td className="px-6 py-4 text-sm text-slate-800">
