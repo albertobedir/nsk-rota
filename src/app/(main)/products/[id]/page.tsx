@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import Icons from "@/components/icons";
 import useSessionStore from "@/store/session-store";
@@ -190,7 +191,12 @@ export default function ProductDetailPage() {
     fetchProduct();
   }, [id]);
 
-  if (loading) return <div className="p-10 text-2xl">Loading...</div>;
+  if (loading)
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <Spinner label="Loading product..." size={48} />
+      </div>
+    );
   if (!product) return <div className="p-10 text-2xl">Product not found</div>;
 
   const raw = product.raw;

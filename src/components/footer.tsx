@@ -60,40 +60,6 @@ export default function Footer() {
         </div>
 
         {/* NEWSLETTER SECTION */}
-        <div className="relative bg-primary rounded-xl overflow-hidden w-full sm:ml-auto sm:-mt-[7rem] sm:w-[40rem] mb-10">
-          <Image
-            src="/footer-overlay.png"
-            alt="footer overlay"
-            width={1000}
-            height={1000}
-            className="h-full object-cover absolute top-0 left-0 opacity-30"
-          />
-
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-6 md:gap-4 py-10 px-8 text-white">
-            <Icons name="mail-open" width={63} height={63} />
-
-            <div className="flex-1">
-              <h2 className="text-lg md:text-xl font-semibold">
-                Subscribe to our{" "}
-                <span className="text-secondary">Newsletter!</span>
-              </h2>
-              <p className="text-[#cfcfcf] text-sm md:text-base mt-1">
-                You can subscribe to our email list for new products and the
-                latest news.
-              </p>
-            </div>
-
-            <button className="flex items-center gap-2 text-white font-semibold whitespace-nowrap cursor-pointer">
-              <span>Subscribe</span>
-              <Icons
-                className="text-secondary"
-                name="move-right"
-                width={20}
-                height={20}
-              />
-            </button>
-          </div>
-        </div>
 
         {/* DESKTOP LOGO */}
         <div className="hidden md:flex items-center justify-between mb-10">

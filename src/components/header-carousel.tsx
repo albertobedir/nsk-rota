@@ -16,6 +16,7 @@ const banners = ["/cr1.jpg", "/cr1.jpg", "/cr3.jpg", "/cr3.jpg", "/cr3.jpg"];
 export default function HeaderCarousel() {
   const [api, setApi] = React.useState<CarouselApi | null>(null);
   const [selected, setSelected] = React.useState(0);
+  const AUTOPLAY_MS = 5000; // 5 seconds
 
   React.useEffect(() => {
     if (!api) return;
@@ -31,10 +32,26 @@ export default function HeaderCarousel() {
     };
   }, [api]);
 
+  // autoplay: advance every AUTOPLAY_MS milliseconds
+  React.useEffect(() => {
+    if (!api) return;
+
+    const id = setInterval(() => {
+      try {
+        const next = (api.selectedScrollSnap() + 1) % banners.length;
+        api.scrollTo(next);
+      } catch (e) {
+        // ignore if api isn't ready
+      }
+    }, AUTOPLAY_MS);
+
+    return () => clearInterval(id);
+  }, [api]);
+
   return (
     <div className="w-full overflow-hidden bg-transparent relative">
       <Carousel className="relative h-full w-full" setApi={setApi}>
-        <CarouselPrevious className="hidden sm:block" />
+        <CarouselPrevious className="absolute left-2 top-1/2 -translate-y-1/2 z-30" />
         <CarouselContent className="flex">
           {banners.map((src, i) => (
             <CarouselItem key={i}>
@@ -49,7 +66,7 @@ export default function HeaderCarousel() {
             </CarouselItem>
           ))}
         </CarouselContent>
-        <CarouselNext className="hidden sm:block" />
+        <CarouselNext className="absolute right-2 top-1/2 -translate-y-1/2 z-30" />
       </Carousel>
 
       {/* indicators (absolute over image) */}

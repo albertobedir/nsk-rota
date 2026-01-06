@@ -3,7 +3,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { Spinner } from "@/components/ui/spinner";
 
 type LineItem = {
   title: string;
@@ -15,6 +16,7 @@ type LineItem = {
 export default function OrderDetailPage() {
   const params = useParams();
   const id = params?.id;
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<any | null>(null);
@@ -124,9 +126,20 @@ export default function OrderDetailPage() {
 
   return (
     <div className="space-y-6 px-6 py-6">
-      <h2 className="text-xl font-semibold">Order Detail</h2>
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => router.push("/profile/open-orders")}
+          className="text-sm text-secondary hover:underline"
+        >
+          ← Back to orders
+        </button>
+        <h2 className="text-xl font-semibold">Order Detail</h2>
+      </div>
       {loading ? (
-        <div className="p-6">Loading…</div>
+        <div className="min-h-[20vh] flex items-center justify-center">
+          <Spinner label="Loading order..." />
+        </div>
       ) : error ? (
         <div className="p-6 text-amber-600">{error}</div>
       ) : !order ? (

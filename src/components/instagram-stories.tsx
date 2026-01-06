@@ -26,30 +26,7 @@ export default function InstagramStories({
   const [active, setActive] = useState<Item | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
-  const [slideDistance, setSlideDistance] = useState(0);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    function measure() {
-      const w = containerRef.current?.clientWidth ?? 0;
-      const inner = innerRef.current?.scrollWidth ?? 0;
-      const dist = Math.max(0, inner - w);
-      setSlideDistance(dist);
-      setIsMobile(
-        typeof window !== "undefined" ? window.innerWidth < 640 : false
-      );
-    }
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    if (containerRef.current) ro.observe(containerRef.current);
-    if (innerRef.current) ro.observe(innerRef.current);
-    window.addEventListener("resize", measure);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, []);
+  // We'll rely on native touch scrolling + CSS scroll-snap for mobile swipe behavior.
 
   return (
     <section className="w-full py-12 bg-primary">
@@ -65,35 +42,16 @@ export default function InstagramStories({
           </a>
         </h3>
 
-        <div
-          ref={containerRef}
-          className="flex flex-row gap-4 sm:gap-10 overflow-hidden py-1 px-1 justify-center items-center w-full"
-        >
-          <motion.div
+        <div ref={containerRef} className="w-full flex justify-center">
+          <div
             ref={innerRef}
-            className="flex flex-row items-center gap-4"
-            initial={false}
-            animate={
-              isMobile && slideDistance > 0
-                ? { x: [0, -slideDistance, 0] }
-                : { x: 0 }
-            }
-            transition={
-              isMobile && slideDistance > 0
-                ? {
-                    duration: Math.max(6, slideDistance / 60),
-                    ease: "linear",
-                    repeat: Infinity,
-                    repeatType: "reverse",
-                  }
-                : { duration: 0 }
-            }
+            className="flex flex-row items-center gap-4 overflow-x-auto snap-x snap-mandatory py-2 px-2 justify-start lg:justify-center"
           >
             {items.map((it) => (
               <button
                 key={it.id}
                 onClick={() => setActive(it)}
-                className="shrink-0 w-[88%] max-w-xs sm:w-[200px] md:w-[240px] lg:w-[300px] aspect-9/16 rounded-lg overflow-hidden relative bg-white shadow-md"
+                className="shrink-0 w-[88%] max-w-xs sm:w-[200px] md:w-[240px] lg:w-[300px] aspect-9/16 rounded-lg overflow-hidden relative bg-white shadow-md snap-center"
               >
                 {it.videoUrl ? (
                   <>
@@ -165,7 +123,7 @@ export default function InstagramStories({
                 ) : null}
               </button>
             ))}
-          </motion.div>
+          </div>
         </div>
       </div>
 

@@ -79,7 +79,7 @@ export default function LoginForm() {
     <Card
       className="
      max-w-xl w-full
-    shadow-none border-none
+     border-none
     px-6 py-16
     md:shadow md:border 
     md:px-12 md:py-24

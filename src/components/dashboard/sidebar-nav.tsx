@@ -19,8 +19,6 @@ const nav = [
   { label: "Open Orders", href: "/profile/open-orders", icon: ShoppingBag },
   { label: "Order History", href: "/profile/order-history", icon: Receipt },
   { label: "Invoices", href: "/profile/invoices", icon: Receipt },
-
-  { label: "Payment", href: "/profile/payment", icon: ShoppingCart },
 ];
 
 const bottom = [

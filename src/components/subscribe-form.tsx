@@ -80,7 +80,7 @@ export default function Page() {
   });
 
   return (
-    <Card className="shadow-none border-none max-w-xl w-full px-12 py-24">
+    <Card className=" border-none max-w-xl w-full px-12 py-24">
       <CardContent className="h-full w-full flex flex-col p-0">
         <Form {...form}>
           <form
