@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -42,11 +43,55 @@ export default function MiniPaginationGroup({
         if (!mounted) return;
 
         if (json?.ok && Array.isArray(json.results)) {
+          const extractRotaNo = (metafields: any[] = []) => {
+            try {
+              const direct = metafields.find((m) => m.key === "rota_no")?.value;
+              if (direct) return direct;
+
+              const candidate = metafields.find(
+                (m) =>
+                  m.key === "oem_info" ||
+                  m.key === "brand_info" ||
+                  (m.namespace === "custom" && /(oem|brand)/i.test(m.key))
+              );
+
+              if (candidate) {
+                try {
+                  const parsed = JSON.parse(candidate.value);
+                  if (Array.isArray(parsed) && parsed[0]) {
+                    return (
+                      parsed[0].RotaNo ||
+                      parsed[0].rotaNo ||
+                      parsed[0].Rota ||
+                      parsed[0].rota ||
+                      undefined
+                    );
+                  }
+                  if (parsed && typeof parsed === "object") {
+                    return (
+                      parsed.RotaNo ||
+                      parsed.rotaNo ||
+                      parsed.Rota ||
+                      parsed.rota
+                    );
+                  }
+                } catch (e) {
+                  const m = String(candidate.value).match(/\d{3,}/);
+                  if (m) return m[0];
+                }
+              }
+
+              return undefined;
+            } catch (e) {
+              return undefined;
+            }
+          };
+
           const mapped: Product[] = json.results.map((r: any, i: number) => {
             const raw = r.raw ?? {};
             const rotaNo =
               raw?.metafields && Array.isArray(raw.metafields)
-                ? raw.metafields.find((m: any) => m.key === "rota_no")?.value
+                ? extractRotaNo(raw.metafields)
                 : undefined;
             const codeVal =
               rotaNo ?? raw?.handle ?? String(r.shopifyId ?? r._id ?? `p-${i}`);
@@ -64,13 +109,24 @@ export default function MiniPaginationGroup({
                 ? parseFloat(priceStr) || 0
                 : Number(priceStr) || 0;
 
+            const oemsArr =
+              raw?.metafields && Array.isArray(raw.metafields)
+                ? raw.metafields
+                    .filter(
+                      (m: any) =>
+                        /(oem|brand)/i.test(m.key) ||
+                        (m.namespace === "custom" && /(oem|brand)/i.test(m.key))
+                    )
+                    .map((m: any) => m.value)
+                : [];
+
             return {
               id: codeVal,
               code: codeVal,
               title: raw?.title ?? raw?.name ?? `Product ${i + 1}`,
               price,
               image,
-              oems: [],
+              oems: oemsArr,
               location: "",
               inStock: true,
               stock: 0,

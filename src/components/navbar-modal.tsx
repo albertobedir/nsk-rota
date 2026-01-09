@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import useSessionStore from "@/store/session-store";
 import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./ui/sheet";
@@ -31,6 +32,13 @@ const categories = [
 
 export default function NavbarModal({ open, setOpen }: Props) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const user = useSessionStore((s) => s.user);
+
+  const fmt = (v: number) =>
+    new Intl.NumberFormat("tr-TR", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(v) + " $";
 
   // No document-level outside-click listener: we only close the menu
   // when a menu item is clicked (per requested behavior).
@@ -67,6 +75,44 @@ export default function NavbarModal({ open, setOpen }: Props) {
                 </ul>
               </div>
             ))}
+
+            {/* Mobile: show credit summary under links */}
+            <div className="w-full pt-3 border-t">
+              {(() => {
+                const creditLimit = Number(user?.creditLimit ?? 0);
+                const creditUsed = Number(user?.creditUsed ?? 0);
+                const creditRemaining = Number(
+                  user?.creditRemaining ?? Math.max(0, creditLimit - creditUsed)
+                );
+
+                return (
+                  <div className="bg-white p-3 rounded-md shadow-sm mt-3">
+                    <div className="flex items-center justify-between text-sm text-slate-400">
+                      <span>Credit</span>
+                      <span className="text-slate-600 font-medium">
+                        {fmt(creditLimit)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm mt-2">
+                      <span className="text-orange-500 font-semibold">
+                        Used
+                      </span>
+                      <span className="text-orange-500 font-bold">
+                        {fmt(creditUsed)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm text-slate-400 mt-2">
+                      <span>Remaining</span>
+                      <span className="text-slate-600 font-medium">
+                        {fmt(creditRemaining)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
 
           {/* top-right X provided by SheetContent */}

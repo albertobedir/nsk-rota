@@ -33,12 +33,12 @@ export default function Page() {
               <p className="text-base md:text-lg text-gray-700 font-bold text-start sm:text-center w-full  mb-6">
                 We are a manufacturer of steering, suspension, hydraulic and
                 forged parts for commercial, agricultural, and construction
-                vehicles as well as some other industries. We have two factories
-                located in Bursa (Turkey), as well as sales and marketing
-                offices in Istanbul (Turkey), New Jersey (USA), and warehouses
-                in São Paulo (Brazil) and Chicago (USA). We are driven by the
-                vision of being a customer-focused, market leading and global
-                brand that spring first into the mind all over the world.
+                vehicles as well as some other industries. We operate two
+                manufacturing facilities in Bursa Turkey, supported by sales and
+                marketing offices in Istanbul, Turkey, and warehouse-based sales
+                offices in São Paulo, Brazil, and Chicago, USA. We are driven by
+                the vision of being a customer-focused, market leading and
+                global brand that spring first into the mind all over the world
               </p>
 
               {/* Read more and promotional video removed per request */}
@@ -80,7 +80,7 @@ export default function Page() {
                     id: 5,
                     end: 250,
                     suffix: "+",
-                    label: "CUSTOMERS",
+                    label: "WAREHOUSES",
                     icon: "customers.svg",
                   },
                   {

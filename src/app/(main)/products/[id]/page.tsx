@@ -40,6 +40,7 @@ export interface ShopifyRaw {
   images: ShopifyImage[];
   variants: ShopifyVariant[];
   metafields: ShopifyMetafield[];
+  vendor?: string;
 }
 interface IProduct {
   _id: string;
@@ -207,7 +208,94 @@ export default function ProductDetailPage() {
     maximumFractionDigits: 2,
   });
   const image = raw.images?.[0]?.src ?? "/placeholder.png";
-  const rotaNo = raw.metafields.find((m) => m.key === "rota_no")?.value ?? "-";
+  const extractRotaNo = (metafields: ShopifyMetafield[] = []) => {
+    const direct = metafields.find((m) => m.key === "rota_no")?.value;
+    if (direct) return direct;
+
+    const candidate = metafields.find(
+      (m) =>
+        m.key === "oem_info" ||
+        m.key === "brand_info" ||
+        (m.namespace === "custom" && /(oem|brand)/i.test(m.key))
+    );
+
+    if (candidate) {
+      try {
+        const parsed = JSON.parse(candidate.value);
+        if (Array.isArray(parsed) && parsed[0]) {
+          return (
+            parsed[0].RotaNo ||
+            parsed[0].rotaNo ||
+            parsed[0].rota ||
+            parsed[0].Rota ||
+            "-"
+          );
+        }
+        if (parsed && typeof parsed === "object") {
+          return parsed.RotaNo || parsed.rotaNo || parsed.rota || "-";
+        }
+      } catch {
+        // fallback: try to regexp
+        const m = String(candidate.value).match(/\d{3,}/);
+        if (m) return m[0];
+      }
+    }
+
+    return "-";
+  };
+
+  const rotaNo = extractRotaNo(raw.metafields);
+
+  // Build dynamic technical information rows from metafields when present.
+  const mapHarfToLabel: Record<string, string> = {
+    L1: "L1 Length",
+    C1: "C1 Hole Distance",
+    E1: "E1 Hole Ø",
+    F1: "F1 Thickness",
+    G1: "G1 Pipe/Shaft Ø",
+    d1: "d1",
+    d2: "d2",
+    A1: "A1",
+    J1: "J1",
+    W: "Weight",
+  };
+
+  const getTechnicalRows = (metafields: ShopifyMetafield[] = []) => {
+    try {
+      const candidate = metafields.find(
+        (m) =>
+          /(technical|tech|technical_info)/i.test(m.key) ||
+          (m.namespace === "custom" && /(technical|tech)/i.test(m.key))
+      );
+
+      if (!candidate) return TECH_INFO;
+
+      const parsed = JSON.parse(candidate.value);
+      if (!Array.isArray(parsed)) return TECH_INFO;
+
+      const asString = (v: unknown) => (v == null ? "" : String(v));
+      const rows: TechInfoRow[] = parsed.map((it: unknown) => {
+        const obj = it as Record<string, unknown>;
+        const key = String(obj.HarfKodu ?? obj.key ?? "");
+        return {
+          key,
+          label: mapHarfToLabel[key] ?? key,
+          value_mm: asString(
+            obj.Technicalmm ?? obj.TechnicalMM ?? obj.Technical ?? ""
+          ),
+          value_in: asString(
+            obj.Technicalinch ?? obj.TechnicalInch ?? obj.Technicalinch ?? ""
+          ),
+        } as TechInfoRow;
+      });
+
+      return rows.length ? rows : TECH_INFO;
+    } catch {
+      return TECH_INFO;
+    }
+  };
+
+  const technicalRows = getTechnicalRows(raw.metafields);
 
   /* ---------------------- COMPONENTS ---------------------- */
 
@@ -268,21 +356,17 @@ export default function ProductDetailPage() {
       </div>
 
       <div className="mt-6 space-y-4 text-lg">
-        {TECH_INFO.map((row) => (
+        {technicalRows.map((row) => (
           <div key={row.key} className="flex justify-between border-b pb-2">
             <span className="font-semibold">{row.label}</span>
 
-            {inchMode ? (
-              <span>
-                {row.value_mm}{" "}
-                <span className="text-gray-500">({row.value_in})</span>
-              </span>
-            ) : (
-              <span>
-                {row.value_in}{" "}
-                <span className="text-gray-500">({row.value_mm})</span>
-              </span>
-            )}
+            <span>
+              {inchMode ? (
+                <span>{row.value_mm}</span>
+              ) : (
+                <span>{row.value_in}</span>
+              )}
+            </span>
           </div>
         ))}
       </div>
@@ -392,7 +476,62 @@ export default function ProductDetailPage() {
               Suitable for
               <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
             </h3>
-            <p className="font-semibold text-black text-lg mt-3">HENDRICKSON</p>
+            {(() => {
+              try {
+                // parse applications or brand_info metafields
+                const appsField = raw.metafields?.find((m) =>
+                  /applications?/i.test(m.key)
+                );
+                const brandField = raw.metafields?.find((m) =>
+                  /brand_info/i.test(m.key)
+                );
+
+                let brand = raw.vendor ?? "";
+                if (brandField) {
+                  const parsed = JSON.parse(brandField.value) as unknown[];
+                  if (Array.isArray(parsed) && parsed[0]) {
+                    const obj = parsed[0] as Record<string, unknown>;
+                    brand = String(obj.BrandDescription ?? brand);
+                  }
+                }
+
+                const models: string[] = [];
+                if (appsField) {
+                  const parsedApps = JSON.parse(appsField.value) as unknown[];
+                  if (Array.isArray(parsedApps)) {
+                    for (const item of parsedApps) {
+                      const a = item as Record<string, unknown>;
+                      const md = String(
+                        a.ModelDescription ?? a.Model2 ?? a.Model ?? ""
+                      );
+                      if (md && !models.includes(md)) models.push(md);
+                      if (models.length >= 6) break;
+                    }
+                  }
+                }
+
+                return (
+                  <div className="mt-3">
+                    <p className="font-semibold text-black text-lg">{brand}</p>
+                    {models.length > 0 && (
+                      <div className="mt-2 text-sm space-y-1">
+                        {models.map((m, i) => (
+                          <div key={i} className="flex justify-between">
+                            <span className="font-semibold">{m}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              } catch {
+                return (
+                  <p className="font-semibold text-black text-lg mt-3">
+                    {raw.vendor}
+                  </p>
+                );
+              }
+            })()}
           </div>
 
           {/* References */}
@@ -402,26 +541,94 @@ export default function ProductDetailPage() {
               <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
             </h3>
 
-            <div className="mt-4 space-y-3 text-lg">
-              <div className="flex justify-between">
-                <span className="font-semibold">HENDRICKSON</span>
-                <span className="w-[50%] text-end">
-                  67428565 , 62000565 , 62011565
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">ATRO</span>
-                <span>TR5042565</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">AUTOMANN</span>
-                <span>TMRN841</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">DAYTON PARTS</span>
-                <span>345943</span>
-              </div>
-            </div>
+            {(() => {
+              try {
+                const compField = raw.metafields?.find((m) =>
+                  /competitor_info/i.test(m.key)
+                );
+                const compsField = raw.metafields?.find((m) =>
+                  /comp$/i.test(m.key)
+                );
+
+                const competitors = compField
+                  ? (JSON.parse(compField.value) as unknown[])
+                  : ([] as unknown[]);
+                const components = compsField
+                  ? (JSON.parse(compsField.value) as unknown[])
+                  : ([] as unknown[]);
+
+                const getFirst = (
+                  obj: Record<string, unknown>,
+                  keys: string[]
+                ) => {
+                  for (const k of keys) {
+                    const v = obj[k];
+                    if (v != null && String(v) !== "") return String(v);
+                  }
+                  return "";
+                };
+
+                return (
+                  <div className="mt-4 space-y-3 text-lg">
+                    {competitors.length > 0 && (
+                      <div>
+                        {competitors.map((c, i) => {
+                          const obj = c as Record<string, unknown>;
+                          return (
+                            <div
+                              key={`comp-${i}`}
+                              className="flex justify-between"
+                            >
+                              <span className="font-semibold">
+                                {getFirst(obj, [
+                                  "CompetitorName",
+                                  "Competitor",
+                                  "CompetitorId",
+                                ])}
+                              </span>
+                              <span>
+                                {getFirst(obj, ["ReferansView", "Referans"])}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {components.length > 0 && (
+                      <div>
+                        {components.map((c, i) => {
+                          const obj = c as Record<string, unknown>;
+                          return (
+                            <div
+                              key={`c-${i}`}
+                              className="flex justify-between"
+                            >
+                              <span className="font-semibold">Component</span>
+                              <span>
+                                {getFirst(obj, ["ComponentNo", "ReferansView"])}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {!competitors.length && !components.length && (
+                      <div className="text-sm text-muted-foreground">
+                        No references available
+                      </div>
+                    )}
+                  </div>
+                );
+              } catch {
+                return (
+                  <div className="mt-4 text-sm text-muted-foreground">
+                    No references available
+                  </div>
+                );
+              }
+            })()}
           </div>
 
           {/* Mobile tech info */}

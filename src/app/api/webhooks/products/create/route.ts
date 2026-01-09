@@ -1,5 +1,6 @@
 import { connectDB } from "@/lib/mongoose/instance";
 import Product from "@/schemas/mongoose/product";
+import { clear } from "console";
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -73,6 +74,15 @@ async function fetchProductMetafields(productId: string) {
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
+    console.log("Webhook raw body:", rawBody);
+    try {
+      console.log(
+        "Webhook headers:",
+        Object.fromEntries(req.headers.entries())
+      );
+    } catch (hdrErr) {
+      console.warn("Could not stringify headers:", hdrErr);
+    }
     const verified = verifyShopifyWebhook(req, rawBody);
 
     if (!verified) {
@@ -80,6 +90,11 @@ export async function POST(req: NextRequest) {
     }
 
     const productData = JSON.parse(rawBody);
+    try {
+      console.log("Parsed webhook JSON:", JSON.stringify(productData, null, 2));
+    } catch (jsonErr) {
+      console.warn("Could not pretty-print parsed JSON:", jsonErr);
+    }
     console.log("Product ID:", productData.id);
 
     // Metafields fetch'i try-catch içine al

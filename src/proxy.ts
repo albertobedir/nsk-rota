@@ -18,6 +18,11 @@ export function proxy(req: NextRequest) {
   const protected_routes = [
     "/basket",
     "/profile",
+    "/profile/account",
+    "/profile/open-orders",
+    "/profile/order-history",
+    "/profile/invoices",
+    "/profile/payment",
     "/orders",
     "/order-history",
     "/products",
@@ -39,13 +44,13 @@ export function proxy(req: NextRequest) {
   const is_auth_route = auth_routes.includes(pathname);
   const is_protected_route = protected_routes.includes(pathname);
 
-  // Eğer kullanıcı login olmuşsa login sayfasına giremez
   if (is_auth_route && is_authenticated) {
-    return NextResponse.redirect(new URL("/products", req.url));
+    return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // Login olmamış kullanıcı korumalı sayfaya girmeye çalışırsa login'e gönder
-  if (is_protected_route && !is_authenticated) {
+  // Eğer kullanıcı login olmamışsa, sadece auth sayfalarına erişebilir.
+  // Herhangi bir başka sayfaya erişmeye çalışırsa login'e gönder.
+  if (!is_authenticated && !is_auth_route) {
     const callback = pathname; // tekrar geri dönecek adres
     return NextResponse.redirect(
       new URL(`/auth/login?redirect=${callback}`, req.url)

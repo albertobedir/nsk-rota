@@ -16,6 +16,7 @@ interface ProductCardProps {
   title: string;
   price: number;
   image: string;
+  shopifyId?: number | string;
   oems?: string[]; // OEM list
   location?: string;
   inStock?: boolean;
@@ -46,6 +47,79 @@ export default function SingleProdCard({
 
   const isExact = matchType === "exact";
   const isPartial = matchType === "partial";
+
+  // Build product detail link id: prefer variant id (numeric part of `variantId`),
+  // fallback to numeric `id` or `code`.
+  const productLinkId = (() => {
+    try {
+      if (variantId) {
+        const s = String(variantId);
+        const m = s.match(/(\d+)$/);
+        if (m) return m[1];
+        if (/^\d+$/.test(s)) return s;
+      }
+
+      if (typeof id === "number") return String(id);
+      if (typeof id === "string" && /^\d{6,}$/.test(id)) return id;
+
+      if (code && typeof code === "string") return code;
+    } catch (e) {
+      /* ignore */
+    }
+    return String(id ?? "unknown");
+  })();
+
+  const renderOemEntry = (entry: any) => {
+    try {
+      if (!entry) return null;
+      if (typeof entry === "string") {
+        const s = entry.trim();
+        // try parse JSON
+        if (s.startsWith("[") || s.startsWith("{")) {
+          const parsed = JSON.parse(s);
+          const obj = Array.isArray(parsed) ? parsed[0] : parsed;
+          if (obj && typeof obj === "object") {
+            const rota = obj.RotaNo || obj.rotaNo || obj.Rota || obj.rota;
+            const oemno = obj.OemNo || obj.OEMNo || obj.oemNo || obj.Oem || "";
+            const brand =
+              obj.MarkaDescription || obj.BrandDescription || obj.Brand || "";
+            return (
+              <div className="leading-tight">
+                <div className="font-semibold">{rota ?? ""}</div>
+                <div className="text-sm text-muted-foreground">
+                  {oemno && <span>{oemno}</span>}
+                  {oemno && brand && <span className="px-2">•</span>}
+                  {brand && <span>{brand}</span>}
+                </div>
+              </div>
+            );
+          }
+        }
+      }
+
+      if (typeof entry === "object") {
+        const obj = entry as any;
+        const rota = obj.RotaNo || obj.rotaNo || obj.Rota || obj.rota;
+        const oemno = obj.OemNo || obj.OEMNo || obj.oemNo || obj.Oem || "";
+        const brand =
+          obj.MarkaDescription || obj.BrandDescription || obj.Brand || "";
+        return (
+          <div className="leading-tight">
+            <div className="font-semibold">{rota ?? ""}</div>
+            <div className="text-sm text-muted-foreground">
+              {oemno && <span>{oemno}</span>}
+              {oemno && brand && <span className="px-2">•</span>}
+              {brand && <span>{brand}</span>}
+            </div>
+          </div>
+        );
+      }
+    } catch (e) {
+      console.warn("parse oem entry failed", e);
+    }
+
+    return <span className="font-normal">{String(entry)}</span>;
+  };
 
   return (
     <Card className="shadow-none bg-white flex flex-col gap-0 rounded-md w-full p-0 border-2">
@@ -99,7 +173,7 @@ export default function SingleProdCard({
 
       <div className="flex flex-col bg-white gap-2 p-3">
         {/* Product Title */}
-        <Link href={`/products/${id}`} className="hover:underline">
+        <Link href={`/products/${productLinkId}`} className="hover:underline">
           <div>
             {/* Prominent code (styled for exact/partial matches) */}
             <p
@@ -150,12 +224,12 @@ export default function SingleProdCard({
 
         {/* OEM dynamic list (first 3) */}
         {oems && oems.length > 0 ? (
-          <div className="relative h-[60px] overflow-hidden text-sm leading-[1.35] pr-3">
-            <div className="absolute right-0 top-0 w-[4px] h-full bg-[#f5a623] rounded-full"></div>
+          <div className="relative h-[60px] overflow-y-scroll text-sm leading-[1.35] pr-3">
+            <div className="absolute right-0 top-0 w-[4px] h-full  rounded-full"></div>
             {oems.slice(0, 3).map((oem, i) => (
-              <p key={i} className="font-semibold">
-                <span className="font-normal">{oem}</span>
-              </p>
+              <div key={i} className="font-semibold">
+                {renderOemEntry(oem)}
+              </div>
             ))}
           </div>
         ) : null}

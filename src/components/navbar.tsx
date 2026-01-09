@@ -133,8 +133,8 @@ export default function Navbar() {
               </button>
             </div>
 
-            <div className="hidden xl:flex col-span-1 w-full justify-end">
-              <div className="bg-white p-1   rounded-xl shadow-md w-[220px]">
+            <div className="col-span-6 xl:col-span-1 w-full flex justify-end">
+              <div className="bg-white p-2 rounded-xl shadow-md w-full md:w-[220px]">
                 {(() => {
                   const creditLimit = Number(user?.creditLimit ?? 0);
                   const creditUsed = Number(user?.creditUsed ?? 0);

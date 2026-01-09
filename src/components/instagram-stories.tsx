@@ -31,16 +31,15 @@ export default function InstagramStories({
   return (
     <section className="w-full py-12 bg-primary">
       <div className="max-w-screen-2xl mx-auto px-6 flex flex-col items-center gap-6">
-        <h3 className="font-extrabold text-white text-6xl mb-6">
-          <a
-            href="https://www.instagram.com/nskgrouprota/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:underline"
-          >
-            Discovery us on Instagram
-          </a>
+        <h3 className="font-extrabold text-white text-5xl mb-6">
+          Trusted by OEMs. Proven by Mechanics
         </h3>
+        <p className="text-white text-2xl max-w-4xl text-center">
+          Discover real experiences from our customers and OEM partners who rely
+          on ROTA’s steering and suspension parts. From long-term collaborations
+          to field-proven performance, these stories reflect our commitment to
+          quality, reliability, and engineering excellence.
+        </p>
 
         <div ref={containerRef} className="w-full flex justify-center">
           <div
@@ -59,8 +58,7 @@ export default function InstagramStories({
                       src={it.videoUrl}
                       muted
                       playsInline
-                      autoPlay
-                      loop
+                      preload="metadata"
                       className="w-full h-full object-cover"
                     />
 

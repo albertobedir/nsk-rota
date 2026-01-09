@@ -285,9 +285,61 @@ export default function ProductsPage() {
               const price = Number(product.raw.variants?.[0]?.price ?? "0");
               const image = product.raw.images?.[0]?.src ?? "/placeholder.png";
 
-              const code =
-                product.raw.metafields.find((m) => m.key === "rota_no")
-                  ?.value ?? "Unknown";
+              const extractRotaNoFromMetafields = (metafields: any[] = []) => {
+                const direct = metafields.find(
+                  (m) => m.key === "rota_no"
+                )?.value;
+                if (direct) return direct;
+
+                const candidate = metafields.find(
+                  (m) =>
+                    m.key === "oem_info" ||
+                    m.key === "brand_info" ||
+                    (m.namespace === "custom" && /(oem|brand)/i.test(m.key))
+                );
+
+                if (candidate) {
+                  try {
+                    const parsed = JSON.parse(candidate.value);
+                    if (Array.isArray(parsed) && parsed[0]) {
+                      return (
+                        parsed[0].RotaNo ||
+                        parsed[0].rotaNo ||
+                        parsed[0].Rota ||
+                        parsed[0].rota ||
+                        "Unknown"
+                      );
+                    }
+                    if (parsed && typeof parsed === "object") {
+                      return (
+                        parsed.RotaNo ||
+                        parsed.rotaNo ||
+                        parsed.Rota ||
+                        parsed.rota ||
+                        "Unknown"
+                      );
+                    }
+                  } catch (e) {
+                    const m = String(candidate.value).match(/\d{3,}/);
+                    if (m) return m[0];
+                  }
+                }
+
+                return "Unknown";
+              };
+
+              const code = extractRotaNoFromMetafields(product.raw.metafields);
+
+              const oemsArr =
+                product.raw.metafields
+                  ?.filter(
+                    (m: any) =>
+                      /(oem|brand)/i.test(m.key) ||
+                      (m.namespace === "custom" && /(oem|brand)/i.test(m.key))
+                  )
+                  ?.map((m: any) => m.value) ?? [];
+
+              const shopifyId = product.shopifyId ?? (product.raw as any)?.id;
 
               // determine match type based on active searchTerm
               const matchType = (() => {
@@ -310,9 +362,10 @@ export default function ProductsPage() {
                   id={code}
                   code={code}
                   title={product.raw.title}
+                  shopifyId={shopifyId}
                   price={price}
                   image={image}
-                  oems={[]}
+                  oems={oemsArr}
                   variantId={`gid://shopify/ProductVariant/${product.raw.variants?.[0]?.id}`}
                   location="CHICAGO"
                   inStock={true}

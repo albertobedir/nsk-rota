@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
     const skipBatch =
       Math.floor(((pageNum - 1) * limitNum) / batchNum) * batchNum;
 
-    const metafieldConditions: MetafieldFilter[] = [];
+    const metafieldConditions: any[] = [];
     // baseQuery holds explicit id-based filters (shopifyId / variant id)
     const baseQuery: Record<string, any> = {};
 
@@ -69,22 +69,40 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Rota No search (ana ürün kodu)
+    // Rota No / OEM search (accepts RotaNo or OemNo inside oem_info)
     if (search) {
       const searchValues = search
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
       const regexArray = searchValues.map((v) => new RegExp(v, "i"));
+      const combinedPattern = searchValues.map((v) => `(${v})`).join("|");
 
+      // Match either a direct rota_no metafield OR the oem_info JSON string containing RotaNo/OemNo
       metafieldConditions.push({
-        "raw.metafields": {
-          $elemMatch: {
-            namespace: "custom",
-            key: "rota_no",
-            value: { $in: regexArray },
+        $or: [
+          {
+            "raw.metafields": {
+              $elemMatch: {
+                namespace: "custom",
+                key: "rota_no",
+                value: { $in: regexArray },
+              },
+            },
           },
-        },
+          {
+            "raw.metafields": {
+              $elemMatch: {
+                namespace: "custom",
+                key: "oem_info",
+                value: {
+                  $regex: combinedPattern,
+                  $options: "i",
+                },
+              },
+            },
+          },
+        ],
       });
     }
 
