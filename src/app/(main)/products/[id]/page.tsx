@@ -41,6 +41,7 @@ export interface ShopifyRaw {
   variants: ShopifyVariant[];
   metafields: ShopifyMetafield[];
   vendor?: string;
+  product_type?: string;
 }
 interface IProduct {
   _id: string;
@@ -116,6 +117,72 @@ export default function ProductDetailPage() {
   const [addingToCart, setAddingToCart] = useState(false);
   // use string so user can clear the input while typing (e.g. replace "1" with "300")
   const [qty, setQty] = useState<string>("1");
+
+  /* Components state (moved up to avoid conditional hook calls) */
+  const [componentsProducts, setComponentsProducts] = useState<
+    { prod: IProduct; qty: number }[]
+  >([]);
+  const [componentsLoading, setComponentsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!product) return;
+
+    let mounted = true;
+
+    (async () => {
+      try {
+        setComponentsLoading(true);
+
+        const compsField = product.raw?.metafields?.find((m) =>
+          /comp$/i.test(m.key)
+        );
+        if (!compsField) {
+          if (mounted) setComponentsProducts([]);
+          return;
+        }
+
+        let parsed: unknown[] = [];
+        try {
+          parsed = JSON.parse(compsField.value) as unknown[];
+        } catch {
+          parsed = [];
+        }
+
+        const results: { prod: IProduct; qty: number }[] = [];
+
+        for (const item of parsed) {
+          const obj = item as Record<string, unknown>;
+          const compNo = String(
+            obj.ComponentNo ?? obj.RotaNo ?? obj.Component ?? ""
+          ).trim();
+          if (!compNo) continue;
+
+          try {
+            const resp = await fetch(
+              `/api/products/gets?search=${encodeURIComponent(compNo)}`
+            );
+            const json = await resp.json().catch(() => null);
+            const found = json?.results?.[0] ?? null;
+            if (found) {
+              const qty =
+                Number(obj.Quantity ?? obj.Count ?? obj.Adet ?? 1) || 1;
+              results.push({ prod: found as IProduct, qty });
+            }
+          } catch (e) {
+            console.warn("Failed to fetch component", compNo, e);
+          }
+        }
+
+        if (mounted) setComponentsProducts(results);
+      } finally {
+        if (mounted) setComponentsLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [product]);
 
   const handleAddToCart = async () => {
     setAddingToCart(true);
@@ -661,6 +728,85 @@ export default function ProductDetailPage() {
           {TechnicalInfo}
         </div>
       </div>
+
+      {/* COMPONENTS (parts used to build this product) */}
+      {(componentsLoading || componentsProducts.length > 0) && (
+        <div className="container px-4 md:px-25 mt-10 w-full">
+          <h3 className="font-bold text-2xl inline-block">
+            Components
+            <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
+          </h3>
+
+          {componentsLoading ? (
+            <div className="py-8 flex items-center justify-center">
+              <Spinner label="Loading components..." size={30} />
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:justify-start items-start gap-4 mt-6">
+              {componentsProducts.map(({ prod, qty }) => {
+                const cp = prod as IProduct;
+                const img = cp.raw.images?.[0]?.src ?? "/placeholder.png";
+                const cpRota = extractRotaNo(cp.raw.metafields);
+
+                const href = `/products/${cp.shopifyId ?? cp._id}`;
+                const compTech = getTechnicalRows(cp.raw.metafields || []);
+
+                return (
+                  <div
+                    key={cp._id}
+                    className="block bg-white rounded-lg p-4 max-w-xs"
+                  >
+                    <div className="w-full h-44 relative mb-4">
+                      <Image
+                        src={img}
+                        alt={cp.raw.title}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+
+                    <div className="mb-2">
+                      <div className="text-xl font-bold">
+                        <a href={href} className="hover:underline">
+                          {cpRota}
+                        </a>{" "}
+                        {qty > 1 && (
+                          <span className="text-base font-normal">
+                            (X {qty})
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-medium">{cp.raw.title}</div>
+                    </div>
+
+                    {compTech.length > 0 && (
+                      <div className="mt-3">
+                        <div className="font-semibold inline-block text-xl border-b-2 border-secondary">
+                          Technical Information
+                        </div>
+
+                        <div className="mt-3 text-sm grid grid-cols-2 gap-y-2">
+                          {compTech.slice(0, 8).map((row: TechInfoRow) => (
+                            <div
+                              key={row.key}
+                              className="flex justify-between col-span-2 border-b border-muted/20 py-2"
+                            >
+                              <span className="font-medium">{row.label}</span>
+                              <span className="text-right">
+                                {row.value_mm || row.value_in}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* SUITABLE MODELS */}
       <div className="container px-4 md:px-25 mt-20 mb-[5rem] w-full">

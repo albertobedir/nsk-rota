@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/carousel";
 import Image from "next/image";
 
-const banners = ["/cr1.jpg", "/cr1.jpg", "/cr3.jpg", "/cr3.jpg", "/cr3.jpg"];
+const banners = ["/cr1.jpg", "/cr2.jpg", "/cr3.jpg"];
 
 export default function HeaderCarousel() {
   const [api, setApi] = React.useState<CarouselApi | null>(null);
