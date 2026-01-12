@@ -74,7 +74,7 @@ export default function Navbar() {
         <div className="h-1.5 bg-primary w-full"></div>
         <div className="container relative flex items-center justify-end">
           <Link
-            href="/"
+            href="https://nskgroup.com.tr/en"
             className="
       relative flex items-center justify-center
       rounded-b-md text-white px-30 text-xs font-medium

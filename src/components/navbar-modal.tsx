@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import useSessionStore from "@/store/session-store";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./ui/sheet";
 
@@ -20,8 +20,6 @@ const categories = [
       { name: "Open Orders", href: "/profile/open-orders" },
       { name: "Order History", href: "/profile/order-history" },
       { name: "Invoices", href: "/profile/invoices" },
-
-      { name: "Payment", href: "/profile/payment" },
     ],
   },
   {
