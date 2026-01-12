@@ -63,8 +63,7 @@ export default function LoginForm() {
       await auth.login(values);
     },
     onSuccess: () => {
-      const callback = searchParams.get("callback");
-      router.push(callback || "/products");
+      router.push("/");
     },
     onError: (error: unknown) => {
       if (error instanceof Error) {

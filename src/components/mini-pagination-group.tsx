@@ -203,20 +203,65 @@ export default function MiniPaginationGroup({
         </button>
 
         <div className="flex items-center gap-2">
-          {Array.from({ length: totalPages }).map((_, i) => {
-            const p = i + 1;
-            return (
-              <button
-                key={p}
-                onClick={() => goto(p)}
-                className={`px-3 py-1 rounded-md ${
-                  p === page ? "bg-secondary text-white" : "bg-white border"
-                }`}
-              >
-                {p}
-              </button>
-            );
-          })}
+          {(() => {
+            type PageToken = number | "ellipsis";
+
+            function buildPagination(
+              total: number,
+              current: number,
+              edge = 3,
+              around = 1
+            ): PageToken[] {
+              if (total <= edge * 2 + around * 2 + 3) {
+                return Array.from({ length: total }, (_, i) => i + 1);
+              }
+
+              const pages = new Set<number>();
+              for (let i = 1; i <= Math.min(edge, total); i++) pages.add(i);
+              for (let i = Math.max(1, total - edge + 1); i <= total; i++)
+                pages.add(i);
+              for (
+                let i = Math.max(1, current - around);
+                i <= Math.min(total, current + around);
+                i++
+              )
+                pages.add(i);
+
+              const arr = Array.from(pages).sort((a, b) => a - b);
+              const out: PageToken[] = [];
+              for (let i = 0; i < arr.length; i++) {
+                out.push(arr[i]);
+                if (i < arr.length - 1 && arr[i + 1] - arr[i] > 1)
+                  out.push("ellipsis");
+              }
+              return out;
+            }
+
+            const tokens = buildPagination(totalPages, page, 3, 1);
+
+            return tokens.map((t, idx) => {
+              if (t === "ellipsis") {
+                return (
+                  <span key={`e-${idx}`} className="px-2 text-sm">
+                    ...
+                  </span>
+                );
+              }
+
+              const p = t as number;
+              return (
+                <button
+                  key={p}
+                  onClick={() => goto(p)}
+                  className={`px-3 py-1 rounded-md ${
+                    p === page ? "bg-secondary text-white" : "bg-white border"
+                  }`}
+                >
+                  {p}
+                </button>
+              );
+            });
+          })()}
         </div>
 
         <button
