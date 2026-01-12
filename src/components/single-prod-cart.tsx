@@ -7,7 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import useSessionStore from "@/store/session-store";
 import Icons from "./icons";
-import { Check } from "lucide-react";
+import { Check, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
 interface ProductCardProps {
@@ -163,12 +163,18 @@ export default function SingleProdCard({
           </div>
         ) : null}
 
-        <Image
-          alt={title}
-          fill
-          className="rounded-[inherit] object-contain"
-          src={image}
-        />
+        {!image ? (
+          <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5 rounded-[inherit]">
+            <ImageIcon size={48} className="text-muted-foreground" />
+          </div>
+        ) : (
+          <Image
+            alt={title}
+            fill
+            className="rounded-[inherit] object-contain"
+            src={image}
+          />
+        )}
       </div>
 
       <div className="flex flex-col bg-white gap-2 p-3">

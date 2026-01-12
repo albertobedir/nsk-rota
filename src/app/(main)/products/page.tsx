@@ -283,7 +283,7 @@ export default function ProductsPage() {
           >
             {products.map((product) => {
               const price = Number(product.raw.variants?.[0]?.price ?? "0");
-              const image = product.raw.images?.[0]?.src ?? "/placeholder.png";
+              const image = product.raw.images?.[0]?.src ?? "";
 
               const extractRotaNoFromMetafields = (metafields: any[] = []) => {
                 const direct = metafields.find(

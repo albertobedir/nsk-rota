@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { Image as ImageIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
@@ -274,7 +275,7 @@ export default function ProductDetailPage() {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  const image = raw.images?.[0]?.src ?? "/placeholder.png";
+  const image = raw.images?.[0]?.src ?? "";
   const extractRotaNo = (metafields: ShopifyMetafield[] = []) => {
     const direct = metafields.find((m) => m.key === "rota_no")?.value;
     if (direct) return direct;
@@ -374,12 +375,18 @@ export default function ProductDetailPage() {
           {(raw.images.length ? raw.images : [{ src: image }]).map((img, i) => (
             <CarouselItem key={i} className="min-h-[300px] md:min-h-[450px]">
               <div className="relative w-full h-[300px] md:h-[450px]">
-                <Image
-                  src={img.src}
-                  alt={title}
-                  fill
-                  className="object-contain"
-                />
+                {!img.src ? (
+                  <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5">
+                    <ImageIcon size={64} className="text-muted-foreground" />
+                  </div>
+                ) : (
+                  <Image
+                    src={img.src}
+                    alt={title}
+                    fill
+                    className="object-contain"
+                  />
+                )}
               </div>
             </CarouselItem>
           ))}
@@ -710,12 +717,21 @@ export default function ProductDetailPage() {
                 (img, i) => (
                   <CarouselItem key={i} className="min-h-[450px]">
                     <div className="relative w-full h-[450px]">
-                      <Image
-                        src={img.src}
-                        alt={title}
-                        fill
-                        className="object-contain"
-                      />
+                      {!img.src ? (
+                        <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5">
+                          <ImageIcon
+                            size={80}
+                            className="text-muted-foreground"
+                          />
+                        </div>
+                      ) : (
+                        <Image
+                          src={img.src}
+                          alt={title}
+                          fill
+                          className="object-contain"
+                        />
+                      )}
                     </div>
                   </CarouselItem>
                 )
@@ -745,7 +761,7 @@ export default function ProductDetailPage() {
             <div className="flex flex-col sm:flex-row sm:justify-start items-start gap-4 mt-6">
               {componentsProducts.map(({ prod, qty }) => {
                 const cp = prod as IProduct;
-                const img = cp.raw.images?.[0]?.src ?? "/placeholder.png";
+                const img = cp.raw.images?.[0]?.src ?? "";
                 const cpRota = extractRotaNo(cp.raw.metafields);
 
                 const href = `/products/${cp.shopifyId ?? cp._id}`;
@@ -757,12 +773,21 @@ export default function ProductDetailPage() {
                     className="block bg-white rounded-lg p-4 max-w-xs"
                   >
                     <div className="w-full h-44 relative mb-4">
-                      <Image
-                        src={img}
-                        alt={cp.raw.title}
-                        fill
-                        className="object-cover"
-                      />
+                      {!img ? (
+                        <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5 rounded-lg">
+                          <ImageIcon
+                            size={48}
+                            className="text-muted-foreground"
+                          />
+                        </div>
+                      ) : (
+                        <Image
+                          src={img}
+                          alt={cp.raw.title}
+                          fill
+                          className="object-cover"
+                        />
+                      )}
                     </div>
 
                     <div className="mb-2">
