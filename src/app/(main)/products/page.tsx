@@ -3,11 +3,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import SingleProdCard from "@/components/single-prod-cart";
 import { useProductsStore } from "@/store/products-store";
 import { Button } from "@/components/ui/button";
 import { Search, Share2, X } from "lucide-react";
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -17,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import Image from "next/image";
+import responseJson from "@/static/response.json";
 
 export default function ProductsPage() {
   const [page, setPage] = useState(1);
@@ -40,7 +51,170 @@ export default function ProductsPage() {
     stock: string[];
   }>({ brand: [], model: [], type: [], desc: [], stock: [] });
 
+  const [maps, setMaps] = useState<{
+    modelsByBrand: Record<string, string[]>;
+    typesByBrandModel: Record<string, string[]>;
+    descsByBrandModelType: Record<string, string[]>;
+  }>({ modelsByBrand: {}, typesByBrandModel: {}, descsByBrandModelType: {} });
+
+  const buildOptionsFromResponse = (data: any) => {
+    // If JSON matches `{ tree: { BRAND: { MODEL: { TYPE: [descs] } } } }` use a specific parser
+    if (
+      data &&
+      typeof data === "object" &&
+      data.tree &&
+      typeof data.tree === "object"
+    ) {
+      const tree = data.tree;
+      const brands = Object.keys(tree).sort();
+      const modelsByBrandPlain: Record<string, string[]> = {};
+      const typesByBrandModelPlain: Record<string, string[]> = {};
+      const descsByBrandModelTypePlain: Record<string, string[]> = {};
+
+      for (const brand of brands) {
+        const modelsObj = tree[brand] || {};
+        const models = Object.keys(modelsObj).sort();
+        modelsByBrandPlain[brand] = models;
+
+        for (const model of models) {
+          const typesObj = modelsObj[model] || {};
+          const types = Object.keys(typesObj).sort();
+          typesByBrandModelPlain[`${brand}||${model}`] = types;
+
+          for (const type of types) {
+            const descs = Array.isArray(typesObj[type])
+              ? typesObj[type].map((d: any) => String(d))
+              : [];
+            descsByBrandModelTypePlain[`${brand}||${model}||${type}`] = descs;
+          }
+        }
+      }
+
+      return {
+        options: { brand: brands, model: [], type: [], desc: [], stock: [] },
+        maps: {
+          modelsByBrand: modelsByBrandPlain,
+          typesByBrandModel: typesByBrandModelPlain,
+          descsByBrandModelType: descsByBrandModelTypePlain,
+        },
+      };
+    }
+
+    // Fallback generic extraction (flatten strings found anywhere)
+    const sets = {
+      brand: new Set<string>(),
+      model: new Set<string>(),
+      type: new Set<string>(),
+      desc: new Set<string>(),
+      stock: new Set<string>(),
+    };
+
+    const visitGeneric = (node: any) => {
+      if (node == null) return;
+      if (Array.isArray(node)) return node.forEach(visitGeneric);
+      if (typeof node === "object") {
+        for (const [k, v] of Object.entries(node)) {
+          const lk = k.toLowerCase();
+          if (
+            typeof v === "string" ||
+            typeof v === "number" ||
+            typeof v === "boolean"
+          ) {
+            const sv = String(v).trim();
+            if (!sv) continue;
+            if (lk.includes("brand")) sets.brand.add(sv);
+            if (lk.includes("model")) sets.model.add(sv);
+            if (lk.includes("type")) sets.type.add(sv);
+            if (lk.includes("desc") || lk.includes("description"))
+              sets.desc.add(sv);
+            if (lk.includes("stock")) sets.stock.add(sv);
+          } else {
+            visitGeneric(v);
+          }
+        }
+      }
+    };
+
+    visitGeneric(data);
+
+    return {
+      options: {
+        brand: Array.from(sets.brand).sort(),
+        model: Array.from(sets.model).sort(),
+        type: Array.from(sets.type).sort(),
+        desc: Array.from(sets.desc).sort(),
+        stock: Array.from(sets.stock).sort(),
+      },
+      maps: {
+        modelsByBrand: {},
+        typesByBrandModel: {},
+        descsByBrandModelType: {},
+      },
+    };
+  };
+
+  const normalizeOptionArray = (arr: any): string[] => {
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((v) => {
+        if (v == null) return null;
+        if (typeof v === "string" || typeof v === "number") return String(v);
+        if (typeof v === "object") {
+          return String(
+            v.label ??
+              v.name ??
+              v.title ??
+              v.value ??
+              v.code ??
+              JSON.stringify(v)
+          );
+        }
+        return null;
+      })
+      .filter(Boolean) as string[];
+  };
+
+  const filterFields = [
+    {
+      key: "brand",
+      label: "Brand",
+      options: options.brand.length
+        ? options.brand
+        : ["HENDRICKSON", "MERCEDES", "SCANIA"],
+      disabled: false,
+    },
+    {
+      key: "model",
+      label: "Model",
+      options: filters.brand ? maps.modelsByBrand[filters.brand] ?? [] : [],
+      disabled: !filters.brand,
+    },
+    {
+      key: "type",
+      label: "Type",
+      options:
+        filters.brand && filters.model
+          ? maps.typesByBrandModel[`${filters.brand}||${filters.model}`] ?? []
+          : [],
+      disabled: !filters.model,
+    },
+    {
+      key: "desc",
+      label: "Description",
+      options:
+        filters.brand && filters.model && filters.type
+          ? maps.descsByBrandModelType[
+              `${filters.brand}||${filters.model}||${filters.type}`
+            ] ?? []
+          : [],
+      disabled: !filters.type,
+    },
+  ];
+
   const totalPages = Math.ceil(total / perPage);
+
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const requestMsgRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     // On mount: fetch dynamic filter options and restore any URL params.
@@ -48,9 +222,27 @@ export default function ProductsPage() {
       try {
         const res = await fetch("/api/products/options");
         const json = await res.json();
-        if (json?.ok && json.options) setOptions(json.options);
+        if (json?.ok && json.options) {
+          const src = json.options;
+          setOptions({
+            brand: normalizeOptionArray(src.brand ?? src.brands ?? []),
+            model: normalizeOptionArray(src.model ?? src.models ?? []),
+            type: normalizeOptionArray(src.type ?? src.types ?? []),
+            desc: normalizeOptionArray(src.desc ?? src.descriptions ?? []),
+            stock: normalizeOptionArray(src.stock ?? []),
+          });
+          // if API returned maps, set them too
+          if (json.options.maps) setMaps(json.options.maps as any);
+        }
       } catch (e) {
-        // ignore — we'll fall back to static lists below
+        // fallback — build hierarchical options and maps from local static nested tree
+        try {
+          const built = buildOptionsFromResponse(responseJson);
+          setOptions((prev) => ({ ...prev, brand: built.options.brand }));
+          setMaps(built.maps as any);
+        } catch (err) {
+          // ignore and leave defaults
+        }
       }
 
       // restore filters from URL if present
@@ -80,6 +272,29 @@ export default function ProductsPage() {
     fetchProducts(page, perPage, filters);
     // Only re-run when page or searchTerm changes — filters won't auto-trigger searches
   }, [page, searchTerm, fetchProducts]);
+
+  // Handler to manage cascading selection and clearing children
+  const handleSelectChange = (key: string, value: string) => {
+    if (key === "brand") {
+      setFilters((prev) => ({
+        ...prev,
+        brand: value,
+        model: "",
+        type: "",
+        desc: "",
+      }));
+      return;
+    }
+    if (key === "model") {
+      setFilters((prev) => ({ ...prev, model: value, type: "", desc: "" }));
+      return;
+    }
+    if (key === "type") {
+      setFilters((prev) => ({ ...prev, type: value, desc: "" }));
+      return;
+    }
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
 
   const clearAllFilters = () => {
     setFilters({
@@ -155,36 +370,22 @@ export default function ProductsPage() {
           gap-4 w-full
         "
         >
-          {[
-            {
-              key: "brand",
-              label: "Brand",
-              options: ["HENDRICKSON", "MERCEDES", "SCANIA"],
-            },
-            { key: "model", label: "Model", options: ["ACTROS", "AXOR", "XF"] },
-            {
-              key: "type",
-              label: "Type",
-              options: ["TRUCK", "TRAILER", "BUS"],
-            },
-            {
-              key: "desc",
-              label: "Description",
-              options: ["STEERING", "ROD", "ARM"],
-            },
-          ].map((f) => (
+          {filterFields.map((f) => (
             <Select
               key={f.key}
-              onValueChange={(v) =>
-                setFilters((prev) => ({ ...prev, [f.key]: v }))
-              }
+              onValueChange={(v) => handleSelectChange(f.key, v)}
               value={filters[f.key as keyof typeof filters]}
             >
-              <SelectTrigger className="w-full h-[52px] bg-[#f7f7f7] text-[16px] rounded-md px-4">
+              <SelectTrigger
+                className={`w-full h-[52px] bg-[#f7f7f7] text-[16px] rounded-md px-4 ${
+                  (f as any).disabled ? "opacity-50 pointer-events-none" : ""
+                }`}
+                aria-disabled={(f as any).disabled}
+              >
                 <SelectValue placeholder={f.label} />
               </SelectTrigger>
               <SelectContent>
-                {f.options.map((opt) => (
+                {((f.options as string[]) || []).map((opt) => (
                   <SelectItem
                     key={opt}
                     value={opt}
@@ -264,10 +465,168 @@ export default function ProductsPage() {
       <div className="mx-auto sm:px-27 w-full max-w-[1540px] px-4 py-10">
         {searchTerm && products.length === 0 ? (
           <div className="w-full py-24 flex flex-col items-center justify-center">
-            <p className="text-xl font-semibold">No results found</p>
+            <h2 className="text-4xl font-bold">Out of stock</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              &quot;{searchTerm}&quot; No results found
+              We couldn&apos;t find &quot;{searchTerm}&quot; in our available
+              stock.
             </p>
+
+            <div className="mt-6 flex gap-4">
+              {/* Desktop: show modal */}
+              <div className="hidden md:block">
+                <Button
+                  className="bg-white text-secondary border"
+                  onClick={() => setShowRequestModal(true)}
+                >
+                  Request product
+                </Button>
+              </div>
+
+              {/* Mobile: Sheet trigger */}
+              <div className="md:hidden">
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button className="bg-white text-secondary border">
+                      Request product
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="max-w-lg">
+                    <SheetHeader>
+                      <SheetTitle>Request product: {searchTerm}</SheetTitle>
+                    </SheetHeader>
+
+                    <div className="p-4">
+                      <label className="block font-medium mb-2">Details</label>
+                      <Textarea
+                        id="product-request-message"
+                        defaultValue={`I'm looking for: ${searchTerm}`}
+                      />
+                    </div>
+
+                    <SheetFooter>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={async () => {
+                            try {
+                              const ta = document.getElementById(
+                                "product-request-message"
+                              ) as HTMLTextAreaElement | null;
+                              const message = ta
+                                ? ta.value
+                                : `I'm looking for ${searchTerm}`;
+                              const resp = await fetch(
+                                `/api/requests/product`,
+                                {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    query: searchTerm,
+                                    message,
+                                  }),
+                                }
+                              );
+                              if (resp.ok) {
+                                toast.success("Request submitted");
+                                const close = document.querySelector(
+                                  '[data-slot="sheet-close"]'
+                                ) as HTMLElement | null;
+                                if (close) close.click();
+                              } else {
+                                toast.error("Failed to submit request");
+                              }
+                            } catch (e) {
+                              console.error(e);
+                              toast.error("Failed to submit request");
+                            }
+                          }}
+                        >
+                          Send request
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            const close = document.querySelector(
+                              '[data-slot="sheet-close"]'
+                            ) as HTMLElement | null;
+                            if (close) close.click();
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </SheetFooter>
+                  </SheetContent>
+                </Sheet>
+              </div>
+            </div>
+
+            {/* Desktop modal overlay */}
+            {showRequestModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div
+                  className="absolute inset-0 bg-black/50"
+                  onClick={() => setShowRequestModal(false)}
+                />
+
+                <div className="bg-white rounded-lg max-w-lg w-full z-10 p-6">
+                  <h3 className="text-lg font-semibold mb-2">
+                    Request product: {searchTerm}
+                  </h3>
+                  <label className="block font-medium mb-2">Details</label>
+                  <textarea
+                    id="product-request-message-desktop"
+                    defaultValue={`I'm looking for: ${searchTerm}`}
+                    ref={requestMsgRef}
+                    className="border-input w-full rounded-md px-3 py-2 mb-4"
+                    rows={6}
+                  />
+
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const ta = document.getElementById(
+                            "product-request-message-desktop"
+                          ) as HTMLTextAreaElement | null;
+                          const message = ta
+                            ? ta.value
+                            : `I'm looking for ${searchTerm}`;
+                          const resp = await fetch(`/api/requests/product`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              query: searchTerm,
+                              message,
+                            }),
+                          });
+                          if (resp.ok) {
+                            toast.success("Request submitted");
+                            setShowRequestModal(false);
+                          } else {
+                            toast.error("Failed to submit request");
+                          }
+                        } catch (e) {
+                          console.error(e);
+                          toast.error("Failed to submit request");
+                        }
+                      }}
+                    >
+                      Send request
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      onClick={() => setShowRequestModal(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div

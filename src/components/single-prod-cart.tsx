@@ -63,6 +63,7 @@ export default function SingleProdCard({
       if (typeof id === "string" && /^\d{6,}$/.test(id)) return id;
 
       if (code && typeof code === "string") return code;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {
       /* ignore */
     }

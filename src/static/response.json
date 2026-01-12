@@ -1,0 +1,2231 @@
+{
+  "tree": {
+    "ISUZU": {
+      "NPR": {
+        "66": ["Tie Rod End"],
+        "75": ["Centre Rod"]
+      },
+      "NKR": {
+        "55": ["Tie Rod End"]
+      },
+      "NNR": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "H SERIES": {
+        "05-08": ["Drag Link"],
+        "H6500": ["Drag Link"],
+        "H7500": ["Drag Link"]
+      }
+    },
+    "VOLVO": {
+      "VM": {
+        "_NO_TYPE_": [
+          "Mounting, Engine",
+          "Torque Rod",
+          "Repair Kit, Torque & V Rod",
+          "V Stay Arm (V-Rod)"
+        ]
+      },
+      "VHD": {
+        "_NO_TYPE_": ["Tie Rod End", "Torque Rod"]
+      },
+      "VNL Gen II": {
+        "_NO_TYPE_": ["Tie Rod End", "Drag Link"]
+      },
+      "WIA": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "VNM Gen I": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "VNM Gen III": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "WIM": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "VNL Gen I": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "VNL Gen III": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "VNM Gen II": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "VNR": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "VT": {
+        "VT880": ["Tie Rod End", "Torque Rod"]
+      },
+      "WCM": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "VNL II": {
+        "_NO_TYPE_": [
+          "Torque Rod",
+          "Drag Link",
+          "Tie Rod Assembly, Steering",
+          "Repair Kit, Torque & V Rod"
+        ]
+      },
+      "VNM II": {
+        "_NO_TYPE_": ["Torque Rod"]
+      },
+      "WG": {
+        "WG64": ["Torque Rod"]
+      },
+      "VN": {
+        "_NO_TYPE_": ["Torque Rod"]
+      },
+      "FE": {
+        "FE 240-18": ["Repair Kit, Torque & V Rod"],
+        "FE 240-26": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "FE 280-26": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "FE 320-26": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "FE 260-26": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "FE 300-26": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "FE 340-26": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"]
+      },
+      "FH": {
+        "400": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "420": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "440": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "460": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "480": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "500": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "520": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "540": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"]
+      },
+      "FH12": {
+        "FH 12/340": [
+          "Repair Kit, Torque & V Rod",
+          "V Stay Arm (V-Rod)",
+          "Torque Rod",
+          "Mounting, Spring"
+        ],
+        "FH 12/380": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 12/420": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 12/460": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 12/500": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 12/430": ["V Stay Arm (V-Rod)"],
+        "FH 12/390": ["V Stay Arm (V-Rod)"]
+      },
+      "FH16": {
+        "FH 16/520": [
+          "Repair Kit, Torque & V Rod",
+          "V Stay Arm (V-Rod)",
+          "Torque Rod",
+          "Mounting, Spring"
+        ],
+        "FH 16/470": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 16/540, FH 16/550": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 16/610": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 16/550": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 16/540": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 16/580": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 16/600": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 16/660": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 16/700": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FH 16/750": ["V Stay Arm (V-Rod)"]
+      },
+      "FL6": {
+        "FL 608": [
+          "Repair Kit, Torque & V Rod",
+          "V Stay Arm (V-Rod)",
+          "Torque Rod"
+        ],
+        "FL 621": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 626": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 611": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 612": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 614": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 615": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 618": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 609": ["Torque Rod"],
+        "FL 610": ["Torque Rod"],
+        "FL 613": ["Torque Rod"],
+        "FL 616": ["Torque Rod"],
+        "FL 617": ["Torque Rod"],
+        "FL 619": ["Torque Rod", "V Stay Arm (V-Rod)"]
+      },
+      "FM": {
+        "FM 300": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "FM 380": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 430": ["V Stay Arm (V-Rod)"],
+        "FM 330": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 370": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 450": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 410": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 420": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 460": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 500": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 340": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 390": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 400": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 440": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 480": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FM 360": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"]
+      },
+      "FM7": {
+        "FM 7/250": [
+          "Repair Kit, Torque & V Rod",
+          "V Stay Arm (V-Rod)",
+          "Torque Rod",
+          "Mounting, Spring"
+        ],
+        "FM 7/290": ["V Stay Arm (V-Rod)", "Torque Rod"]
+      },
+      "FM9": {
+        "FM 9/260": [
+          "Repair Kit, Torque & V Rod",
+          "V Stay Arm (V-Rod)",
+          "Torque Rod"
+        ],
+        "FM 9/300": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FM 9/340": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FM 9/380": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ]
+      },
+      "FM10": {
+        "FM 10/320": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "FM 10/360": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ]
+      },
+      "FM12": {
+        "FM 12/340": [
+          "Repair Kit, Torque & V Rod",
+          "V Stay Arm (V-Rod)",
+          "Torque Rod",
+          "Mounting, Spring"
+        ],
+        "FM 12H/340": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FM 12/380": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FM 12H/380": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FM 12/420": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FM 12/460": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FM 12H/420": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ]
+      },
+      "FL12": {
+        "FL 12/380": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Mounting, Spring"
+        ],
+        "FL 12H/380": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FL 12/420": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FL 12H/420": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"]
+      },
+      "NH12": {
+        "NH 12/380": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "NH 12/420": ["V Stay Arm (V-Rod)", "Mounting, Spring"],
+        "NH 12/460": ["V Stay Arm (V-Rod)"],
+        "NH 12/340": ["V Stay Arm (V-Rod)"]
+      },
+      "FL": {
+        "FL 180-18": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FL 180-21": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 180-26": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 180-17": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FL 220-17": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FL 220-26": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 220-16": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FL 220-19": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 250-17": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FL 250-18": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FL 250-19": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 250-26": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 250-16": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod"
+        ],
+        "FL 180-7,5": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 180-8": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 180-9": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 180-10": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 180-11": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 180-12": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 180-13": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 180-14": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 180-15": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 180-16": [
+          "Repair Kit, Torque & V Rod",
+          "V Stay Arm (V-Rod)",
+          "Torque Rod"
+        ],
+        "FL 220-7,5": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 250-7,5": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 220-8": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 250-8": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 220-9": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 250-9": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 220-10": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 250-10": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 220-11": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 250-11": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 220-12": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 250-12": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 220-13": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 250-13": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 220-14": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 250-14": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 220-15": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 250-15": ["Repair Kit, Torque & V Rod", "Torque Rod"],
+        "FL 220-18": [
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod",
+          "V Stay Arm (V-Rod)"
+        ],
+        "FL 180-19": ["V Stay Arm (V-Rod)"],
+        "FL 220-21": ["V Stay Arm (V-Rod)"],
+        "FL 250-21": ["V Stay Arm (V-Rod)"]
+      },
+      "FMX": {
+        "330": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "370": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "380": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "400": ["V Stay Arm (V-Rod)"],
+        "410": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "420": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "430": ["V Stay Arm (V-Rod)"],
+        "440": ["V Stay Arm (V-Rod)"],
+        "450": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "460": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "480": ["V Stay Arm (V-Rod)"],
+        "500": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"]
+      },
+      "FH II": {
+        "420": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "460": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "480": ["V Stay Arm (V-Rod)"],
+        "500": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "540": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "420 LNG": ["V Stay Arm (V-Rod)"],
+        "460 LNG": ["V Stay Arm (V-Rod)"]
+      },
+      "FH16 II": {
+        "FH 16/540, FH 16/550": [
+          "V Stay Arm (V-Rod)",
+          "Repair Kit, Torque & V Rod"
+        ],
+        "FH 16/600": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FH 16/700": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FH 16/750": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FH 16/650": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "FH 16/550": ["V Stay Arm (V-Rod)"]
+      },
+      "FMX II": {
+        "330": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "370": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "410": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "420": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "450": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "460": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "500": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"],
+        "540": ["V Stay Arm (V-Rod)", "Repair Kit, Torque & V Rod"]
+      },
+      "FM II": {
+        "FM 370": ["V Stay Arm (V-Rod)"],
+        "FM 420 LNG": ["V Stay Arm (V-Rod)"],
+        "FM 460 LNG": ["V Stay Arm (V-Rod)"],
+        "FM 420": ["V Stay Arm (V-Rod)"],
+        "FM 460": ["V Stay Arm (V-Rod)"],
+        "FM 500": ["V Stay Arm (V-Rod)"]
+      },
+      "FMX III": {
+        "330": ["V Stay Arm (V-Rod)"],
+        "380": ["V Stay Arm (V-Rod)"],
+        "420": ["V Stay Arm (V-Rod)"],
+        "430": ["V Stay Arm (V-Rod)"],
+        "460": ["V Stay Arm (V-Rod)"],
+        "500": ["V Stay Arm (V-Rod)"],
+        "540": ["V Stay Arm (V-Rod)"],
+        "460 LNG": ["V Stay Arm (V-Rod)"],
+        "420 LNG": ["V Stay Arm (V-Rod)"]
+      },
+      "FM III": {
+        "330": ["V Stay Arm (V-Rod)"],
+        "380": ["V Stay Arm (V-Rod)"],
+        "420": ["V Stay Arm (V-Rod)"],
+        "430": ["V Stay Arm (V-Rod)"],
+        "460": ["V Stay Arm (V-Rod)"],
+        "500": ["V Stay Arm (V-Rod)"],
+        "420 LNG": ["V Stay Arm (V-Rod)"],
+        "460 LNG": ["V Stay Arm (V-Rod)"]
+      },
+      "FH16 III": {
+        "550": ["V Stay Arm (V-Rod)"],
+        "650": ["V Stay Arm (V-Rod)"],
+        "750": ["V Stay Arm (V-Rod)"]
+      },
+      "FH III": {
+        "420": ["V Stay Arm (V-Rod)"],
+        "460": ["V Stay Arm (V-Rod)"],
+        "500": ["V Stay Arm (V-Rod)"],
+        "540": ["V Stay Arm (V-Rod)"],
+        "460 LNG": ["V Stay Arm (V-Rod)"],
+        "420 LNG": ["V Stay Arm (V-Rod)"]
+      },
+      "FE II": {
+        "FE 280-26": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "FE 320-26": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "FE 260-26": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "FE 300-26": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "FE 340-26": ["Repair Kit, Torque & V Rod", "V Stay Arm (V-Rod)"],
+        "FE 320-26 CNG": ["V Stay Arm (V-Rod)"]
+      },
+      "T-RIDE": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "FL II": {
+        "FL 290-12": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "FL 240-12": ["Torque Rod"],
+        "FL 280-12": ["Torque Rod"],
+        "FL 240-18": ["Torque Rod"],
+        "FL 280-18": ["Torque Rod"],
+        "FL 240-16": ["Torque Rod"],
+        "FL 240-15": ["Torque Rod"],
+        "FL 280-15": ["Torque Rod"],
+        "FL 280-16": ["Torque Rod"],
+        "FL 240-14": ["Torque Rod"],
+        "FL 260-15": ["Torque Rod"],
+        "FL 260-12": ["Torque Rod"],
+        "FL 260-14": ["Torque Rod"],
+        "FL 260-16": ["Torque Rod"],
+        "FL 290-16": ["Torque Rod"],
+        "FL 260-18": ["Torque Rod"],
+        "FL 290-18": ["Torque Rod"],
+        "FL 280-14": ["Torque Rod"],
+        "FL 290-14": ["Torque Rod"],
+        "FL 300-12": ["Torque Rod"],
+        "FL 300-13": ["Torque Rod"],
+        "FL 300-14": ["Torque Rod"],
+        "FL 300-15": ["Torque Rod"],
+        "FL 300-16": ["Torque Rod"],
+        "FL 300-18": ["Torque Rod"],
+        "FL 340-12": ["Torque Rod"],
+        "FL 340-13": ["Torque Rod"],
+        "FL 340-14": ["Torque Rod"],
+        "FL 340-15": ["Torque Rod"],
+        "FL 340-16": ["Torque Rod"],
+        "FL 340-18": ["Torque Rod"]
+      },
+      "FL III": {
+        "FL 250-14": ["Torque Rod"],
+        "FL 210-12": ["Torque Rod"],
+        "FL 240-12": ["Torque Rod"],
+        "FL 250-12": ["Torque Rod"],
+        "FL 280-12": ["Torque Rod"],
+        "FL 280-14": ["Torque Rod"],
+        "FL 250-16": ["Torque Rod"],
+        "FL 280-16": ["Torque Rod"],
+        "FL 240-18": ["Torque Rod"],
+        "FL 280-18": ["Torque Rod"],
+        "FL 260-18": ["Torque Rod"],
+        "FL 290-18": ["Torque Rod"],
+        "FL 260-12": ["Torque Rod"],
+        "FL 290-12": ["Torque Rod"],
+        "FL 240-14": ["Torque Rod"],
+        "FL 260-14": ["Torque Rod"],
+        "FL 290-14": ["Torque Rod"],
+        "FL 240-16": ["Torque Rod"],
+        "FL 260-16": ["Torque Rod"],
+        "FL 290-16": ["Torque Rod"],
+        "FL 240-15": ["Torque Rod"],
+        "FL 260-15": ["Torque Rod"],
+        "FL 210-10": ["Torque Rod"],
+        "FL 240-10": ["Torque Rod"],
+        "FL 210-14": ["Torque Rod"],
+        "FL 210-16": ["Torque Rod"],
+        "FL 250-18": ["Torque Rod"],
+        "ELECTRIC": ["Torque Rod"]
+      },
+      "VNL": {
+        "_NO_TYPE_": ["Torque Rod"]
+      },
+      "VNM": {
+        "_NO_TYPE_": ["Torque Rod"]
+      },
+      "FL10": {
+        "FL 10/320": ["Mounting, Spring"]
+      },
+      "N10": {
+        "N 10/300": ["Mounting, Spring"]
+      },
+      "N12": {
+        "N 12/290": ["Mounting, Spring"]
+      },
+      "NL10": {
+        "_NO_TYPE_": ["Mounting, Spring"]
+      },
+      "NL12": {
+        "_NO_TYPE_": ["Mounting, Spring"]
+      }
+    },
+    "FREIGHTLINER": {
+      "CASCADIA SERIES": {
+        "Cascadia 113": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod",
+          "Tie Rod End",
+          "V Stay Arm (V-Rod)"
+        ],
+        "Cascadia 125": [
+          "Drag Link",
+          "Tie Rod Assembly, Steering",
+          "Repair Kit, Torque & V Rod",
+          "Torque Rod",
+          "Tie Rod End",
+          "V Stay Arm (V-Rod)"
+        ],
+        "Cascadia 126": [
+          "Tie Rod Assembly, Steering",
+          "Repair Kit, Torque & V Rod",
+          "Tie Rod End",
+          "Drag Link",
+          "V Stay Arm (V-Rod)"
+        ],
+        "Cascadia 116": [
+          "Tie Rod Assembly, Steering",
+          "Tie Rod End",
+          "Repair Kit, Torque & V Rod",
+          "Drag Link",
+          "V Stay Arm (V-Rod)"
+        ],
+        "Columbia 120 Glider": ["Drag Link", "Tie Rod Assembly, Steering"],
+        "Cascadia 112": ["Drag Link"],
+        "Cascadia 120": ["Drag Link"]
+      },
+      "CENTURY SERIES": {
+        "Century 120": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ],
+        "Century 112": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ]
+      },
+      "FL SERIES": {
+        "FL106": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ],
+        "FL80": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ],
+        "FL60": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ],
+        "FL70": [
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod Assembly, Steering",
+          "Tie Rod End"
+        ],
+        "FL50": [
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod Assembly, Steering",
+          "Tie Rod End"
+        ],
+        "FL Business Class": ["Tie Rod End"]
+      },
+      "M2 SERIES": {
+        "M2 Business Class": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ],
+        "M2-106": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ],
+        "M2-112": [
+          "Tie Rod Assembly, Steering",
+          "Torque Rod",
+          "Drag Link",
+          "Tie Rod End"
+        ]
+      },
+      "ARGOSY SERIES": {
+        "Argosy": ["Tie Rod Assembly, Steering", "Drag Link", "Torque Rod"]
+      },
+      "FLC SERIES": {
+        "FLC112": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ],
+        "FLC120": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ]
+      },
+      "CLASSIC SERIES": {
+        "Classic XL 132": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ],
+        "Classic 120": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ]
+      },
+      "COLUMBIA SERIES": {
+        "Columbia 120": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ],
+        "Columbia 112": [
+          "Drag Link",
+          "Tie Rod Assembly, Steering",
+          "Torque Rod",
+          "Tie Rod End"
+        ]
+      },
+      "114SD": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering", "Drag Link", "Torque Rod"]
+      },
+      "CORONADO SERIES": {
+        "Coronado 132": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ],
+        "Coronado New Style": [
+          "Tie Rod Assembly, Steering",
+          "Drag Link",
+          "Torque Rod",
+          "Tie Rod End"
+        ]
+      },
+      "122SD": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering", "Drag Link", "Torque Rod"]
+      },
+      "FLT SERIES": {
+        "FLT Cabover": [
+          "Tie Rod Assembly, Steering",
+          "Torque Rod",
+          "Drag Link",
+          "Tie Rod End"
+        ]
+      },
+      "108SD": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering", "Drag Link", "Torque Rod"]
+      },
+      "FLD SERIES": {
+        "FLD112": [
+          "Tie Rod Assembly, Steering",
+          "Torque Rod",
+          "Drag Link",
+          "Tie Rod End"
+        ],
+        "FLD120": ["Drag Link", "Torque Rod", "Tie Rod End"]
+      },
+      "FASII AIRLINER": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "FAS AIRLINER": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "TUFTRAC": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "MT55": {
+        "_NO_TYPE_": ["Drag Link"]
+      },
+      "ARGOSY": {
+        "Argosy": ["Tie Rod End"]
+      },
+      "MB SERIES": {
+        "_NO_TYPE_": ["Drag Link"]
+      },
+      "FH34A-44A FOUR SPRING": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "FH36-40 3\" SPRING": {
+        "SUSPENSION": ["Torque Rod"]
+      }
+    },
+    "MERITOR": {
+      "FF-943": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "RF-16": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "RF-21": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "MFS-12": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FF-931": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "MFS-8": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FL-941": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FF-941": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "RF-23": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FL-931": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FG-941": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FD-931": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FF-942": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FC-901": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FL-943": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FF-961": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FF-981": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FF-982": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FC-941": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FF-986": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "FH-945": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "MFS-13": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "MFS-10": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      }
+    },
+    "GMC": {
+      "TOPKICK SERIES III": {
+        "C6500": ["Tie Rod End", "Drag Link"],
+        "C4500": ["Tie Rod End", "Drag Link"],
+        "C5500": ["Tie Rod End", "Drag Link"],
+        "C7500": ["Tie Rod End", "Drag Link"]
+      },
+      "B SERIES": {
+        "_NO_TYPE_": ["Drag Link"]
+      },
+      "C SERIES": {
+        "_NO_TYPE_": ["Drag Link"]
+      }
+    },
+    "CHEVROLET": {
+      "KODIAK SERIES III": {
+        "C4500": ["Tie Rod End", "Drag Link"],
+        "C6500": ["Tie Rod End", "Drag Link"],
+        "C7500": ["Tie Rod End", "Drag Link"],
+        "C5500": ["Tie Rod End", "Drag Link"]
+      },
+      "B SERIES": {
+        "_NO_TYPE_": ["Drag Link"]
+      },
+      "C SERIES": {
+        "_NO_TYPE_": ["Drag Link"]
+      }
+    },
+    "MACK": {
+      "DM SERIES": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering", "Drag Link"]
+      },
+      "RD SERIES": {
+        "RD700": ["Tie Rod End"],
+        "RD400": ["Tie Rod End"],
+        "RD600": ["Tie Rod End", "Drag Link"],
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "R SERIES": {
+        "R685R": ["Tie Rod End"],
+        "R685ST": ["Tie Rod End"],
+        "R686ST": ["Tie Rod End"],
+        "R600LS": ["Tie Rod End"],
+        "R700L": ["Tie Rod End"],
+        "R700LS": ["Tie Rod End"],
+        "RWL700S": ["Tie Rod End"],
+        "R700": ["Tie Rod End"],
+        "R767ST": ["Tie Rod End"],
+        "_NO_TYPE_": ["Torque Rod", "Tie Rod End"]
+      },
+      "U SERIES": {
+        "U600": ["Tie Rod End"],
+        "U68ST": ["Tie Rod End"]
+      },
+      "MAXLITE 40": {
+        "_NO_TYPE_": ["Torque Rod", "Drag Link"]
+      },
+      "MAXLITE 40EZ": {
+        "_NO_TYPE_": ["Torque Rod", "Drag Link"]
+      },
+      "CHN SERIES": {
+        "CHN613": ["Torque Rod", "Tie Rod End", "Repair Kit, Torque & V Rod"]
+      },
+      "CHU SERIES": {
+        "CHU613": ["Torque Rod", "Tie Rod End", "Repair Kit, Torque & V Rod"]
+      },
+      "CXN SERIES": {
+        "CXN613": ["Torque Rod", "Tie Rod End", "Repair Kit, Torque & V Rod"]
+      },
+      "CXU SERIES": {
+        "CXU613": ["Torque Rod", "Tie Rod End", "Repair Kit, Torque & V Rod"]
+      },
+      "CV SERIES": {
+        "CV713": [
+          "Drag Link",
+          "Tie Rod End",
+          "Torque Rod",
+          "Repair Kit, Torque & V Rod"
+        ]
+      },
+      "GU SERIES": {
+        "GU713": [
+          "Drag Link",
+          "Tie Rod End",
+          "Torque Rod",
+          "Repair Kit, Torque & V Rod"
+        ],
+        "GU813": [
+          "Drag Link",
+          "Tie Rod End",
+          "Torque Rod",
+          "Repair Kit, Torque & V Rod"
+        ],
+        "GU803": ["Torque Rod"]
+      },
+      "MR SERIES": {
+        "_NO_TYPE_": [
+          "Drag Link",
+          "Tie Rod End",
+          "Torque Rod",
+          "Repair Kit, Torque & V Rod"
+        ]
+      },
+      "AL40": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "AL AIR": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "CAMELBACK": {
+        "_NO_TYPE_": ["Torque Rod"]
+      },
+      "RW": {
+        "Superliner": ["Tie Rod End"]
+      },
+      "CH SERIES": {
+        "CH SBA": ["Tie Rod End"],
+        "CH SFA": ["Tie Rod End"],
+        "CH612": ["Torque Rod"],
+        "CH613": ["Torque Rod", "Drag Link"]
+      },
+      "CX SERIES": {
+        "CX613": ["Tie Rod End"]
+      },
+      "CT SERIES": {
+        "CT713": ["Torque Rod"]
+      }
+    },
+    "NAVISTAR": {
+      "9000 SERIES": {
+        "9100": ["Tie Rod End", "Tie Rod Assembly, Steering", "Drag Link"],
+        "9200": [
+          "Tie Rod End",
+          "Drag Link",
+          "Tie Rod Assembly, Steering",
+          "Torque Rod"
+        ],
+        "9300": ["Tie Rod End", "Drag Link", "Torque Rod", "Inner Tie Rod End"],
+        "9370": ["Torque Rod"],
+        "9400": [
+          "Tie Rod End",
+          "Drag Link",
+          "Tie Rod Assembly, Steering",
+          "Torque Rod",
+          "Inner Tie Rod End"
+        ],
+        "9600": ["Tie Rod End", "Inner Tie Rod End", "Torque Rod"],
+        "9670": ["Torque Rod"],
+        "9700": [
+          "Tie Rod End",
+          "Tie Rod Assembly, Steering",
+          "Inner Tie Rod End",
+          "Torque Rod"
+        ],
+        "9800": ["Tie Rod End", "Torque Rod"],
+        "9900": [
+          "Tie Rod End",
+          "Drag Link",
+          "Tie Rod Assembly, Steering",
+          "Torque Rod"
+        ],
+        "9200I": ["Drag Link"],
+        "9400I": ["Drag Link"]
+      },
+      "8000 SERIES": {
+        "8000": ["Drag Link", "Torque Rod"],
+        "8100": ["Tie Rod End", "Drag Link", "Torque Rod"],
+        "8200": ["Tie Rod End", "Drag Link", "Torque Rod"],
+        "8300": ["Tie Rod End", "Drag Link", "Torque Rod"],
+        "8500": ["Tie Rod End", "Drag Link"],
+        "8600": ["Tie Rod End", "Tie Rod Assembly, Steering", "Torque Rod"]
+      },
+      "4000 SERIES": {
+        "4100": ["Drag Link", "Tie Rod End", "Torque Rod"],
+        "4300": ["Drag Link"],
+        "4400": ["Drag Link", "Tie Rod End", "Torque Rod"],
+        "4500": ["Drag Link"],
+        "4600": ["Tie Rod End", "Drag Link"],
+        "4700": ["Tie Rod End", "Drag Link", "Torque Rod"],
+        "4800": ["Tie Rod End", "Drag Link"],
+        "4900": ["Tie Rod End", "Drag Link", "Torque Rod"]
+      },
+      "S SERIES HEAVY DUTY": {
+        "2275": ["Tie Rod End", "Drag Link"],
+        "2276": ["Tie Rod End", "Drag Link"],
+        "2375": ["Tie Rod End", "Drag Link"],
+        "2524": ["Tie Rod End", "Drag Link"],
+        "2554": ["Tie Rod End", "Drag Link"],
+        "2574": ["Tie Rod End", "Drag Link"],
+        "2575": ["Drag Link", "Tie Rod End"],
+        "2624": ["Drag Link", "Tie Rod End"],
+        "2654": ["Tie Rod End", "Drag Link"],
+        "2674": ["Tie Rod End", "Drag Link"],
+        "2675": ["Tie Rod End", "Drag Link"],
+        "F2524": ["Tie Rod End", "Drag Link"],
+        "F2554": ["Tie Rod End", "Drag Link"],
+        "F2574": ["Tie Rod End", "Drag Link"],
+        "F2275": ["Tie Rod End", "Drag Link"],
+        "F2276": ["Tie Rod End", "Drag Link"],
+        "F2375": ["Tie Rod End", "Drag Link"],
+        "F2654": ["Tie Rod End", "Drag Link"],
+        "F2674": ["Tie Rod End", "Drag Link"],
+        "F2675": ["Tie Rod End", "Drag Link"],
+        "F2575": ["Drag Link", "Tie Rod End"],
+        "F2624": ["Drag Link", "Tie Rod End"]
+      },
+      "3000 SERIES": {
+        "3700": ["Tie Rod End", "Drag Link"],
+        "3800": ["Tie Rod End", "Drag Link"],
+        "3900": ["Tie Rod End", "Drag Link"],
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "7000 SERIES": {
+        "7000": ["Torque Rod"],
+        "7100": ["Tie Rod End", "Drag Link"],
+        "7300": ["Drag Link"],
+        "7400": ["Drag Link", "Torque Rod"],
+        "7500": ["Drag Link", "Torque Rod"],
+        "7600": ["Drag Link"],
+        "7700": ["Drag Link"]
+      },
+      "CARGOSTAR SERIES": {
+        "CO1610": ["Tie Rod End"],
+        "CO1630": ["Tie Rod End"],
+        "CO1710": ["Tie Rod End"],
+        "CO1730": ["Tie Rod End"],
+        "CO1750": ["Tie Rod End"],
+        "C01810": ["Tie Rod End"],
+        "COF1810": ["Tie Rod End"],
+        "CO1830": ["Tie Rod End"],
+        "CO1850": ["Tie Rod End"],
+        "CO1910": ["Tie Rod End"],
+        "COF1910": ["Tie Rod End"],
+        "CO1950": ["Tie Rod End"],
+        "COF1950": ["Tie Rod End"],
+        "COF5870": ["Tie Rod End"],
+        "CO4000": ["Tie Rod End"],
+        "COF4000": ["Tie Rod End"],
+        "COT4000": ["Tie Rod End"],
+        "CO9670": ["Drag Link", "Tie Rod End"],
+        "COF9670": ["Drag Link", "Tie Rod End"]
+      },
+      "TRANSTAR 400 SERIES": {
+        "D400": ["Tie Rod End"],
+        "DC400": ["Tie Rod End"],
+        "DCF400": ["Tie Rod End"],
+        "DCF400M": ["Tie Rod End"],
+        "DF400": ["Tie Rod End"],
+        "D405": ["Tie Rod End"],
+        "DC405": ["Tie Rod End"],
+        "DCF405": ["Tie Rod End"],
+        "DCT405": ["Tie Rod End"],
+        "DF405": ["Tie Rod End"],
+        "DT405": ["Tie Rod End"]
+      },
+      "FLEETSTAR SERIES": {
+        "1900": ["Tie Rod End"],
+        "1950": ["Tie Rod End"],
+        "2000": ["Tie Rod End"],
+        "F1900": ["Tie Rod End"],
+        "T1900": ["Tie Rod End"],
+        "F1900A": ["Tie Rod End"],
+        "1910A": ["Tie Rod End"],
+        "F1950": ["Tie Rod End"],
+        "T1950": ["Tie Rod End"],
+        "F2000": ["Tie Rod End"],
+        "T2000": ["Tie Rod End"],
+        "2010A": ["Tie Rod End"],
+        "F2010A": ["Tie Rod End"],
+        "2050A": ["Tie Rod End"],
+        "F2050A": ["Tie Rod End"],
+        "2070A": ["Tie Rod End"],
+        "F2070A": ["Tie Rod End"],
+        "2110A": ["Tie Rod End"]
+      },
+      "LOADSTAR SERIES": {
+        "1600": ["Tie Rod End", "Drag Link"],
+        "1700": ["Tie Rod End", "Drag Link"],
+        "1750": ["Tie Rod End"],
+        "1800": ["Tie Rod End", "Drag Link"],
+        "1850": ["Tie Rod End", "Drag Link"],
+        "1890": ["Tie Rod End"],
+        "CO1600": ["Tie Rod End"],
+        "F1600": ["Tie Rod End"],
+        "CO1700": ["Tie Rod End"],
+        "F1700": ["Tie Rod End"],
+        "CO1750": ["Tie Rod End"],
+        "CO1800": ["Tie Rod End"],
+        "F1800": ["Tie Rod End", "Drag Link"],
+        "CO1850": ["Tie Rod End"],
+        "F1850": ["Tie Rod End", "Drag Link"]
+      },
+      "M SERIES": {
+        "M1400": ["Tie Rod End", "Drag Link"],
+        "M1452": ["Tie Rod End", "Drag Link"],
+        "M1652": ["Tie Rod End", "Drag Link"],
+        "M1600": ["Tie Rod End", "Drag Link"]
+      },
+      "PAYSTAR SERIES": {
+        "5010": ["Tie Rod End"],
+        "5050": ["Tie Rod End"],
+        "5070": ["Tie Rod End"],
+        "F5010": ["Tie Rod End"],
+        "F5050": ["Tie Rod End"],
+        "F5050SF": ["Tie Rod End"],
+        "F5050SF LW": ["Tie Rod End"],
+        "F5070": ["Tie Rod End"],
+        "F5070SF": ["Tie Rod End"],
+        "F5070SF LW": ["Tie Rod End"],
+        "CO5370": ["Tie Rod End"],
+        "COF5370": ["Tie Rod End"],
+        "5900 SBA": ["Drag Link"]
+      },
+      "DURASTAR SERIES": {
+        "DuraStar 4400": ["Drag Link", "Torque Rod", "Tie Rod End"],
+        "_NO_TYPE_": ["Drag Link"]
+      },
+      "1000 SERIES": {
+        "1310": ["Tie Rod End"],
+        "1400": ["Drag Link"],
+        "1600": ["Drag Link"],
+        "1652": ["Drag Link"],
+        "1300A": ["Tie Rod End"],
+        "1300B": ["Tie Rod End"],
+        "1300C": ["Tie Rod End"],
+        "1300D": ["Tie Rod End"]
+      },
+      "2000 SERIES": {
+        "2500": ["Drag Link"],
+        "2600": ["Drag Link"],
+        "_NO_TYPE_": ["Drag Link"]
+      },
+      "TRANSTAR CONVENTIONAL SERIES": {
+        "4170": ["Drag Link", "Tie Rod End"],
+        "4200": ["Drag Link", "Tie Rod End"],
+        "4300": ["Drag Link", "Tie Rod End", "Torque Rod"],
+        "4070B": ["Drag Link", "Tie Rod End"],
+        "CO4070B": ["Drag Link", "Tie Rod End"],
+        "F4070B": ["Drag Link", "Tie Rod End"],
+        "COF4070B": ["Drag Link", "Tie Rod End"],
+        "F4170": ["Drag Link", "Tie Rod End"],
+        "F4200": ["Drag Link", "Tie Rod End"],
+        "F4300": ["Drag Link", "Tie Rod End"],
+        "CO4070A": ["Tie Rod End"],
+        "COF4070A": ["Tie Rod End"]
+      },
+      "S SERIES MEDIUM DUTY": {
+        "1624": ["Tie Rod End", "Drag Link"],
+        "1654": ["Tie Rod End", "Drag Link"],
+        "1658": ["Tie Rod End", "Drag Link"],
+        "1723": ["Tie Rod End", "Drag Link"],
+        "1724": ["Tie Rod End", "Drag Link"],
+        "1753": ["Tie Rod End", "Drag Link"],
+        "1754": ["Tie Rod End", "Drag Link"],
+        "1758": ["Tie Rod End", "Drag Link"],
+        "1823": ["Tie Rod End", "Drag Link"],
+        "1824": ["Tie Rod End", "Drag Link"],
+        "1853": ["Tie Rod End", "Drag Link"],
+        "1854": ["Tie Rod End", "Drag Link"],
+        "1858": ["Tie Rod End", "Drag Link"],
+        "1924": ["Tie Rod End", "Drag Link"],
+        "1925": ["Tie Rod End", "Drag Link"],
+        "1954": ["Tie Rod End", "Drag Link"],
+        "1955": ["Tie Rod End", "Drag Link"],
+        "1958": ["Tie Rod End", "Drag Link"],
+        "2125": ["Tie Rod End", "Drag Link"],
+        "2155": ["Tie Rod End", "Drag Link"],
+        "F1924": ["Tie Rod End", "Drag Link"],
+        "F1954": ["Tie Rod End", "Drag Link"],
+        "F2125": ["Tie Rod End", "Drag Link"]
+      },
+      "LONESTAR SERIES": {
+        "LoneStar": ["Tie Rod Assembly, Steering", "Drag Link", "Torque Rod"]
+      },
+      "PROSTAR SERIES": {
+        "ProStar 113 BBC": ["Tie Rod Assembly, Steering", "Torque Rod"],
+        "ProStar 122 BBC": ["Tie Rod Assembly, Steering", "Torque Rod"],
+        "ProStar": ["Torque Rod", "Drag Link"]
+      },
+      "5000 SERIES": {
+        "5000": ["Drag Link", "Torque Rod"],
+        "5600": ["Drag Link"],
+        "5870": ["Drag Link"],
+        "5900": ["Drag Link"]
+      },
+      "CORPORATE FOUR SPRING": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "LT SERIES": {
+        "LT": ["Torque Rod"]
+      },
+      "TRANSTAR SERIES": {
+        "TranStar": ["Torque Rod"]
+      },
+      "WORKSTAR SERIES": {
+        "Workstar": ["Drag Link"]
+      },
+      "TERRASTAR SERIES": {
+        "TerraStar": ["Drag Link"]
+      },
+      "S SERIES": {
+        "S1700": ["Torque Rod"],
+        "S1900": ["Torque Rod"],
+        "S2100": ["Torque Rod"],
+        "S2300": ["Torque Rod"],
+        "S2200": ["Torque Rod"],
+        "S2600": ["Torque Rod"]
+      },
+      "CORPORATE AIR": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "HX SERIES": {
+        "HX520": ["Torque Rod"],
+        "HX620": ["Torque Rod"]
+      }
+    },
+    "FORD": {
+      "F SERIES": {
+        "F700": ["Drag Link", "Tie Rod Assembly, Steering", "Tie Rod End"],
+        "F7000": ["Drag Link", "Tie Rod End"],
+        "FT700": ["Drag Link", "Tie Rod End"],
+        "F600": ["Drag Link", "Tie Rod End"],
+        "F900": ["Drag Link", "Tie Rod End"],
+        "F6000": ["Drag Link", "Tie Rod End"],
+        "F9000": ["Drag Link", "Tie Rod End"],
+        "FT600": ["Drag Link", "Tie Rod End"],
+        "FT900": ["Drag Link", "Tie Rod End"],
+        "FT6000": ["Drag Link", "Tie Rod End"],
+        "FT9000": ["Drag Link", "Tie Rod End"],
+        "F650": ["Tie Rod Assembly, Steering", "Drag Link"],
+        "F800": ["Tie Rod Assembly, Steering", "Drag Link", "Tie Rod End"],
+        "F750": ["Drag Link", "Tie Rod Assembly, Steering"],
+        "FT800": ["Drag Link", "Tie Rod End"],
+        "F880": ["Drag Link", "Tie Rod End"],
+        "F8000": ["Drag Link", "Tie Rod End"],
+        "F500": ["Drag Link", "Tie Rod End"],
+        "F1000": ["Tie Rod End"],
+        "F850": ["Tie Rod End"],
+        "F1100": ["Tie Rod End"],
+        "F950": ["Tie Rod End"],
+        "F250": ["Tie Rod Assembly, Steering"],
+        "F350": ["Tie Rod Assembly, Steering"],
+        "F450": ["Tie Rod Assembly, Steering"]
+      },
+      "C SERIES": {
+        "CT700": ["Drag Link", "Tie Rod End"],
+        "C7000": ["Drag Link", "Tie Rod End"],
+        "C750": ["Drag Link", "Tie Rod End"],
+        "CT750": ["Drag Link", "Tie Rod End"],
+        "C800": ["Drag Link", "Tie Rod End"],
+        "C8000": ["Drag Link", "Tie Rod End"],
+        "CT800": ["Drag Link", "Tie Rod End"],
+        "CT8000": ["Drag Link", "Tie Rod End"],
+        "C850": ["Drag Link", "Tie Rod End"],
+        "CT850": ["Drag Link", "Tie Rod End"],
+        "C900": ["Drag Link", "Tie Rod End"],
+        "C500": ["Drag Link", "Tie Rod End"],
+        "C550": ["Drag Link", "Tie Rod End"],
+        "C600": ["Drag Link", "Tie Rod End"],
+        "CT600": ["Drag Link", "Tie Rod End"],
+        "C700": ["Drag Link", "Tie Rod End"],
+        "CF7000": ["Tie Rod Assembly, Steering"],
+        "CF8000": ["Tie Rod Assembly, Steering"],
+        "C1100": ["Drag Link"],
+        "CF800": ["Tie Rod End"],
+        "CFT800": ["Tie Rod End"],
+        "CF600": ["Tie Rod End"],
+        "CF700": ["Tie Rod End"],
+        "CL900": ["Tie Rod End"],
+        "CLT900": ["Tie Rod End"],
+        "CL9000": ["Tie Rod End"],
+        "CLT9000": ["Tie Rod End"]
+      },
+      "B SERIES": {
+        "B600": ["Drag Link", "Tie Rod End"],
+        "B700": ["Drag Link", "Tie Rod End"],
+        "B6000": ["Drag Link", "Tie Rod End"],
+        "B750": ["Drag Link", "Tie Rod End"],
+        "B7000": ["Drag Link", "Tie Rod End"],
+        "B500": ["Drag Link", "Tie Rod End"]
+      },
+      "L SERIES": {
+        "L800": ["Drag Link", "Tie Rod End"],
+        "L900": ["Drag Link", "Tie Rod End"],
+        "LCFC450": ["Tie Rod End"],
+        "L8000": ["Drag Link", "Tie Rod End"],
+        "L9000": ["Drag Link", "Tie Rod End"],
+        "LN8000": ["Tie Rod Assembly, Steering"],
+        "L85": ["Drag Link"],
+        "LT85": ["Drag Link"],
+        "L95": ["Drag Link"],
+        "LT95": ["Drag Link"],
+        "LN500": ["Drag Link", "Tie Rod End"],
+        "LN600": ["Tie Rod End"],
+        "LN700": ["Tie Rod End"],
+        "LN750": ["Tie Rod End"],
+        "LLA900": ["Tie Rod End", "Drag Link"],
+        "LLS900": ["Tie Rod End", "Drag Link"],
+        "LTLA900": ["Tie Rod End", "Drag Link"],
+        "LTLS900": ["Tie Rod End", "Drag Link"],
+        "LNT880": ["Tie Rod End", "Drag Link"],
+        "LT880": ["Tie Rod End", "Drag Link"],
+        "Aeromax A": ["Tie Rod End", "Drag Link"],
+        "_NO_TYPE_": ["Drag Link"]
+      },
+      "A SERIES": {
+        "A85": ["Drag Link"],
+        "AT85": ["Drag Link"],
+        "A95": ["Drag Link"],
+        "AT95": ["Drag Link"]
+      },
+      "N SERIES": {
+        "N850": ["Tie Rod End"],
+        "NT850": ["Tie Rod End"],
+        "N950": ["Tie Rod End"],
+        "NT950": ["Tie Rod End"],
+        "N1000": ["Tie Rod End"],
+        "N1100": ["Tie Rod End"],
+        "N500": ["Tie Rod End"],
+        "N600": ["Tie Rod End"],
+        "N6000": ["Tie Rod End"],
+        "N8000": ["Tie Rod End"]
+      },
+      "H SERIES": {
+        "HT950": ["Tie Rod End"],
+        "H1000": ["Tie Rod End"]
+      },
+      "T SERIES": {
+        "T800": ["Tie Rod End"],
+        "T850": ["Tie Rod End"],
+        "T950": ["Tie Rod End"]
+      },
+      "E SERIES": {
+        "E450": ["Drag Link"],
+        "E250": ["Drag Link"],
+        "E350": ["Drag Link"]
+      },
+      "P SERIES": {
+        "P400": ["Tie Rod End"],
+        "P500": ["Tie Rod End"],
+        "P600": ["Tie Rod End"]
+      },
+      "W SERIES": {
+        "W1000": ["Tie Rod End"],
+        "WT10000": ["Tie Rod End"],
+        "W900": ["Tie Rod End"],
+        "WT900": ["Tie Rod End"],
+        "W9000": ["Tie Rod End"],
+        "WT9000": ["Tie Rod End"]
+      }
+    },
+    "KENWORTH": {
+      "C SERIES": {
+        "C500": ["Tie Rod End"]
+      },
+      "K SERIES": {
+        "K100": ["Tie Rod End", "Torque Rod"],
+        "K300": ["Tie Rod End"],
+        "K100C": ["Torque Rod"],
+        "K100E": ["Torque Rod"]
+      },
+      "L SERIES": {
+        "L700": ["Tie Rod End"]
+      },
+      "T SERIES": {
+        "T450": ["Tie Rod End", "Torque Rod", "Drag Link"],
+        "T800": ["Tie Rod End", "Drag Link", "Torque Rod"],
+        "T400": ["Tie Rod End", "Drag Link"],
+        "T600": ["Tie Rod End", "Torque Rod", "Drag Link"],
+        "T300": ["Drag Link", "Torque Rod"],
+        "T380": ["Drag Link"],
+        "T880": ["Repair Kit, Torque & V Rod", "Torque Rod", "Drag Link"],
+        "T660": ["Tie Rod Assembly, Steering", "Torque Rod", "Drag Link"],
+        "T680": ["Drag Link", "Torque Rod"],
+        "T2000": ["Drag Link", "Torque Rod"],
+        "T370": ["Drag Link", "Torque Rod"],
+        "T600B": ["Torque Rod"],
+        "T700": ["Torque Rod", "Drag Link"],
+        "T460": ["Drag Link"]
+      },
+      "W SERIES": {
+        "W900": ["Tie Rod End", "Drag Link"],
+        "W900B": ["Torque Rod"],
+        "W900L": ["Torque Rod"],
+        "W900A": ["Torque Rod"]
+      },
+      "AIRGLIDE 100": {
+        "SUSPENSION": ["Torque Rod", "Torque Rod End"]
+      },
+      "AIRGLIDE 380": {
+        "SUSPENSION": ["Repair Kit, Torque & V Rod", "Torque Rod"]
+      },
+      "AIRGLIDE 230": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "AIRGLIDE 200/400/460/690": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "W-SERIES": {
+        "W900": ["Drag Link"]
+      }
+    },
+    "HENDRICKSON": {
+      "ULTIMAXX": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "PARASTEER": {
+        "FRONT AIR SUSPENSION": ["Torque Rod"]
+      },
+      "FIREMAAX EX": {
+        "240-480  AIR SUSPENSION": ["Torque Rod"],
+        "270-540  AIR SUSPENSION": ["Torque Rod"]
+      },
+      "HN": {
+        "400,402,460,462,522 SPRING SUSPENSION": [
+          "Torque Rod",
+          "Torque Rod End"
+        ]
+      },
+      "RS": {
+        "340 SUSPENSION": ["Torque Rod", "Torque Rod End"],
+        "450,480,520 SUSPENSION": ["Torque Rod", "Torque Rod End"],
+        "380,400,440,460 SUSPENSION": ["Torque Rod End", "Torque Rod"]
+      },
+      "RTE": {
+        "340,380,440 SUSPENSION": ["Torque Rod", "Torque Rod End"]
+      },
+      "E4": {
+        "340,380 SUSPENSION": ["Torque Rod"]
+      },
+      "U2": {
+        "340 SUSPENSION": ["Torque Rod End"]
+      },
+      "RT": {
+        "340,380,440 SUSPENSION": ["Torque Rod End", "Torque Rod"]
+      },
+      "RT2": {
+        "340,400,480 SUSPENSION": ["Torque Rod End"]
+      },
+      "RT 520": {
+        "SUSPENSION": ["Torque Rod End"]
+      },
+      "R": {
+        "400,460,480,520 SUSPENSION": ["Torque Rod End", "Torque Rod"]
+      },
+      "AR": {
+        "340,380 REAR AIR SUSPENSION": ["Torque Rod End"]
+      },
+      "SR": {
+        "340,380 SUSPENSION": ["Torque Rod End"]
+      },
+      "V4": {
+        "340,380 SUSPENSION": ["Torque Rod End"]
+      },
+      "UE2": {
+        "340 SUSPENSION": ["Torque Rod End"]
+      },
+      "RTE2": {
+        "340,400,480 SUSPENSION": ["Torque Rod End"]
+      },
+      "AR2": {
+        "400,460 REAR AIR SUSPENSION": ["Torque Rod End"]
+      },
+      "HA": {
+        "180,200,230,360,400,460 AIR SUSPENSION": [
+          "Torque Rod End",
+          "Torque Rod"
+        ]
+      },
+      "HAS": {
+        "120,150,190,210,230,360,400,402,40LH,460 AIR SUSPENSION": [
+          "Torque Rod End",
+          "Torque Rod"
+        ]
+      },
+      "Q-TR-QS-QT-QU": {
+        "AIR,LEAF SUSPENSION": ["Torque Rod"]
+      },
+      "RT-RT2-RTE-RTE2": {
+        "340 SUSPENSION": ["Torque Rod End"],
+        "380,400,440,460 SUSPENSION": ["Torque Rod End"],
+        "480,520 SUSPENSION": ["Torque Rod End"]
+      },
+      "RU-RUE-U-U2-UE-UE2": {
+        "340 SUSPENSION": ["Torque Rod End"]
+      },
+      "HAULMAAX": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "PRIMAAX": {
+        "230-460-690 AIR SUSPENSION": ["Torque Rod"],
+        "260-520-780 AIR SUSPENSION": ["Torque Rod"]
+      },
+      "PRIMAAX EX": {
+        "232-462-692 AIR SUSPENSION": ["Torque Rod"],
+        "262-522-782 AIR SUSPENSION": ["Torque Rod"]
+      },
+      "HTS": {
+        "REAR SUSPENSION": ["Torque Rod"]
+      }
+    },
+    "PETERBILT": {
+      "300 SERIES": {
+        "300": ["Drag Link", "Tie Rod End"],
+        "310": ["Drag Link", "Tie Rod End"],
+        "320": ["Drag Link", "Tie Rod End"],
+        "330": ["Drag Link", "Tie Rod End", "Torque Rod"],
+        "335": ["Torque Rod"],
+        "337": ["Torque Rod", "Drag Link"],
+        "340": ["Torque Rod"],
+        "348": ["Drag Link", "Tie Rod End", "Torque Rod"],
+        "352": ["Drag Link", "Tie Rod End"],
+        "353": ["Drag Link", "Tie Rod End"],
+        "357": ["Drag Link", "Tie Rod End", "Torque Rod"],
+        "359": ["Drag Link", "Tie Rod End", "Torque Rod"],
+        "362": ["Drag Link", "Tie Rod End", "Torque Rod"],
+        "365": ["Torque Rod", "Drag Link"],
+        "367": ["Torque Rod", "Drag Link"],
+        "372": ["Drag Link", "Tie Rod End"],
+        "375": ["Drag Link", "Tie Rod End", "Torque Rod"],
+        "376": ["Drag Link", "Tie Rod End"],
+        "377": ["Drag Link", "Tie Rod End", "Torque Rod"],
+        "378": ["Torque Rod", "Drag Link", "Tie Rod End"],
+        "379": ["Torque Rod", "Drag Link", "Tie Rod End"],
+        "384": ["Torque Rod", "Drag Link"],
+        "385": ["Drag Link", "Tie Rod End", "Torque Rod"],
+        "386": ["Repair Kit, Torque & V Rod", "Torque Rod", "Drag Link"],
+        "387": ["Drag Link", "Tie Rod End", "Torque Rod"],
+        "388": ["Torque Rod"],
+        "389": ["Repair Kit, Torque & V Rod", "Torque Rod", "Drag Link"]
+      },
+      "FLEX AIR": {
+        "SUSPENSION": ["Repair Kit, Torque & V Rod", "Torque Rod"]
+      },
+      "4 SPRING": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "AIR TRAC": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "200 SERIES": {
+        "252": ["Drag Link", "Tie Rod End"],
+        "282": ["Drag Link", "Tie Rod End"],
+        "285": ["Drag Link"],
+        "289": ["Drag Link", "Tie Rod End"]
+      },
+      "LOW MOUNT AIR LEAF": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "500 SERIES": {
+        "567": ["Torque Rod", "Drag Link"],
+        "579": ["Drag Link", "Torque Rod"],
+        "587": ["Drag Link", "Torque Rod"]
+      },
+      "QUADRAFLEX 4 SPRING": {
+        "SUSPENSION": ["Torque Rod"]
+      }
+    },
+    "HUTCHENS": {
+      "H SERIES": {
+        "H7700,H9700 SUSPENSION": ["Bushing", "Torque Rod"]
+      },
+      "CH SERIES": {
+        "CH7700,CH7800,CH9700 SUSPENSION": ["Bushing", "Torque Rod"]
+      },
+      "9700 SERIES": {
+        "SUSPENSION": ["Torque Rod"]
+      }
+    },
+    "FRUEHAUF": {
+      "F SERIES": {
+        "SUSPENSION": ["Bushing"]
+      },
+      "J SERIES": {
+        "SUSPENSION": ["Bushing"]
+      },
+      "NF-2 PROTRAC SERIES": {
+        "SUSPENSION": ["Bushing"]
+      },
+      "NT-2/2W PROTRAC SERIES": {
+        "AIR SUSPENSION": ["Bushing"]
+      }
+    },
+    "REYCO": {
+      "21": {
+        "TRAILER SPRING SUSPENSION": ["Torque Rod"]
+      },
+      "45": {
+        "TRAILER SPRING SUSPENSION": ["Torque Rod"]
+      },
+      "102": {
+        "TRUCK SPRING SUSPENSION": ["Torque Rod"]
+      },
+      "21B/21B-FAB": {
+        "TRAILER SPRING SUSPENSION": ["Torque Rod"]
+      },
+      "102CC": {
+        "TRUCK SPRING SUSPENSION": ["Torque Rod"]
+      },
+      "102AR": {
+        "TRUCK AIR SUSPENSION": ["Torque Rod"]
+      },
+      "102W": {
+        "TRUCK SPRING SUSPENSION": ["Torque Rod"]
+      },
+      "21AR": {
+        "TRAILER AIR SUSPENSION": ["Torque Rod"]
+      },
+      "86/88/89": {
+        "TRAILER SPRING SUSPENSION": ["Torque Rod"]
+      },
+      "31/41": {
+        "TRAILER SPRING SUSPENSION": ["Torque Rod"]
+      },
+      "79KB": {
+        "TRUCK SPRING SUSPENSION": ["Torque Rod"]
+      }
+    },
+    "BINKLEY": {
+      "DURALITE 9000 SERIES": {
+        "SUSPENSION": ["Torque Rod"]
+      }
+    },
+    "WESTERN STAR": {
+      "5700 SERIES": {
+        "5700XE": ["Tie Rod End"]
+      },
+      "4700 SERIES": {
+        "4700SF": ["Tie Rod End"]
+      },
+      "4900 SERIES": {
+        "4964EX Constellation": ["Tie Rod End"],
+        "4964FX Constellation": ["Tie Rod End"]
+      },
+      "5900 SERIES": {
+        "5964 SBA": ["Tie Rod End"]
+      }
+    },
+    "WATSON & CHALIN": {
+      "SL SERIES": {
+        "SL2055 SUSPENSION": ["Torque Rod"]
+      }
+    },
+    "RENAULT": {
+      "KERAX": {
+        "260.18/B": ["Repair Kit, Torque & V Rod"],
+        "420.34": ["V Stay Arm (V-Rod)"],
+        "370.32": ["V Stay Arm (V-Rod)"],
+        "420.26": ["V Stay Arm (V-Rod)"],
+        "420.32": ["V Stay Arm (V-Rod)"],
+        "370.18": ["V Stay Arm (V-Rod)"],
+        "410.18": ["V Stay Arm (V-Rod)"],
+        "450.18": ["V Stay Arm (V-Rod)"],
+        "370.26": ["V Stay Arm (V-Rod)"],
+        "410.26": ["V Stay Arm (V-Rod)"],
+        "450.26": ["V Stay Arm (V-Rod)"],
+        "410.32": ["V Stay Arm (V-Rod)"],
+        "450.32": ["V Stay Arm (V-Rod)"],
+        "460.32": ["V Stay Arm (V-Rod)"],
+        "500.32": ["V Stay Arm (V-Rod)"],
+        "340.32/A": ["V Stay Arm (V-Rod)"],
+        "385.32/A,385.32/B,385.32/C": ["V Stay Arm (V-Rod)"],
+        "385.32/B": ["V Stay Arm (V-Rod)"],
+        "385.32/A,385.32/B": ["V Stay Arm (V-Rod)"],
+        "400.32/A,400.32/B,400.32/C": ["V Stay Arm (V-Rod)"],
+        "400.32/B": ["V Stay Arm (V-Rod)"]
+      },
+      "PREMIUM 2": {
+        "Distribution 280.18 D": [
+          "Repair Kit, Torque & V Rod",
+          "V Stay Arm (V-Rod)"
+        ],
+        "Lander 460.26": ["V Stay Arm (V-Rod)"],
+        "Distribution 320.18 D": ["V Stay Arm (V-Rod)"],
+        "Distribution 370.18 D": ["V Stay Arm (V-Rod)"],
+        "Distribution 410.18 D": ["V Stay Arm (V-Rod)"],
+        "Distribution 450.18 D": ["V Stay Arm (V-Rod)"],
+        "Distribution 370.19 D": ["V Stay Arm (V-Rod)"],
+        "Distribution 320.26": ["V Stay Arm (V-Rod)"],
+        "Distribution 370.26": ["V Stay Arm (V-Rod)"],
+        "Distribution 410.26": ["V Stay Arm (V-Rod)"],
+        "Route 410.18 D": ["V Stay Arm (V-Rod)"],
+        "Route 450.18 D": ["V Stay Arm (V-Rod)"],
+        "Route 450.24": ["V Stay Arm (V-Rod)"],
+        "Route 450.26": ["V Stay Arm (V-Rod)"],
+        "Route 410.18": ["V Stay Arm (V-Rod)"],
+        "Route 450.18": ["V Stay Arm (V-Rod)"],
+        "Distribution 240.18 D": ["V Stay Arm (V-Rod)"],
+        "Lander 440.18": ["V Stay Arm (V-Rod)"],
+        "Lander 440.19": ["V Stay Arm (V-Rod)"],
+        "Lander 440.26": ["V Stay Arm (V-Rod)"],
+        "Lander 440.32": ["V Stay Arm (V-Rod)"],
+        "Lander 270.18, Lander 270.19": ["V Stay Arm (V-Rod)"],
+        "Lander 310.19": ["V Stay Arm (V-Rod)"],
+        "Lander 340.18, Lander 340.19": ["V Stay Arm (V-Rod)"],
+        "Lander 380.19": ["V Stay Arm (V-Rod)"],
+        "Lander 430.18": ["V Stay Arm (V-Rod)"],
+        "Lander 460.18": ["V Stay Arm (V-Rod)"],
+        "Lander 310.26": ["V Stay Arm (V-Rod)"],
+        "Lander 340.26": ["V Stay Arm (V-Rod)"],
+        "Lander 430.26": ["V Stay Arm (V-Rod)"],
+        "Lander 380.26": ["V Stay Arm (V-Rod)"],
+        "Lander 380.32": ["V Stay Arm (V-Rod)"],
+        "Lander 430.32": ["V Stay Arm (V-Rod)"],
+        "Lander 460.32": ["V Stay Arm (V-Rod)"],
+        "Distribution 270.19": ["V Stay Arm (V-Rod)"],
+        "Distribution 310.18": ["V Stay Arm (V-Rod)"],
+        "Distribution 340.18": ["V Stay Arm (V-Rod)"],
+        "Distribution 380.18": ["V Stay Arm (V-Rod)"],
+        "Distribution 430.18": ["V Stay Arm (V-Rod)"],
+        "Distribution 460.19": ["V Stay Arm (V-Rod)"],
+        "Distribution 340.19": ["V Stay Arm (V-Rod)"],
+        "Distribution 380.19": ["V Stay Arm (V-Rod)"],
+        "Distribution 430.26": ["V Stay Arm (V-Rod)"],
+        "Distribution 380.26": ["V Stay Arm (V-Rod)"],
+        "Distribution 310.26": ["V Stay Arm (V-Rod)"],
+        "Distribution 430.19": ["V Stay Arm (V-Rod)"],
+        "Route 380.18": ["V Stay Arm (V-Rod)"],
+        "Route 380.19": ["V Stay Arm (V-Rod)"],
+        "Route 430.18": ["V Stay Arm (V-Rod)"],
+        "Route 430.19": ["V Stay Arm (V-Rod)"],
+        "Route 460.18": ["V Stay Arm (V-Rod)"],
+        "Route 380.26": ["V Stay Arm (V-Rod)"],
+        "Route 430.26": ["V Stay Arm (V-Rod)"],
+        "Route 460.26": ["V Stay Arm (V-Rod)"],
+        "Route 410.25": ["V Stay Arm (V-Rod)"],
+        "Route 450.25": ["V Stay Arm (V-Rod)"]
+      },
+      "C": {
+        "250P, 250PK": ["V Stay Arm (V-Rod)"],
+        "250P": ["V Stay Arm (V-Rod)"],
+        "280P, 280PK": ["V Stay Arm (V-Rod)"],
+        "320P, 320PK": ["V Stay Arm (V-Rod)"],
+        "320P": ["V Stay Arm (V-Rod)"],
+        "380P": ["V Stay Arm (V-Rod)"],
+        "430P": ["V Stay Arm (V-Rod)"],
+        "380T": ["V Stay Arm (V-Rod)"],
+        "430T": ["V Stay Arm (V-Rod)"],
+        "C460": ["V Stay Arm (V-Rod)"],
+        "C480": ["V Stay Arm (V-Rod)"],
+        "C380": ["V Stay Arm (V-Rod)"],
+        "C520": ["V Stay Arm (V-Rod)"],
+        "C280": ["V Stay Arm (V-Rod)"],
+        "C440": ["V Stay Arm (V-Rod)"],
+        "C430": ["V Stay Arm (V-Rod)"],
+        "480T, 480TK": ["V Stay Arm (V-Rod)"],
+        "280P": ["V Stay Arm (V-Rod)"],
+        "380P, 380PK": ["V Stay Arm (V-Rod)"],
+        "380P, 380PK, 380P XLOAD": ["V Stay Arm (V-Rod)"],
+        "430P, 430PK": ["V Stay Arm (V-Rod)"],
+        "430P, 430PK, 430P XLOAD": ["V Stay Arm (V-Rod)"],
+        "440P, 440PK": ["V Stay Arm (V-Rod)"],
+        "440P": ["V Stay Arm (V-Rod)"],
+        "460P, 460PK": ["V Stay Arm (V-Rod)"],
+        "460P": ["V Stay Arm (V-Rod)"],
+        "460P, 460PK, 460P XLOAD": ["V Stay Arm (V-Rod)"],
+        "480P, 480PK": ["V Stay Arm (V-Rod)"],
+        "480P": ["V Stay Arm (V-Rod)"],
+        "520P, 520PK": ["V Stay Arm (V-Rod)"],
+        "520P": ["V Stay Arm (V-Rod)"],
+        "380T, 380TK": ["V Stay Arm (V-Rod)"],
+        "430T, 430TK": ["V Stay Arm (V-Rod)"],
+        "440T, 440TK": ["V Stay Arm (V-Rod)"],
+        "460T, 460TK": ["V Stay Arm (V-Rod)"],
+        "520T, 520TK": ["V Stay Arm (V-Rod)"]
+      },
+      "K": {
+        "520P MEDIUM, 520P HEAVY": ["V Stay Arm (V-Rod)"],
+        "520T MEDIUM, 520T HEAVY": ["V Stay Arm (V-Rod)"],
+        "K380": ["V Stay Arm (V-Rod)"],
+        "K520": ["V Stay Arm (V-Rod)"],
+        "K460": ["V Stay Arm (V-Rod)"],
+        "K480": ["V Stay Arm (V-Rod)"],
+        "K440": ["V Stay Arm (V-Rod)"],
+        "K430": ["V Stay Arm (V-Rod)"],
+        "460P MEDIUM, 460P HEAVY, 480P XTREM": ["V Stay Arm (V-Rod)"],
+        "380P MEDIUM, 380P HEAVY": ["V Stay Arm (V-Rod)"],
+        "380P MEDIUM, 380P HEAVY, 380P XTREM": ["V Stay Arm (V-Rod)"],
+        "430P MEDIUM, 430P HEAVY": ["V Stay Arm (V-Rod)"],
+        "430P MEDIUM, 430P HEAVY, 430P XTREM": ["V Stay Arm (V-Rod)"],
+        "440P MEDIUM, 440P HEAVY": ["V Stay Arm (V-Rod)"],
+        "440P MEDIUM, 440P HEAVY, 440P XTREM": ["V Stay Arm (V-Rod)"],
+        "460P MEDIUM, 460P HEAVY": ["V Stay Arm (V-Rod)"],
+        "480P MEDIUM, 480P HEAVY": ["V Stay Arm (V-Rod)"],
+        "480P MEDIUM, 480P HEAVY, 480P XTREM": ["V Stay Arm (V-Rod)"],
+        "520P MEDIUM, 520P HEAVY, 520P XTREM": ["V Stay Arm (V-Rod)"],
+        "380T MEDIUM, 380T HEAVY": ["V Stay Arm (V-Rod)"],
+        "430T MEDIUM, 430T HEAVY": ["V Stay Arm (V-Rod)"],
+        "440T MEDIUM, 440T HEAVY": ["V Stay Arm (V-Rod)"],
+        "460T MEDIUM, 460T HEAVY": ["V Stay Arm (V-Rod)"],
+        "480T MEDIUM, 480T HEAVY": ["V Stay Arm (V-Rod)"]
+      },
+      "D": {
+        "25 P 250": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "25 P 280": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "25 P 320": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "26 P 250, 26 KP 250": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "26 P 280, 26 KP 280": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "26 P 320, 26 KP 320": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "26 P 250": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "26 P 280": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "26 P 320": ["V Stay Arm (V-Rod)", "Torque Rod"],
+        "18 T 280": ["Torque Rod"],
+        "18 T 320": ["Torque Rod"],
+        "10 P 240": ["Torque Rod"],
+        "10 P 210": ["Torque Rod"],
+        "12 P 210": ["Torque Rod"],
+        "12 P 240": ["Torque Rod"],
+        "12 P 250": ["Torque Rod"],
+        "12 P 280": ["Torque Rod"],
+        "13 P 210, 13 KP 210": ["Torque Rod"],
+        "13 P 240, 13 KP 240": ["Torque Rod"],
+        "13 P 250, 13 KP 250": ["Torque Rod"],
+        "13 P 280, 13 KP 280": ["Torque Rod"],
+        "14 P 210, 14 KP 210": ["Torque Rod"],
+        "14 P 240, 14 KP 240": ["Torque Rod"],
+        "14 P 250, 14 KP 250": ["Torque Rod"],
+        "14 P 280, 14 KP 280": ["Torque Rod"],
+        "16 P 210, 16 KP 210": ["Torque Rod"],
+        "16 P 250, 16 KP 250": ["Torque Rod"],
+        "16 P 280, 16 KP 280": ["Torque Rod"],
+        "16 P 240, 16 KP 240": ["Torque Rod"],
+        "18 P 250, 18 KP 250": ["Torque Rod"],
+        "18 P 280, 18 KP 280": ["Torque Rod"],
+        "18 P 320, 18 KP 320": ["Torque Rod"],
+        "18 P 250": ["Torque Rod"],
+        "18 P 280": ["Torque Rod"],
+        "18 P 320": ["Torque Rod"],
+        "6.5 P 150": ["Torque Rod"],
+        "7.5 P 180": ["Torque Rod"],
+        "12 KP 250": ["Torque Rod"],
+        "12 KP 280": ["Torque Rod"],
+        "14 KP 250": ["Torque Rod"],
+        "14 P 250": ["Torque Rod"],
+        "16 KP 250": ["Torque Rod"],
+        "16 KP 280": ["Torque Rod"],
+        "16 P 250": ["Torque Rod"],
+        "18 P 380": ["Torque Rod"],
+        "18 P 430": ["Torque Rod"],
+        "18 T 380": ["Torque Rod"],
+        "18 T 430": ["Torque Rod"],
+        "D250": ["Torque Rod"],
+        "D310": ["Torque Rod"],
+        "D320": ["Torque Rod"],
+        "D320 CNG": ["Torque Rod"],
+        "D280": ["Torque Rod"],
+        "D340": ["Torque Rod"],
+        "D180": ["Torque Rod"],
+        "D270": ["Torque Rod"],
+        "D430": ["Torque Rod"],
+        "D250 Z.E.": ["Torque Rod"],
+        "D300": ["Torque Rod"],
+        "D500 Z.E.": ["Torque Rod"],
+        "D220": ["Torque Rod"],
+        "D380": ["Torque Rod"]
+      },
+      "MIDLUM": {
+        "150.08/B": ["Torque Rod"],
+        "150.10/B": ["Torque Rod"],
+        "270.16/C": ["Torque Rod"],
+        "180.08/B": ["Torque Rod"],
+        "180.10/B": ["Torque Rod"],
+        "180.12/B, 180.12/C": ["Torque Rod"],
+        "220.18/D": ["Torque Rod"],
+        "270.12/C": ["Torque Rod"],
+        "270.13/C, 270.13/D": ["Torque Rod"],
+        "270.14/C, 270.14/D": ["Torque Rod"],
+        "270.18/D": ["Torque Rod"],
+        "270.16/C, 270.16/D": ["Torque Rod"],
+        "180.12": ["Torque Rod"],
+        "220.15": ["Torque Rod"],
+        "160.12": ["Torque Rod"],
+        "160.08": ["Torque Rod"],
+        "160.10": ["Torque Rod"],
+        "190.08": ["Torque Rod"],
+        "190.10": ["Torque Rod"],
+        "190.12": ["Torque Rod"],
+        "190.13": ["Torque Rod"],
+        "190.14": ["Torque Rod"],
+        "190.16": ["Torque Rod"],
+        "220.08": ["Torque Rod"],
+        "220.10": ["Torque Rod"],
+        "220.12": ["Torque Rod"],
+        "220.13": ["Torque Rod"],
+        "220.14": ["Torque Rod"],
+        "220.16": ["Torque Rod"],
+        "240.12": ["Torque Rod"],
+        "240.13": ["Torque Rod"],
+        "240.14": ["Torque Rod"],
+        "240.15": ["Torque Rod"],
+        "240.16": ["Torque Rod"],
+        "240.18": ["Torque Rod"],
+        "280.12": ["Torque Rod"],
+        "280.13": ["Torque Rod"],
+        "280.14": ["Torque Rod"],
+        "280.16": ["Torque Rod"],
+        "280.18": ["Torque Rod"],
+        "135.08/B,150.08/B": ["Torque Rod"],
+        "135.10/B,150.10/B": ["Torque Rod"],
+        "150.12/B": ["Torque Rod"],
+        "210.08/B, 220.08/B": ["Torque Rod"],
+        "210.10/B, 220.10/B": ["Torque Rod"],
+        "210.12/C, 220.12/C": ["Torque Rod"],
+        "210.13/C, 220.13/C, 220.13/D": ["Torque Rod"],
+        "210.14/C, 220.14/C, 220.14/D": ["Torque Rod"],
+        "210.16/C, 220.16/C, 22.16/D": ["Torque Rod"],
+        "270.16/B": ["Torque Rod"]
+      },
+      "D ACCESS": {
+        "D280": ["Torque Rod"],
+        "D320": ["Torque Rod"]
+      }
+    },
+    "MAN": {
+      "TGM I": {
+        "18.240": ["Repair Kit, Torque & V Rod"]
+      }
+    },
+    "AGRALE": {
+      "C7500": {
+        "_NO_TYPE_": ["Drag Link"]
+      }
+    },
+    "NEWAY/SAF HOLLAND": {
+      "ARDAB SERIES": {
+        "120,238,240 AIR SUSPENSION": ["Torque Rod"]
+      }
+    },
+    "DANA SPICER": {
+      "26 & 36 SERIES": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "55 SERIES": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "62 SERIES": {
+        "SUSPENSION": ["Torque Rod"]
+      },
+      "68 SERIES": {
+        "SUSPENSION": ["Torque Rod"]
+      }
+    },
+    "": {
+      "_NO_MODEL_": {
+        "_NO_TYPE_": ["Drag Link"]
+      }
+    },
+    "IVECO": {
+      "EUROCARGO I-III": {
+        "75 E 15, 75 E 15 P, 80 E 15": ["Torque Rod"],
+        "75 E 15 K": ["Torque Rod"],
+        "100 E 18, 100 E 18 P": ["Torque Rod"],
+        "100 E 18 K": ["Torque Rod"],
+        "100 E 21, 100 E 21 P": ["Torque Rod"],
+        "75 E 16 tector, 75 E 16 P tector": ["Torque Rod"],
+        "75 E 13 tector, 75 E 13 P tector": ["Torque Rod"],
+        "75 E 15 tector, 75 E 15 P tector": ["Torque Rod"],
+        "75 E 17, 75 E 17 P, 75 E 18 tector": ["Torque Rod"],
+        "75 E 17 K, 75 E 18 K tector": ["Torque Rod"],
+        "75 E 18 K tector": ["Torque Rod"],
+        "75 E 15 K tector": ["Torque Rod"],
+        "75 E 18 tector, 75 E 18 P tector": ["Torque Rod"],
+        "100 E 17, 100 E 17 DP tector, 100 E 18 tector": ["Torque Rod"],
+        "100 E 18 tector, 100 E 18 P tector, 100 E 18 FP tector": [
+          "Torque Rod"
+        ],
+        "100 E 21, 100 E 21 DP tector, 100 E 22 tector": ["Torque Rod"],
+        "100 E 17 K tector, 100 E 17 DK tector": ["Torque Rod"],
+        "100 E 18 K tector, 100 E 18 DK tector": ["Torque Rod"],
+        "100 E 21 K tector, 100 E 21 DK tector": ["Torque Rod"],
+        "100 E 18 W tector, 100 E 18 WS tector": ["Torque Rod"],
+        "100 E 21 W tector, 100 E 21 WS tector": ["Torque Rod"],
+        "140 E 18 tector, 140 E 18 P tector, 140 E 18 D FP tector": [
+          "Torque Rod"
+        ],
+        "140 E 22 tector, 140 E 22 P tector, 140 E 22 D FP tector": [
+          "Torque Rod"
+        ],
+        "140 E D 25 tector, 140 E 25 P tector, 140 E 25 FP tector": [
+          "Torque Rod"
+        ],
+        "140 E 25 W tector, 140 E 25 WS tector": ["Torque Rod"],
+        "140 E 28 W tector, 140 E 28 WS tector": ["Torque Rod"],
+        "140 E 25 K tector, 140 E 25 DK tector": ["Torque Rod"],
+        "140 E 28 K tector": ["Torque Rod"],
+        "140 E 18 K tector, 140 E 18 DK tector": ["Torque Rod"],
+        "140 E 22 K tector": ["Torque Rod"],
+        "75 E 14 tector, 75 E 14 P tector": ["Torque Rod"],
+        "75 E 14 K tector": ["Torque Rod"],
+        "75 E 16 K tector": ["Torque Rod"],
+        "100 E 18 K tector": ["Torque Rod"],
+        "100 E 22 tector, 100 E 22 P tector, 100 E 22 FP tector": [
+          "Torque Rod"
+        ],
+        "100 E 22 W tector, 100 E 22 WS tector": ["Torque Rod"],
+        "75 E 13 K tector": ["Torque Rod"],
+        "100 E 22 K tector": ["Torque Rod"]
+      },
+      "EUROCARGO V": {
+        "75E21, 75E21P": ["Torque Rod"],
+        "100E19, 100E19P": ["Torque Rod"],
+        "100E21, 100E21P, 100E21FP": ["Torque Rod"],
+        "100E22, 100E22P, 100E22FP": ["Torque Rod"],
+        "140E19, 140E19P": ["Torque Rod"],
+        "140E21, 140E21P": ["Torque Rod"],
+        "140E22, 140E22FP, 140E22P": ["Torque Rod"],
+        "140E25, 140E25FP, 140E25P": ["Torque Rod"],
+        "140E28, 140E28FP, 140E28P": ["Torque Rod"],
+        "140E.19FP": ["Torque Rod"],
+        "100E.19FP": ["Torque Rod"],
+        "140E.21FP": ["Torque Rod"],
+        "100E.19 MY19": ["Torque Rod"],
+        "100E.19P MY19": ["Torque Rod"],
+        "100E.21 MY19": ["Torque Rod"],
+        "100E.21FP MY19": ["Torque Rod"],
+        "100E.21P MY19": ["Torque Rod"],
+        "100E.22 MY19": ["Torque Rod"],
+        "100E.22FP MY19": ["Torque Rod"],
+        "100E.22P MY19": ["Torque Rod"],
+        "140E.19 MY19": ["Torque Rod"],
+        "140E.19FP MY19": ["Torque Rod"],
+        "140E.19P MY19": ["Torque Rod"],
+        "140E.21 MY19": ["Torque Rod"],
+        "140E.21FP MY19": ["Torque Rod"],
+        "140E.21P MY19": ["Torque Rod"],
+        "140E.22 MY19": ["Torque Rod"],
+        "140E.22FP MY19": ["Torque Rod"],
+        "140E.22P MY19": ["Torque Rod"],
+        "140E.25 MY19": ["Torque Rod"],
+        "140E.25FP MY19": ["Torque Rod"],
+        "140E.25P MY19": ["Torque Rod"],
+        "140E.28 MY19": ["Torque Rod"],
+        "140E.28FP MY19": ["Torque Rod"],
+        "140E.28P MY19": ["Torque Rod"],
+        "75E.16 MY19": ["Torque Rod"],
+        "75E.16P MY19": ["Torque Rod"],
+        "75E.19 MY19": ["Torque Rod"],
+        "75E.19P MY19": ["Torque Rod"],
+        "75E.21 MY19": ["Torque Rod"],
+        "75E.21P MY19": ["Torque Rod"],
+        "100E.19FP MY19": ["Torque Rod"]
+      },
+      "EUROCARGO IV": {
+        "140E.21": ["Torque Rod"],
+        "75E.19": ["Torque Rod"],
+        "140E.25FP": ["Torque Rod"],
+        "75E.21P": ["Torque Rod"],
+        "140E.25": ["Torque Rod"],
+        "140E.19FP": ["Torque Rod"],
+        "100E.22FP": ["Torque Rod"],
+        "140E.22P": ["Torque Rod"],
+        "140E.25P": ["Torque Rod"],
+        "100E.22P": ["Torque Rod"],
+        "140E.22FP": ["Torque Rod"],
+        "100E.21": ["Torque Rod"],
+        "140E.28P": ["Torque Rod"],
+        "140E.19P": ["Torque Rod"],
+        "100E.21FP": ["Torque Rod"],
+        "75E.21": ["Torque Rod"],
+        "140E.22": ["Torque Rod"],
+        "75E.16": ["Torque Rod"],
+        "140E.21P": ["Torque Rod"],
+        "100E.19": ["Torque Rod"],
+        "100E.22": ["Torque Rod"],
+        "75E.16P": ["Torque Rod"],
+        "140E.28": ["Torque Rod"],
+        "140E.19": ["Torque Rod"],
+        "140E.28FP": ["Torque Rod"],
+        "100E.19P": ["Torque Rod"],
+        "100E.21P": ["Torque Rod"],
+        "100E.19FP": ["Torque Rod"],
+        "75E.19P": ["Torque Rod"]
+      },
+      "EUROCARGO": {
+        "_NO_TYPE_": ["Torque Rod"]
+      }
+    },
+    "STERLING": {
+      "L8500 SERIES": {
+        "L8522": ["Tie Rod Assembly, Steering"],
+        "L8513": ["Tie Rod Assembly, Steering"],
+        "L8501": ["Tie Rod Assembly, Steering"]
+      },
+      "L9500 SERIES": {
+        "L9501": ["Tie Rod Assembly, Steering"],
+        "L9513": ["Tie Rod Assembly, Steering"],
+        "L9522": ["Tie Rod Assembly, Steering"]
+      },
+      "A9500 SERIES": {
+        "A9513": ["Tie Rod Assembly, Steering"],
+        "A9522": ["Tie Rod Assembly, Steering"]
+      },
+      "AT9500 SERIES": {
+        "AT9522": ["Tie Rod Assembly, Steering"],
+        "AT9513": ["Tie Rod Assembly, Steering"]
+      },
+      "LT8500 SERIES": {
+        "LT8513": ["Tie Rod Assembly, Steering"],
+        "LT8501": ["Tie Rod Assembly, Steering"],
+        "LT8522": ["Tie Rod Assembly, Steering"]
+      },
+      "AT8500 SERIES": {
+        "AT8513": ["Tie Rod Assembly, Steering"],
+        "AT8522": ["Tie Rod Assembly, Steering"]
+      },
+      "A8500 SERIES": {
+        "A8522": ["Tie Rod Assembly, Steering"],
+        "A8513": ["Tie Rod Assembly, Steering"]
+      },
+      "LT9500 SERIES": {
+        "LT9501": ["Tie Rod Assembly, Steering"],
+        "LT9513": ["Tie Rod Assembly, Steering"],
+        "LT9522": ["Tie Rod Assembly, Steering"]
+      }
+    },
+    "RIDEWELL": {
+      "RSS-232T": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      },
+      "RLT-230": {
+        "_NO_TYPE_": ["Tie Rod Assembly, Steering"]
+      }
+    },
+    "HINO": {
+      "145": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "165": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "185": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "238": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "258": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "268": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      },
+      "338": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      }
+    },
+    "BLUEBIRD": {
+      "VISION": {
+        "_NO_TYPE_": ["Tie Rod End"]
+      }
+    }
+  },
+  "products": [
+    "Centre Rod",
+    "Tie Rod End",
+    "Mounting, Engine",
+    "Tie Rod Assembly, Steering",
+    "Drag Link",
+    "Torque Rod",
+    "Repair Kit, Torque & V Rod",
+    "Bushing",
+    "Torque Rod End",
+    "V Stay Arm (V-Rod)",
+    "Inner Tie Rod End",
+    "Mounting, Spring"
+  ]
+}

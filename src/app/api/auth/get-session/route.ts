@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import prisma from "@/lib/prisma/instance";
@@ -14,6 +15,7 @@ export async function GET(req: NextRequest) {
     let payload: any = null;
     try {
       payload = jwt.verify(token, ACCESS_TOKEN_SECRET);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
