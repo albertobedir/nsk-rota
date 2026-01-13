@@ -25,15 +25,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import BrandModelTypeCombos from "@/components/brand-model-type-combos";
 import { Switch } from "@/components/ui/switch";
 import Image from "next/image";
 import responseJson from "@/static/response.json";
+// TreeFilter removed for step-by-step select flow
 
 export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const perPage = 12;
 
-  const { products, total, fetchProducts, searchTerm } = useProductsStore();
+  const { products, total, fetchProducts, searchTerm, searchProducts } =
+    useProductsStore();
 
   const [filters, setFilters] = useState({
     brand: "",
@@ -56,6 +59,8 @@ export default function ProductsPage() {
     typesByBrandModel: Record<string, string[]>;
     descsByBrandModelType: Record<string, string[]>;
   }>({ modelsByBrand: {}, typesByBrandModel: {}, descsByBrandModelType: {} });
+
+  // no modal; use cascading selects: brand -> model -> type
 
   const buildOptionsFromResponse = (data: any) => {
     // If JSON matches `{ tree: { BRAND: { MODEL: { TYPE: [descs] } } } }` use a specific parser
@@ -178,35 +183,39 @@ export default function ProductsPage() {
     {
       key: "brand",
       label: "Brand",
-      options: options.brand.length
+      options: (options.brand.length
         ? options.brand
-        : ["HENDRICKSON", "MERCEDES", "SCANIA"],
+        : ["HENDRICKSON", "MERCEDES", "SCANIA"]
+      ).map((o) => (typeof o === "string" ? o : JSON.stringify(o))),
       disabled: false,
     },
     {
       key: "model",
       label: "Model",
-      options: filters.brand ? maps.modelsByBrand[filters.brand] ?? [] : [],
+      options: (filters.brand
+        ? maps.modelsByBrand[filters.brand] ?? []
+        : []
+      ).map((o) => (typeof o === "string" ? o : JSON.stringify(o))),
       disabled: !filters.brand,
     },
     {
       key: "type",
       label: "Type",
-      options:
-        filters.brand && filters.model
-          ? maps.typesByBrandModel[`${filters.brand}||${filters.model}`] ?? []
-          : [],
+      options: (filters.brand && filters.model
+        ? maps.typesByBrandModel[`${filters.brand}||${filters.model}`] ?? []
+        : []
+      ).map((o) => (typeof o === "string" ? o : JSON.stringify(o))),
       disabled: !filters.model,
     },
     {
       key: "desc",
       label: "Description",
-      options:
-        filters.brand && filters.model && filters.type
-          ? maps.descsByBrandModelType[
-              `${filters.brand}||${filters.model}||${filters.type}`
-            ] ?? []
-          : [],
+      options: (filters.brand && filters.model && filters.type
+        ? maps.descsByBrandModelType[
+            `${filters.brand}||${filters.model}||${filters.type}`
+          ] ?? []
+        : []
+      ).map((o) => (typeof o === "string" ? o : JSON.stringify(o))),
       disabled: !filters.type,
     },
   ];
@@ -265,17 +274,21 @@ export default function ProductsPage() {
     fetchOptions();
 
     // If there's an active searchTerm (coming from another page),
-    // don't override it by fetching the default product list on mount.
-    if (searchTerm && searchTerm.trim() !== "") return;
+    // fetch the paginated search results instead of the default listing.
+    if (searchTerm && searchTerm.trim() !== "") {
+      searchProducts(searchTerm, page, perPage);
+      return;
+    }
 
     // initial load (no filter-auto-fetch): fetch current page with current filters
     fetchProducts(page, perPage, filters);
     // Only re-run when page or searchTerm changes — filters won't auto-trigger searches
-  }, [page, searchTerm, fetchProducts]);
+  }, [page, searchTerm, fetchProducts, searchProducts]);
 
   // Handler to manage cascading selection and clearing children
   const handleSelectChange = (key: string, value: string) => {
     if (key === "brand") {
+      // set brand and clear dependent fields (model,type,desc)
       setFilters((prev) => ({
         ...prev,
         brand: value,
@@ -297,13 +310,24 @@ export default function ProductsPage() {
   };
 
   const clearAllFilters = () => {
-    setFilters({
+    const cleared = {
       brand: "",
       model: "",
       type: "",
       desc: "",
       stock: "",
-    });
+    };
+    setFilters(cleared);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState({}, "", newUrl);
+    } catch (e) {
+      /* ignore */
+    }
+    // fetch products with cleared filters immediately
+    fetchProducts(1, perPage, cleared);
   };
 
   const applyFilters = async (pageNum = 1) => {
@@ -357,46 +381,30 @@ export default function ProductsPage() {
           </div>
         </div>
       </div>
+      {/* No modal — step-by-step cascading selects below */}
 
       {/* FILTER SECTION */}
       <div className="mx-auto w-full sm:w-[50%] max-w-[1540px] px-6 mt-20 mb-12 flex flex-col gap-8">
         {/* FILTER SELECTS */}
         <div
-          className="
-          grid grid-cols-1 
-          sm:grid-cols-2 
-          md:grid-cols-3 
-          lg:grid-cols-5
-          gap-4 w-full
-        "
+          className="flex sm:flex-row flex-col items-center justify-center"
+          //   className="
+          //   grid grid-cols-1
+          //   sm:grid-cols-2
+          //   md:grid-cols-3
+          //   lg:grid-cols-5
+          //   gap-4 w-full
+          // "
         >
-          {filterFields.map((f) => (
-            <Select
-              key={f.key}
-              onValueChange={(v) => handleSelectChange(f.key, v)}
-              value={filters[f.key as keyof typeof filters]}
-            >
-              <SelectTrigger
-                className={`w-full h-[52px] bg-[#f7f7f7] text-[16px] rounded-md px-4 ${
-                  (f as any).disabled ? "opacity-50 pointer-events-none" : ""
-                }`}
-                aria-disabled={(f as any).disabled}
-              >
-                <SelectValue placeholder={f.label} />
-              </SelectTrigger>
-              <SelectContent>
-                {((f.options as string[]) || []).map((opt) => (
-                  <SelectItem
-                    key={opt}
-                    value={opt}
-                    className="text-[15px] py-2"
-                  >
-                    {opt}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ))}
+          <BrandModelTypeCombos
+            filters={{
+              brand: filters.brand,
+              model: filters.model,
+              type: filters.type,
+              desc: filters.desc,
+            }}
+            setFilters={setFilters}
+          />
 
           {/* STOCK SWITCH (no card) */}
           <div className="flex items-center bg justify-start gap-3">
@@ -434,8 +442,6 @@ export default function ProductsPage() {
             className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center"
             onClick={() => {
               clearAllFilters();
-              // apply cleared filters immediately
-              setTimeout(() => applyFilters(1), 0);
             }}
           >
             Clear Selections <X size={18} />
@@ -722,6 +728,7 @@ export default function ProductsPage() {
                   code={code}
                   title={product.raw.title}
                   shopifyId={shopifyId}
+                  productRaw={product.raw}
                   price={price}
                   image={image}
                   oems={oemsArr}

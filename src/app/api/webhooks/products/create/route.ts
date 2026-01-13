@@ -1,6 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { connectDB } from "@/lib/mongoose/instance";
 import Product from "@/schemas/mongoose/product";
-import { clear } from "console";
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -71,6 +71,94 @@ async function fetchProductMetafields(productId: string) {
   );
 }
 
+// Inventory locations fetch (GraphQL)
+async function fetchInventoryLocations(productId: string) {
+  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
+  const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+
+  const query = `
+    query getProductInventory($id: ID!) {
+      product(id: $id) {
+        variants(first: 100) {
+          edges {
+            node {
+              id
+              inventoryItem {
+                id
+                inventoryLevels(first: 10) {
+                  edges {
+                    node {
+                      location {
+                        id
+                        name
+                      }
+                      quantities(names: ["available", "incoming"]) {
+                        name
+                        quantity
+                      }
+                      updatedAt
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const response = await fetch(
+    `https://${shopifyDomain}/admin/api/2024-10/graphql.json`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": accessToken!,
+      },
+      body: JSON.stringify({ query, variables: { id: productId } }),
+    }
+  );
+
+  const data = await response.json();
+
+  if (data.errors) {
+    console.error("GraphQL inventory errors:", data.errors);
+    return {};
+  }
+
+  const inventoryMap: Record<string, any[]> = {};
+  const variants = data.data?.product?.variants?.edges || [];
+  for (const variantEdge of variants) {
+    const variant = variantEdge.node;
+    const fullVariantId = variant.id;
+    const shortVariantId = String(variant.id).split("/").pop() || "";
+
+    const levels = variant.inventoryItem?.inventoryLevels?.edges || [];
+    const mapped = levels.map((levelEdge: any) => {
+      const node = levelEdge.node;
+      const availableQty =
+        node.quantities?.find((q: any) => q.name === "available")?.quantity ||
+        0;
+      const incomingQty =
+        node.quantities?.find((q: any) => q.name === "incoming")?.quantity || 0;
+
+      return {
+        location_id: String(node.location.id).split("/").pop(),
+        location_name: node.location.name,
+        available: availableQty,
+        incoming: incomingQty,
+        updated_at: node.updatedAt,
+      };
+    });
+
+    inventoryMap[fullVariantId] = mapped;
+    if (shortVariantId) inventoryMap[shortVariantId] = mapped;
+  }
+
+  return inventoryMap;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
@@ -97,16 +185,53 @@ export async function POST(req: NextRequest) {
     }
     console.log("Product ID:", productData.id);
 
-    // Metafields fetch'i try-catch içine al
+    // Metafields ve inventory locations'ı paralel çek
     let metafields = [];
+    let inventoryMap: Record<string, any[]> = {};
     try {
-      metafields = await fetchProductMetafields(
-        productData.admin_graphql_api_id
-      );
+      [metafields, inventoryMap] = await Promise.all([
+        fetchProductMetafields(productData.admin_graphql_api_id),
+        fetchInventoryLocations(productData.admin_graphql_api_id),
+      ]);
       console.log("Metafields fetched:", metafields.length);
+      console.log(
+        "Inventory locations fetched for variants:",
+        Object.keys(inventoryMap).length
+      );
     } catch (metaErr) {
-      console.error("Metafield fetch error:", metaErr);
-      // Metafield hatası olsa bile ürünü kaydet
+      console.error("Fetch error:", metaErr);
+    }
+
+    // Variants'a inventory_locations ekle
+    if (productData.variants && Array.isArray(productData.variants)) {
+      const getInventoryFor = (variantId: any) => {
+        if (!variantId) return [];
+        const key = String(variantId);
+        if (inventoryMap[key]) return inventoryMap[key];
+        try {
+          const short = String(variantId).split("/").pop();
+          if (short && inventoryMap[short]) return inventoryMap[short];
+        } catch {
+          // ignore
+        }
+        return [];
+      };
+
+      try {
+        console.log("InventoryMap:", JSON.stringify(inventoryMap, null, 2));
+      } catch {
+        console.log("InventoryMap (non-serializable)", inventoryMap);
+      }
+
+      productData.variants = productData.variants.map((variant: any) => {
+        const inv = getInventoryFor(variant.id);
+        console.log("Variant lookup:", {
+          id: variant.id,
+          short: String(variant.id).split("/").pop(),
+          found: inv.length,
+        });
+        return { ...variant, inventory_locations: inv };
+      });
     }
 
     const fullProduct = {

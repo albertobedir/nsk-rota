@@ -24,6 +24,7 @@ interface ProductCardProps {
   variantId?: string;
   matchType?: "exact" | "partial" | undefined;
   searchTerm?: string;
+  productRaw?: any;
 }
 
 export default function SingleProdCard({
@@ -39,6 +40,7 @@ export default function SingleProdCard({
   variantId,
   matchType,
   searchTerm,
+  productRaw,
 }: ProductCardProps) {
   const addToCart = useSessionStore((s) => s.addToCart);
 
@@ -69,6 +71,61 @@ export default function SingleProdCard({
     }
     return String(id ?? "unknown");
   })();
+
+  // Determine displayed location and stock.
+  // Preference order:
+  // 1) If `location` and `stock` props provided, use them.
+  // 2) If `productRaw.variants[0].inventory_locations[1]` exists, use that (user requested index 1).
+  // 3) Fallback to `productRaw.variants[0].inventory_locations[0]`.
+  // 4) Fallback to `stock`/`inStock` props as before.
+  const { displayedLocation, displayedStock } = (() => {
+    try {
+      if (location && stock !== undefined && stock !== null) {
+        return { displayedLocation: location, displayedStock: Number(stock) };
+      }
+
+      const firstVariant = productRaw?.variants && productRaw.variants[0];
+      const invs = firstVariant?.inventory_locations;
+      if (Array.isArray(invs) && invs.length > 0) {
+        // prefer index 1 if available
+        const preferred = invs[1] ?? invs[0];
+        if (preferred) {
+          const name =
+            preferred.location_name ||
+            preferred.location ||
+            String(preferred.location_id || "");
+          const qty = Number(preferred.available ?? preferred.quantity ?? 0);
+          return {
+            displayedLocation: name,
+            displayedStock: Number.isNaN(qty) ? undefined : qty,
+          };
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    if (stock !== undefined && stock !== null) {
+      const n = Number(stock as any);
+      return {
+        displayedLocation: location,
+        displayedStock: Number.isNaN(n) ? undefined : n,
+      };
+    }
+
+    if (inStock)
+      return { displayedLocation: location, displayedStock: undefined };
+
+    return { displayedLocation: location, displayedStock: undefined };
+  })();
+
+  const maxAvailable =
+    typeof displayedStock === "number"
+      ? displayedStock === 0
+        ? 0
+        : Math.max(1, displayedStock)
+      : undefined;
+  const outOfStock = maxAvailable === 0;
 
   const renderOemEntry = (entry: any) => {
     try {
@@ -243,52 +300,67 @@ export default function SingleProdCard({
 
         {/* Dynamic badges (location, stock) */}
         <div className="flex flex-wrap gap-2 items-center">
+          {/* Location and Stock (computed from productRaw when available) */}
           <div className="flex items-center gap-1 text-blue-600 font-bold">
             <Icons name="konum" />
-            {location || "—"}
+            {displayedLocation || location || "—"}
           </div>
-          <div
-            className={`flex items-center gap-1 font-bold ${
-              inStock ? "text-green-600" : "text-red-600"
-            }`}
-          >
-            <Icons name="stock" />
-            {stock !== undefined && stock !== null
-              ? (() => {
-                  const n = Number(stock as any);
-                  return !Number.isNaN(n) ? `${n} in stock` : String(stock);
-                })()
-              : inStock
-              ? "In stock"
-              : "Out of stock"}
-          </div>
+          {(() => {
+            const isInStock =
+              typeof displayedStock === "number" ? displayedStock > 0 : inStock;
+
+            return (
+              <div
+                className={`flex items-center gap-1 font-bold ${
+                  isInStock ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {isInStock ? <Icons name="stock" /> : <Icons name="x" />}
+
+                {isInStock
+                  ? displayedStock !== undefined && displayedStock !== null
+                    ? `${displayedStock} in stock`
+                    : "In stock"
+                  : "Out of stock"}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Quantity + Add to cart (split control) */}
         <div className="mt-2">
-          <div className="flex w-full border-2 border-secondary rounded-md overflow-hidden">
+          <div
+            className={`flex w-full border-2 ${
+              outOfStock ? "border-muted-foreground/30" : "border-secondary"
+            } rounded-md overflow-hidden`}
+          >
             <input
               type="number"
               min={1}
+              max={maxAvailable}
               value={qty}
+              disabled={maxAvailable === 0}
               onChange={(e) => {
                 const v = e.target.value;
                 if (v === "") {
-                  // allow clearing the input
                   setQty("");
                   return;
                 }
-                // keep a numeric string with minimum 1
                 const n = Number(v);
-                setQty(String(Math.max(1, Number.isNaN(n) ? 1 : n)));
+                const cap = maxAvailable ?? Number.POSITIVE_INFINITY;
+                const parsed = Number.isNaN(n) ? 1 : n;
+                const final = Math.max(1, Math.min(parsed, cap));
+                setQty(String(final));
               }}
-              className="w-20 h-10 px-3 text-center bg-white border-none outline-none"
+              className="w-20 h-10 px-3 text-center bg-white border-none outline-none disabled:opacity-50"
               aria-label="Quantity"
             />
 
             <button
               onClick={async () => {
                 try {
+                  if (maxAvailable === 0) return; // do nothing when out of stock
+
                   if (variantId) {
                     const resp = await fetch("/api/cart/add", {
                       method: "POST",
@@ -321,15 +393,22 @@ export default function SingleProdCard({
                   toast.error("Failed to add to cart");
                 }
               }}
-              className="
-    flex-1 bg-secondary text-white font-bold h-10
+              disabled={maxAvailable === 0}
+              className={`
+    flex-1
+    ${
+      maxAvailable === 0
+        ? "bg-gray-300 text-gray-700 cursor-not-allowed"
+        : "bg-secondary text-white"
+    }
+    font-bold h-10
     transition duration-150
-    hover:brightness-110
+    ${maxAvailable === 0 ? "" : "hover:brightness-110"}
     active:brightness-90 active:scale-[0.98]
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40
-  "
+  `}
             >
-              Add to cart
+              {maxAvailable === 0 ? "Out of Stock" : "Add to cart"}
             </button>
           </div>
         </div>

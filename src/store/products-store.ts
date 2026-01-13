@@ -54,8 +54,11 @@ interface ProductState {
     limit: number,
     filters?: Filters
   ) => Promise<void>;
-
-  searchProducts: (query: string) => Promise<void>;
+  searchProducts: (
+    query: string,
+    page?: number,
+    limit?: number
+  ) => Promise<void>;
 }
 
 export const useProductsStore = create<ProductState>((set) => ({
@@ -98,11 +101,15 @@ export const useProductsStore = create<ProductState>((set) => ({
   },
 
   /* ------------------------------- SEARCH ------------------------------- */
-  searchProducts: async (query) => {
+  searchProducts: async (query, page = 1, limit = 12) => {
+    // empty query: fallback to paged regular listing
     if (!query || query.trim() === "") {
-      const res = await fetch(`/api/products/gets?page=1&limit=12`, {
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `/api/products/gets?page=${page}&limit=${limit}`,
+        {
+          cache: "no-store",
+        }
+      );
 
       const json = await res.json();
 
@@ -115,7 +122,14 @@ export const useProductsStore = create<ProductState>((set) => ({
       return;
     }
 
-    const res = await fetch(`/api/products/gets?search=${query}`, {
+    // include pagination params for search requests so backend can return paged results
+    const qs = new URLSearchParams({
+      search: String(query),
+      page: String(page),
+      limit: String(limit),
+    });
+
+    const res = await fetch(`/api/products/gets?${qs.toString()}`, {
       cache: "no-store",
     });
 

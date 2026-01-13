@@ -9,7 +9,7 @@ import { ensureCart } from "../_helpers";
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { cart, cartId, created } = await ensureCart(request);
+    const { cartId, created } = await ensureCart(request);
 
     if (!cartId)
       return NextResponse.json(
@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest) {
     } else if (body.merchandiseId && typeof body.quantity === "number") {
       // find the matching line on server-side cart
       const current = await getCart(cartId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const edges = current?.lines?.edges ?? [];
       const match = edges.find(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

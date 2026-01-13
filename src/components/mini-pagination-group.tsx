@@ -18,6 +18,7 @@ type Product = {
   stock?: number | string;
   variantId?: string;
   matchType?: "exact" | "partial" | undefined;
+  productRaw?: any;
 };
 
 export default function MiniPaginationGroup({
@@ -120,6 +121,9 @@ export default function MiniPaginationGroup({
                     .map((m: any) => m.value)
                 : [];
 
+            const firstVariantId =
+              raw?.variants && raw.variants[0] && raw.variants[0].id;
+
             return {
               id: codeVal,
               code: codeVal,
@@ -127,10 +131,13 @@ export default function MiniPaginationGroup({
               price,
               image,
               oems: oemsArr,
+              productRaw: raw,
               location: "",
               inStock: true,
               stock: 0,
-              variantId: raw?.variants?.[0]?.id ?? undefined,
+              variantId: firstVariantId
+                ? `gid://shopify/ProductVariant/${firstVariantId}`
+                : undefined,
             } as Product;
           });
 
@@ -183,6 +190,7 @@ export default function MiniPaginationGroup({
               price={p.price}
               image={p.image}
               oems={p.oems}
+              productRaw={p.productRaw}
               location={p.location}
               inStock={p.inStock}
               stock={p.stock}

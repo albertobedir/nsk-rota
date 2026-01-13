@@ -30,6 +30,33 @@ export async function POST(request: NextRequest) {
     // Normalize
     const lines = lineItems as IncomingLine[];
 
+    // Server-side credit check: if customerId provided, ensure customer's creditRemaining covers cart total
+    if (customerId) {
+      try {
+        const customer = await prisma.customer.findFirst({
+          where: { shopifyId: String(customerId) },
+          select: { creditRemaining: true },
+        });
+        const remaining = Number(customer?.creditRemaining ?? 0);
+        // compute total from provided line items (prefer explicit prices)
+        const computedTotal = lines.reduce((sum, li) => {
+          const qty = Number(li.quantity || 1);
+          const price =
+            Number(li.customPrice ?? li.originalUnitPrice ?? 0) || 0;
+          return sum + price * qty;
+        }, 0);
+
+        if (computedTotal > remaining) {
+          return NextResponse.json(
+            { message: "Insufficient credit" },
+            { status: 402 }
+          );
+        }
+      } catch (e) {
+        console.warn("Credit check failed", e);
+      }
+    }
+
     // Fetch customer-specific prices from DB (if customerId provided)
     let customerPrices: Record<string, number> = {};
     if (customerId) {

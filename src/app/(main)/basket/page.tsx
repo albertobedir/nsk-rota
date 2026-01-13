@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Trash2 } from "lucide-react";
@@ -19,7 +19,13 @@ export default function BasketPage() {
   const [qtyDraft, setQtyDraft] = useState<Record<string, string>>({});
 
   const clearCartStore = useSessionStore((s) => s.clearCart);
+  const sessionUser = useSessionStore((s) => s.user);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  // map of itemId -> available stock (number)
+  const [stockMap, setStockMap] = useState<Record<string, number | undefined>>(
+    {}
+  );
 
   // Clear entire cart both locally and on server
   const clearAll = async () => {
@@ -83,12 +89,14 @@ export default function BasketPage() {
 
   // elde yazılan quantity'yi store'a uygular
   // elde yazılan quantity'yi store'a uygular
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const setQuantity = async (id: string | number, nextQty: number) => {
     const item = cart.find((x) => x.id === id);
     if (!item) return;
-
-    const normalized = Math.max(1, Math.floor(Number(nextQty) || 1));
+    const requested = Math.max(1, Math.floor(Number(nextQty) || 1));
+    // cap to available stock if known
+    const avail = stockMap[String(id)];
+    const normalized =
+      avail !== undefined ? Math.min(requested, avail) : requested;
     const delta = normalized - item.quantity;
 
     if (delta > 0) {
@@ -120,16 +128,21 @@ export default function BasketPage() {
 
   const handleIncrease = async (item: any) => {
     const newQty = (item.quantity ?? 0) + 1;
+    const avail = stockMap[String(item.id)];
+    if (avail !== undefined && newQty > avail) {
+      toast.error("Cannot add more than available stock");
+      return;
+    }
     increase(item.id);
     try {
       const merch = item.variantId;
       if (!merch) return;
-      const resp = await fetch("/api/cart/update", {
+      await fetch("/api/cart/update", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ merchandiseId: merch, quantity: newQty }),
       });
-      if (!resp.ok) throw new Error("Failed to update server");
+      // if (!resp.ok) throw new Error("Failed to update server");
     } catch (e) {
       console.error("Increase failed:", e);
       toast.error("Failed to sync quantity");
@@ -147,7 +160,7 @@ export default function BasketPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ merchandiseId: merch, quantity: newQty }),
       });
-      if (!resp.ok) throw new Error("Failed to update server");
+      // if (!resp.ok) throw new Error("Failed to update server");
     } catch (e) {
       console.error("Decrease failed:", e);
       toast.error("Failed to sync quantity");
@@ -170,6 +183,69 @@ export default function BasketPage() {
       toast.error("Failed to remove from server");
     }
   };
+
+  // Keep stockMap updated for items in cart
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const entries = await Promise.all(
+          cart.map(async (item) => {
+            try {
+              const v = item.variantId ?? "";
+              // extract numeric id if gid
+              const vid = String(v).includes("/")
+                ? String(v).split("/").pop()
+                : String(v);
+              if (!vid) return [String(item.id), undefined] as const;
+              const resp = await fetch(
+                `/api/products/gets?variantId=${encodeURIComponent(vid)}`
+              );
+              const json = await resp.json().catch(() => null);
+              const found = json?.results?.[0] ?? null;
+              if (!found) return [String(item.id), undefined] as const;
+              const firstVariant =
+                (found.raw?.variants && found.raw.variants[0]) ?? null;
+              // prefer inventory_locations[1] then [0]
+              let avail: number | undefined = undefined;
+              try {
+                const invs = firstVariant?.inventory_locations;
+                if (Array.isArray(invs) && invs.length > 0) {
+                  const preferred = invs[1] ?? invs[0];
+                  const q = Number(
+                    preferred?.available ?? preferred?.quantity ?? 0
+                  );
+                  if (!Number.isNaN(q)) avail = q;
+                }
+              } catch {
+                // ignore
+              }
+              if (avail === undefined) {
+                const q = Number(firstVariant?.inventory_quantity ?? 0);
+                if (!Number.isNaN(q)) avail = q;
+              }
+
+              return [String(item.id), avail] as const;
+            } catch {
+              return [String(item.id), undefined] as const;
+            }
+          })
+        );
+
+        if (!mounted) return;
+        const map: Record<string, number | undefined> = {};
+        for (const [k, v] of entries) map[k] = v;
+        setStockMap(map);
+      } catch (e) {
+        console.warn("Failed to fetch stock map", e);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [cart]);
 
   const cartTotalItems = () => cart.reduce((s, i) => s + (i.quantity ?? 0), 0);
 
@@ -607,12 +683,33 @@ export default function BasketPage() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleGetOffer}
-                    className="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-[#f59e0b] px-4 py-3 font-extrabold text-white text-base hover:bg-[#e58f0a]"
-                  >
-                    Proceed to Checkout
-                  </button>
+                  {(() => {
+                    const remaining = Number(
+                      sessionUser?.creditRemaining ?? Number.POSITIVE_INFINITY
+                    );
+                    const disabledByCredit = cartTotalPrice() > remaining;
+
+                    return (
+                      <button
+                        onClick={handleGetOffer}
+                        disabled={disabledByCredit}
+                        className={`mt-5 w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-extrabold text-white text-base ${
+                          disabledByCredit
+                            ? "bg-gray-300 text-gray-700 cursor-not-allowed"
+                            : "bg-[#f59e0b] hover:bg-[#e58f0a]"
+                        }`}
+                        title={
+                          disabledByCredit
+                            ? "Cart exceeds available credit"
+                            : "Proceed to checkout"
+                        }
+                      >
+                        {disabledByCredit
+                          ? "Insufficient credit"
+                          : "Proceed to Checkout"}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             </aside>

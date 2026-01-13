@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import Image from "next/image";
@@ -28,6 +29,9 @@ interface ShopifyVariant {
   id: number;
   price: string;
   sku?: string | null;
+  // optional inventory fields that may be attached by webhook processing
+  inventory_quantity?: number | null;
+  inventory_locations?: any[] | null;
 }
 interface ShopifyMetafield {
   namespace: string;
@@ -192,13 +196,42 @@ export default function ProductDetailPage() {
       // Shopify variant ID'yi al (GID formatında olmalı)
       const variantId = `gid://shopify/ProductVariant/${raw.variants[0].id}`;
 
+      // enforce max quantity based on available stock (from product raw)
+      let desiredQty = Number(qty || 1);
+      try {
+        const firstVariant = raw?.variants && raw.variants[0];
+        const invs = firstVariant?.inventory_locations;
+        let avail: number | undefined = undefined;
+        if (Array.isArray(invs) && invs.length > 0) {
+          const preferred = invs[1] ?? invs[0];
+          const q = Number(preferred?.available ?? preferred?.quantity ?? 0);
+          if (!Number.isNaN(q)) avail = q;
+        }
+        if (avail === undefined) {
+          const q = Number(
+            firstVariant?.inventory_quantity ??
+              firstVariant?.inventory_quantity ??
+              0
+          );
+          if (!Number.isNaN(q)) avail = q;
+        }
+
+        if (avail !== undefined && desiredQty > avail) {
+          desiredQty = avail;
+          setQty(String(desiredQty));
+          toast.warning("Quantity capped to available stock");
+        }
+      } catch {
+        // ignore
+      }
+
       // Call server API to add to Shopify cart
       const resp = await fetch("/api/cart/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           merchandiseId: variantId,
-          quantity: Number(qty || 1),
+          quantity: Number(desiredQty),
         }),
       });
 
@@ -275,7 +308,40 @@ export default function ProductDetailPage() {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+  // Derive preferred inventory location and stock from product raw data
+  let displayedLocation: string | undefined = undefined;
+  let displayedStock: number | undefined = undefined;
+  try {
+    const firstVariant = raw?.variants && raw.variants[0];
+    const invs = firstVariant?.inventory_locations;
+    if (Array.isArray(invs) && invs.length > 0) {
+      const preferred = invs[1] ?? invs[0];
+      if (preferred) {
+        displayedLocation =
+          preferred.location_name ||
+          preferred.location ||
+          String(preferred.location_id || "");
+        const qty = Number(
+          preferred.available ??
+            preferred.quantity ??
+            preferred.available_qty ??
+            0
+        );
+        displayedStock = Number.isNaN(qty) ? undefined : qty;
+      }
+    }
+  } catch {
+    // ignore
+  }
   const image = raw.images?.[0]?.src ?? "";
+  // derived availability for controls: treat 0 as out-of-stock
+  const pageMaxAvailable =
+    typeof displayedStock === "number"
+      ? displayedStock === 0
+        ? 0
+        : Math.max(1, displayedStock)
+      : undefined;
+  const pageOutOfStock = pageMaxAvailable === 0;
   const extractRotaNo = (metafields: ShopifyMetafield[] = []) => {
     const direct = metafields.find((m) => m.key === "rota_no")?.value;
     if (direct) return direct;
@@ -364,6 +430,18 @@ export default function ProductDetailPage() {
   };
 
   const technicalRows = getTechnicalRows(raw.metafields);
+  const hasTechnicalInfo = (() => {
+    try {
+      const candidate = raw.metafields?.find(
+        (m: any) =>
+          /(technical|tech|technical_info)/i.test(m.key) ||
+          (m.namespace === "custom" && /(technical|tech)/i.test(m.key))
+      );
+      return Boolean(candidate);
+    } catch {
+      return false;
+    }
+  })();
 
   /* ---------------------- COMPONENTS ---------------------- */
 
@@ -495,12 +573,35 @@ export default function ProductDetailPage() {
           <div className="flex flex-wrap gap-3 mt-2">
             <div className="flex items-center gap-1 text-blue-600 font-bold">
               <Icons name="konum" />
-              CHICAGO
+              {displayedLocation ?? "—"}
             </div>
-            <div className="flex items-center gap-1 font-bold text-green-600">
-              <Icons name="stock" />
-              IN STOCK
-            </div>
+            {(() => {
+              const isInStock =
+                typeof displayedStock === "number"
+                  ? displayedStock > 0
+                  : (raw?.variants?.[0]?.inventory_quantity ?? 0) > 0;
+
+              return (
+                <div
+                  className={`flex items-center gap-1 font-bold ${
+                    isInStock ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {isInStock ? (
+                    <Icons name="stock" />
+                  ) : (
+                    <Icons name="x" width={20} height={20} />
+                  )}
+
+                  {isInStock
+                    ? displayedStock !== undefined
+                      ? `${displayedStock} in stock`
+                      : "In stock"
+                    : "Out of stock"}
+                </div>
+              );
+            })()}
+
             <div className="flex items-center gap-1 font-bold text-orange-600">
               <Icons name="teslim" />
               3–4 DAYS
@@ -519,28 +620,56 @@ export default function ProductDetailPage() {
 
           {/* ADD TO CART */}
           <div className="mt-4">
-            <div className="flex w-full border-2 border-secondary rounded-md overflow-hidden">
-              <input
-                type="number"
-                min={1}
-                value={qty}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === "") return setQty("");
-                  const n = Number(v);
-                  setQty(String(Math.max(1, Number.isNaN(n) ? 1 : n)));
-                }}
-                className="w-28 h-14 px-3 text-center bg-white border-none outline-none"
-                aria-label="Quantity"
-              />
+            <div
+              className={`flex w-full border-2 ${
+                pageOutOfStock
+                  ? "border-muted-foreground/30"
+                  : "border-secondary"
+              } rounded-md overflow-hidden`}
+            >
+              {(() => {
+                const maxAvailable = pageMaxAvailable;
+                const outOfStock = pageOutOfStock;
 
-              <Button
-                onClick={handleAddToCart}
-                className="flex-1 bg-secondary text-white font-bold h-14"
-                disabled={addingToCart}
-              >
-                {addingToCart ? "Adding..." : "ADD TO CART"}
-              </Button>
+                return (
+                  <>
+                    <input
+                      type="number"
+                      min={1}
+                      max={maxAvailable}
+                      disabled={outOfStock}
+                      value={qty}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === "") return setQty("");
+                        const n = Number(v);
+                        const cap = maxAvailable ?? Number.POSITIVE_INFINITY;
+                        const parsed = Number.isNaN(n) ? 1 : n;
+                        const final = Math.max(1, Math.min(parsed, cap));
+                        setQty(String(final));
+                      }}
+                      className="w-28 h-14 px-3 text-center bg-white border-none outline-none disabled:opacity-50"
+                      aria-label="Quantity"
+                    />
+
+                    <Button
+                      onClick={handleAddToCart}
+                      className={`flex-1 font-bold h-14 ${
+                        outOfStock
+                          ? "bg-gray-300 text-gray-700 cursor-not-allowed"
+                          : "bg-secondary text-white"
+                      }`}
+                      disabled={addingToCart || outOfStock}
+                    >
+                      {outOfStock
+                        ? "Out of Stock"
+                        : addingToCart
+                        ? "Adding..."
+                        : "ADD TO CART"}
+                    </Button>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
@@ -550,46 +679,73 @@ export default function ProductDetailPage() {
               Suitable for
               <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
             </h3>
+
             {(() => {
               try {
-                // parse applications or brand_info metafields
-                const appsField = raw.metafields?.find((m) =>
-                  /applications?/i.test(m.key)
-                );
-                const brandField = raw.metafields?.find((m) =>
-                  /brand_info/i.test(m.key)
+                const brandField = raw.metafields?.find(
+                  (m: any) =>
+                    /brand/i.test(m.key) ||
+                    (m.namespace === "custom" && /brand/i.test(m.key))
                 );
 
-                let brand = raw.vendor ?? "";
-                if (brandField) {
-                  const parsed = JSON.parse(brandField.value) as unknown[];
-                  if (Array.isArray(parsed) && parsed[0]) {
-                    const obj = parsed[0] as Record<string, unknown>;
-                    brand = String(obj.BrandDescription ?? brand);
+                const modelsField = raw.metafields?.find(
+                  (m: any) =>
+                    /models?/i.test(m.key) ||
+                    (m.namespace === "custom" && /models?/i.test(m.key))
+                );
+
+                let brand: string | undefined = undefined;
+                let models: string[] = [];
+
+                if (brandField && typeof brandField.value === "string") {
+                  try {
+                    const parsed = JSON.parse(brandField.value);
+                    if (Array.isArray(parsed) && parsed[0]) {
+                      brand =
+                        parsed[0].Brand ||
+                        parsed[0].MarkaDescription ||
+                        String(parsed[0]);
+                    } else if (parsed && typeof parsed === "object") {
+                      brand =
+                        parsed.Brand ||
+                        parsed.MarkaDescription ||
+                        String(brandField.value);
+                    } else {
+                      brand = String(brandField.value);
+                    }
+                  } catch {
+                    brand = String(brandField.value);
                   }
                 }
 
-                const models: string[] = [];
-                if (appsField) {
-                  const parsedApps = JSON.parse(appsField.value) as unknown[];
-                  if (Array.isArray(parsedApps)) {
-                    for (const item of parsedApps) {
-                      const a = item as Record<string, unknown>;
-                      const md = String(
-                        a.ModelDescription ?? a.Model2 ?? a.Model ?? ""
-                      );
-                      if (md && !models.includes(md)) models.push(md);
-                      if (models.length >= 6) break;
-                    }
+                if (modelsField && typeof modelsField.value === "string") {
+                  try {
+                    const parsed = JSON.parse(modelsField.value);
+                    if (Array.isArray(parsed))
+                      models = parsed
+                        .map((x: any) => String(x))
+                        .filter(Boolean);
+                    else
+                      models = String(modelsField.value)
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter(Boolean);
+                  } catch {
+                    models = String(modelsField.value)
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean);
                   }
                 }
 
                 return (
                   <div className="mt-3">
-                    <p className="font-semibold text-black text-lg">{brand}</p>
+                    <p className="font-semibold text-black text-lg">
+                      {brand ?? raw.vendor}
+                    </p>
                     {models.length > 0 && (
                       <div className="mt-2 text-sm space-y-1">
-                        {models.map((m, i) => (
+                        {models.map((m: string, i: number) => (
                           <div key={i} className="flex justify-between">
                             <span className="font-semibold">{m}</span>
                           </div>
@@ -706,7 +862,9 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Mobile tech info */}
-          <div className="lg:hidden">{TechnicalInfo}</div>
+          {hasTechnicalInfo ? (
+            <div className="lg:hidden">{TechnicalInfo}</div>
+          ) : null}
         </div>
         {/* RIGHT SIDE DESKTOP */}
         <div className="hidden lg:flex flex-col gap-6">
@@ -741,7 +899,7 @@ export default function ProductDetailPage() {
             <CarouselNext className="right-2" />
           </Carousel>
 
-          {TechnicalInfo}
+          {hasTechnicalInfo ? TechnicalInfo : null}
         </div>
       </div>
 

@@ -11,7 +11,11 @@ import {
 } from "@/components/ui/carousel";
 import Image from "next/image";
 
-const banners = ["/cr1.jpg", "/cr2.jpg", "/cr3.jpg"];
+const banners = [
+  { bg: "none", content: "/cr1.jpg" },
+  { bg: "/cr2bg.png", content: "/cr2.png" },
+  { bg: "none", content: "/cr3.jpg" },
+];
 
 export default function HeaderCarousel() {
   const [api, setApi] = React.useState<CarouselApi | null>(null);
@@ -40,7 +44,7 @@ export default function HeaderCarousel() {
       try {
         const next = (api.selectedScrollSnap() + 1) % banners.length;
         api.scrollTo(next);
-      } catch (e) {
+      } catch {
         // ignore if api isn't ready
       }
     }, AUTOPLAY_MS);
@@ -53,14 +57,32 @@ export default function HeaderCarousel() {
       <Carousel className="relative h-full w-full" setApi={setApi}>
         <CarouselPrevious className="absolute left-2 top-1/2 -translate-y-1/2 z-30" />
         <CarouselContent className="flex">
-          {banners.map((src, i) => (
+          {banners.map((item, i) => (
             <CarouselItem key={i}>
               <div className="w-full relative h-64 md:h-96 lg:h-[32rem] overflow-hidden">
+                {item.bg !== "none" && (
+                  <Image
+                    src={item.bg}
+                    fill
+                    alt={`banner-bg-${i}`}
+                    className="absolute inset-0 h-full w-full object-cover z-0"
+                  />
+                )}
+
                 <Image
-                  src={src}
+                  src={item.content}
                   fill
-                  alt={`banner-${i}`}
-                  className="w-full absolute h-full object-center"
+                  alt={`banner-content-${i}`}
+                  className={
+                    item.bg === "none"
+                      ? "absolute inset-0 h-full w-full object-cover z-10"
+                      : "absolute inset-0 h-full w-full object-contain z-10"
+                  }
+                  style={
+                    item.bg === "none"
+                      ? undefined
+                      : { objectPosition: "center" }
+                  }
                 />
               </div>
             </CarouselItem>
