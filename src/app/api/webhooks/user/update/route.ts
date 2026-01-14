@@ -34,6 +34,31 @@ async function fetchCustomerMetafieldsREST(customerId: string) {
   return json.metafields || [];
 }
 
+async function fetchCustomerTagsREST(customerId: string) {
+  const token =
+    process.env.SHOPIFY_ADMIN_ACCESS_TOKEN ??
+    process.env.SHOPIFY_ADMIN_API_TOKEN ??
+    "";
+  const shop = process.env.SHOPIFY_STORE_DOMAIN;
+  if (!token || !shop) return [];
+
+  const url = `https://${shop}/admin/api/2024-10/customers/${customerId}.json?fields=tags`;
+  const res = await fetch(url, {
+    headers: {
+      "X-Shopify-Access-Token": token,
+      "Content-Type": "application/json",
+    },
+  });
+  const json = await res.json();
+  const tagsStr = json?.customer?.tags ?? "";
+  if (!tagsStr) return [];
+  // Shopify returns tags as comma-separated string
+  return tagsStr
+    .split(",")
+    .map((s: string) => s.trim())
+    .filter(Boolean);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.text();
@@ -54,11 +79,8 @@ export async function POST(req: NextRequest) {
         "[webhook:user:update] parsed customer:",
         JSON.stringify(customer)
       );
-    } catch (e) {
-      console.log(
-        "[webhook:user:update] parsed customer (non-serializable)",
-        e
-      );
+    } catch {
+      console.log("[webhook:user:update] parsed customer (non-serializable)");
     }
 
     const metafields = await fetchCustomerMetafieldsREST(customer.id);
@@ -68,13 +90,12 @@ export async function POST(req: NextRequest) {
     );
     try {
       console.log(JSON.stringify(metafields));
-    } catch (e) {
+    } catch {
       /* ignore */
     }
 
     // extract metafield values
     const getField = (key: string) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const f = metafields.find((m: any) => m.key === key);
       return f ? f.value : undefined;
     };
@@ -95,7 +116,7 @@ export async function POST(req: NextRequest) {
         try {
           const anyv: any = v as any;
           if (anyv.amount != null) return Number(anyv.amount) || 0;
-        } catch (e) {
+        } catch {
           return 0;
         }
       }
@@ -106,7 +127,7 @@ export async function POST(req: NextRequest) {
         try {
           const obj = JSON.parse(s);
           if (obj && obj.amount != null) return Number(obj.amount) || 0;
-        } catch (e) {
+        } catch {
           // fallthrough
         }
       }
@@ -134,6 +155,52 @@ export async function POST(req: NextRequest) {
       creditLimit,
       creditUsed,
     });
+
+    // Fetch tags (either provided in payload or via admin REST)
+    let tags: string[] = [];
+    try {
+      if (customer.tags && Array.isArray(customer.tags)) tags = customer.tags;
+      else if (typeof customer.tags === "string")
+        tags = String(customer.tags)
+          .split(",")
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+      else {
+        tags = await fetchCustomerTagsREST(customer.id);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch/parse customer tags:", e);
+      tags = [];
+    }
+
+    // Debug: log raw tags
+    console.log("[webhook:user:update] customer tags raw:", tags);
+
+    // Compute tier based on tags (robust/normalized matching)
+    const computeTier = (tgs: string[] = []) => {
+      try {
+        if (!tgs || tgs.length === 0) return null;
+        const normalized = tgs
+          .map((s: any) =>
+            String(s ?? "")
+              .toLowerCase()
+              .trim()
+          )
+          .map((s) => s.replace(/[_\s]+/g, "-"));
+
+        // match variants like 'tier-3', 'tier 3', 'tier3', 'Tier-3', etc.
+        if (normalized.some((s) => /tier[-]?3$/.test(s) || s === "tier3"))
+          return "tier-3";
+        if (normalized.some((s) => /tier[-]?2$/.test(s) || s === "tier2"))
+          return "tier-2";
+        return null;
+      } catch {
+        return null;
+      }
+    };
+
+    const tierTag = computeTier(tags);
+    console.log("[webhook:user:update] computed tier:", tierTag);
 
     const defaultAddress = customer.default_address ?? null;
 
@@ -177,6 +244,8 @@ export async function POST(req: NextRequest) {
         creditLimit: toDecimalString(creditLimitNum),
         creditUsed: toDecimalString(creditUsedNum),
         creditRemaining: toDecimalString(creditRemainingNum),
+        shopifyTags: tags && tags.length > 0 ? tags : undefined,
+        tier: tierTag ?? null,
       },
       create: {
         email,
@@ -200,8 +269,51 @@ export async function POST(req: NextRequest) {
         creditLimit: toDecimalString(creditLimitNum),
         creditUsed: toDecimalString(creditUsedNum),
         creditRemaining: toDecimalString(creditRemainingNum),
+        shopifyTags: tags && tags.length > 0 ? tags : undefined,
+        tier: tierTag ?? null,
       },
     });
+
+    // Also upsert into prisma.Customer for shopify-specific record tracking
+    try {
+      await prisma.customer.upsert({
+        where: { shopifyId: String(customer.id) },
+        update: {
+          email: email,
+          firstName: customer.first_name ?? null,
+          lastName: customer.last_name ?? null,
+          phone: customer.phone ?? null,
+          creditLimit: creditLimitNum
+            ? toDecimalString(creditLimitNum)
+            : undefined,
+          creditUsed: creditUsedNum
+            ? toDecimalString(creditUsedNum)
+            : undefined,
+          creditRemaining: creditRemainingNum
+            ? toDecimalString(creditRemainingNum)
+            : undefined,
+          updatedAt: new Date(),
+        },
+        create: {
+          shopifyId: String(customer.id),
+          email: email,
+          firstName: customer.first_name ?? null,
+          lastName: customer.last_name ?? null,
+          phone: customer.phone ?? null,
+          creditLimit: creditLimitNum
+            ? toDecimalString(creditLimitNum)
+            : undefined,
+          creditUsed: creditUsedNum
+            ? toDecimalString(creditUsedNum)
+            : undefined,
+          creditRemaining: creditRemainingNum
+            ? toDecimalString(creditRemainingNum)
+            : undefined,
+        },
+      });
+    } catch (e) {
+      console.warn("Failed to upsert prisma.Customer:", e);
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

@@ -13,7 +13,7 @@ import Image from "next/image";
 
 const banners = [
   { bg: "none", content: "/cr1.jpg" },
-  { bg: "/cr2bg.png", content: "/cr2.png" },
+  { bg: "/cr2bg.jpg", content: "/cr2.png" },
   { bg: "none", content: "/cr3.jpg" },
 ];
 

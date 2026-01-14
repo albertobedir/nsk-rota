@@ -49,6 +49,17 @@ export default function SingleProdCard({
 
   const isExact = matchType === "exact";
   const isPartial = matchType === "partial";
+  const tierTag = useSessionStore((s) => s.tierTag);
+  const getDiscountForTier = useSessionStore((s) => s.getDiscountForTier);
+  const discountPercentage = getDiscountForTier();
+  const [prismaDiscount, setPrismaDiscount] = React.useState<number | null>(
+    null
+  );
+
+  const effectiveDiscount = prismaDiscount ?? discountPercentage ?? null;
+  const tierPrice = effectiveDiscount
+    ? Number((Number(price) * (1 - effectiveDiscount / 100)).toFixed(2))
+    : null;
 
   // Build product detail link id: prefer variant id (numeric part of `variantId`),
   // fallback to numeric `id` or `code`.
@@ -71,6 +82,44 @@ export default function SingleProdCard({
     }
     return String(id ?? "unknown");
   })();
+
+  // Fetch pricing tiers from Prisma-backed API and log discount for current tierTag
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const resp = await fetch(`/api/pricing-tiers/db`);
+        const json = await resp.json().catch(() => null);
+        const tiers: any[] = json?.results || [];
+        const tag = tierTag ?? null;
+        if (!tag) {
+          console.log("[single-prod-cart] no tierTag present");
+          return;
+        }
+        const normalized = String(tag).toLowerCase().trim();
+        const found = tiers.find(
+          (t) =>
+            String(t.tierTag ?? "")
+              .toLowerCase()
+              .trim() === normalized
+        );
+        const discount = found ? Number(found.discountPercentage) : null;
+        if (mounted) {
+          setPrismaDiscount(discount);
+          console.log(
+            `[single-prod-cart] prisma discountPercentage for ${tag}:`,
+            discount
+          );
+        }
+      } catch (e) {
+        console.warn("[single-prod-cart] pricing tiers fetch failed", e);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [tierTag]);
 
   // Determine displayed location and stock.
   // Preference order:
@@ -180,8 +229,8 @@ export default function SingleProdCard({
   };
 
   return (
-    <Card className="shadow-none bg-white flex flex-col gap-0 rounded-md w-full p-0 border-2">
-      <div className="relative w-full rounded-t-[inherit] aspect-square">
+    <Card className="shadow-none bg-white flex flex-col gap-0 rounded-md w-full p-0 border-2 h-full">
+      <div className="relative w-full rounded-t-[inherit] h-48 md:h-56 lg:h-64">
         {/* Match badge overlay (top-left) */}
         {matchType ? (
           <div
@@ -235,7 +284,7 @@ export default function SingleProdCard({
         )}
       </div>
 
-      <div className="flex flex-col bg-white gap-2 p-3">
+      <div className="flex flex-col bg-white gap-2 p-3 flex-1 overflow-hidden">
         {/* Product Title */}
         <Link href={`/products/${productLinkId}`} className="hover:underline">
           <div>
@@ -271,25 +320,29 @@ export default function SingleProdCard({
               )}
             </p>
 
-            <p className="text-sm font-medium text-gray-700">{title}</p>
+            <p className="text-sm font-medium text-gray-700 line-clamp-2">
+              {title}
+            </p>
           </div>
         </Link>
 
         {/* Price under title */}
-        <div className="mt-1">
-          <span className="text-base md:text-lg font-bold text-secondary">
-            {Number(price).toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}{" "}
-            USD
-          </span>
+        <div className="mt-1 flex items-center gap-3">
+          <div>
+            <span className="text-base md:text-lg font-bold text-secondary">
+              {(tierPrice ?? Number(price)).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              USD
+            </span>
+          </div>
+          {/* No badge shown — price is already reduced when effectiveDiscount exists */}
         </div>
 
         {/* OEM dynamic list (first 3) */}
         {oems && oems.length > 0 ? (
-          <div className="relative h-[60px] overflow-y-scroll text-sm leading-[1.35] pr-3">
-            <div className="absolute right-0 top-0 w-[4px] h-full  rounded-full"></div>
+          <div className="relative max-h-14 overflow-y-auto text-sm leading-[1.35] overflow-x-hidden pr-3">
             {oems.slice(0, 3).map((oem, i) => (
               <div key={i} className="font-semibold">
                 {renderOemEntry(oem)}
@@ -381,7 +434,7 @@ export default function SingleProdCard({
                   addToCart({
                     id: String(code),
                     title,
-                    price: Number(price),
+                    price: Number(tierPrice ?? Number(price)),
                     image,
                     quantity: Number(qty || 1),
                     variantId: variantId ?? "",

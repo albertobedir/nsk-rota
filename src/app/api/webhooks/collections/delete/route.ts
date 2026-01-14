@@ -31,21 +31,22 @@ export async function POST(req: NextRequest) {
     const collectionData = JSON.parse(rawBody);
     console.log("Collection deleted - ID:", collectionData.id);
 
-    const full = {
-      ...collectionData,
-      deletedAt: new Date(),
-    };
-
     await connectDB();
 
-    await Collection.updateOne(
-      { shopifyId: collectionData.id },
-      { $set: { raw: full } },
-      { upsert: true }
-    );
+    // Hard delete - kaydı tamamen sil
+    const result = await Collection.deleteOne({
+      shopifyId: collectionData.id,
+    });
+
+    console.log(`Collection ${collectionData.id} permanently deleted`);
 
     return NextResponse.json(
-      { status: "ok", action: "deleted", collectionId: collectionData.id },
+      {
+        status: "ok",
+        action: "hard_deleted",
+        collectionId: collectionData.id,
+        deleted: result.deletedCount > 0,
+      },
       { status: 200 }
     );
   } catch (err) {

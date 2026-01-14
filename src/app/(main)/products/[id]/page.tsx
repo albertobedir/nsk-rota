@@ -115,6 +115,49 @@ const SUITABLE_MODELS: SuitableModel[] = [
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const addToCart = useSessionStore((s) => s.addToCart);
+  // hook for computing tier discounts — must be called unconditionally
+  const getDiscountForTier = useSessionStore((s) => s.getDiscountForTier);
+  const tierTag = useSessionStore((s) => s.tierTag);
+  const [prismaDiscount, setPrismaDiscount] = useState<number | null>(null);
+
+  // Log Prisma-backed discountPercentage for current session tierTag
+  // Placed before any early returns to keep hook order stable
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const resp = await fetch(`/api/pricing-tiers/db`);
+        const json = await resp.json().catch(() => null);
+        const tiers: any[] = json?.results || [];
+        const tag = tierTag ?? null;
+        if (!tag) {
+          if (mounted) console.log("[product-page] no tierTag present");
+          return;
+        }
+        const normalized = String(tag).toLowerCase().trim();
+        const found = tiers.find(
+          (t) =>
+            String(t.tierTag ?? "")
+              .toLowerCase()
+              .trim() === normalized
+        );
+        const discount = found ? Number(found.discountPercentage) : null;
+        if (mounted) {
+          setPrismaDiscount(discount);
+          console.log(
+            `[product-page] prisma discountPercentage for ${tag}:`,
+            discount
+          );
+        }
+      } catch (e) {
+        console.warn("[product-page] pricing tiers fetch failed", e);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [tierTag]);
 
   const [product, setProduct] = useState<IProduct | null>(null);
   const [loading, setLoading] = useState(true);
@@ -240,11 +283,11 @@ export default function ProductDetailPage() {
         throw new Error(err?.message || "Failed to add to cart");
       }
 
-      // Update local session store for immediate UI feedback
+      // Update local session store for immediate UI feedback (apply tier price)
       await addToCart({
         id: rotaNo || String(id),
         title,
-        price: Number(price),
+        price: Number(tierPrice ?? Number(price)),
         image,
         variantId,
         quantity: Number(qty || 1),
@@ -308,6 +351,20 @@ export default function ProductDetailPage() {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+  // tier pricing from session store, prefer Prisma-fetched discount when present
+  const discountPercentage = getDiscountForTier();
+  const effectiveDiscount = prismaDiscount ?? discountPercentage ?? null;
+  const tierPrice = effectiveDiscount
+    ? Number((Number(price) * (1 - effectiveDiscount / 100)).toFixed(2))
+    : null;
+  const formattedTierPrice = tierPrice
+    ? tierPrice.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : null;
+
+  // (moved earlier) no-op here to avoid duplicate effect
   // Derive preferred inventory location and stock from product raw data
   let displayedLocation: string | undefined = undefined;
   let displayedStock: number | undefined = undefined;
@@ -565,9 +622,11 @@ export default function ProductDetailPage() {
           <h2 className="text-2xl md:text-6xl font-semibold text-gray-700">
             {rotaNo}
           </h2>
-          <p className="text-3xl md:text-3xl font-bold">
-            ${formattedPrice} USD
-          </p>
+          <div className="text-3xl md:text-3xl font-bold">
+            <span className="text-3xl font-extrabold text-secondary">
+              ${effectiveDiscount ? formattedTierPrice : formattedPrice} USD
+            </span>
+          </div>
 
           {/* Badges */}
           <div className="flex flex-wrap gap-3 mt-2">
@@ -697,19 +756,51 @@ export default function ProductDetailPage() {
                 let brand: string | undefined = undefined;
                 let models: string[] = [];
 
+                const safeStringify = (v: any): string => {
+                  if (v == null) return "";
+                  if (typeof v === "string") return v;
+                  if (Array.isArray(v)) {
+                    // join array elements (prefer primitive values or try to stringify objects)
+                    return v
+                      .map((it: any) =>
+                        typeof it === "object" ? safeStringify(it) : String(it)
+                      )
+                      .filter(Boolean)
+                      .join(", ");
+                  }
+
+                  if (typeof v === "object") {
+                    // prefer common named properties, fallback to JSON
+                    const keysToTry = [
+                      "BrandDescription",
+                      "Brand",
+                      "MarkaDescription",
+                      "Brand1",
+                      "Name",
+                      "name",
+                      "brand",
+                      "description",
+                      "Manufacturer",
+                    ];
+
+                    for (const k of keysToTry) {
+                      if (v[k] != null && String(v[k]) !== "")
+                        return String(v[k]);
+                    }
+
+                    return JSON.stringify(v);
+                  }
+
+                  return String(v);
+                };
+
                 if (brandField && typeof brandField.value === "string") {
                   try {
                     const parsed = JSON.parse(brandField.value);
                     if (Array.isArray(parsed) && parsed[0]) {
-                      brand =
-                        parsed[0].Brand ||
-                        parsed[0].MarkaDescription ||
-                        String(parsed[0]);
+                      brand = safeStringify(parsed[0]);
                     } else if (parsed && typeof parsed === "object") {
-                      brand =
-                        parsed.Brand ||
-                        parsed.MarkaDescription ||
-                        String(brandField.value);
+                      brand = safeStringify(parsed);
                     } else {
                       brand = String(brandField.value);
                     }
@@ -723,7 +814,7 @@ export default function ProductDetailPage() {
                     const parsed = JSON.parse(modelsField.value);
                     if (Array.isArray(parsed))
                       models = parsed
-                        .map((x: any) => String(x))
+                        .map((x: any) => safeStringify(x))
                         .filter(Boolean);
                     else
                       models = String(modelsField.value)

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { shopifyAdminFetch } from "@/lib/shopify/instance";
 import prisma from "@/lib/prisma/instance";
 
@@ -14,8 +16,8 @@ export async function syncUserMetaobjects({
 
   try {
     const GQL = `
-      query GetCustomerPricing($query: String!, $first: Int!) {
-        metaobjects(
+      query GetCustomerPricingAndTiers($query: String!, $first: Int!) {
+        customerPricing: metaobjects(
           type: "customer_pricing"
           first: $first
           query: $query
@@ -36,6 +38,23 @@ export async function syncUserMetaobjects({
             }
           }
         }
+        
+        pricingTiers: metaobjects(
+          type: "pricing_tier"
+          first: 10
+        ) {
+          edges {
+            node {
+              id
+              handle
+              updatedAt
+              fields {
+                key
+                value
+              }
+            }
+          }
+        }
       }
     `;
 
@@ -46,12 +65,18 @@ export async function syncUserMetaobjects({
       variables: { query: queryString, first: 50 },
     });
 
-    const metaobjects =
-      response?.data?.metaobjects?.edges?.map((edge: any) => edge.node) || [];
+    const customerPricingMetaobjects =
+      response?.data?.customerPricing?.edges?.map((edge: any) => edge.node) ||
+      [];
+
+    const pricingTierMetaobjects =
+      response?.data?.pricingTiers?.edges?.map((edge: any) => edge.node) || [];
 
     let upserted = 0;
+    let tiersUpserted = 0;
 
-    for (const metaobject of metaobjects) {
+    // Customer Pricing Sync
+    for (const metaobject of customerPricingMetaobjects) {
       const fields: Array<any> = metaobject.fields ?? [];
 
       const priceField = fields.find((f) => f.key === "price");
@@ -80,7 +105,52 @@ export async function syncUserMetaobjects({
       upserted++;
     }
 
-    return { success: true, count: metaobjects.length, upserted };
+    // Pricing Tier Sync
+    for (const metaobject of pricingTierMetaobjects) {
+      const fields: Array<any> = metaobject.fields ?? [];
+
+      const tierNameField = fields.find((f) => f.key === "tier_name");
+      const tierTagField = fields.find((f) => f.key === "tier_tag");
+      const discountPercentageField = fields.find(
+        (f) => f.key === "discount_percentage"
+      );
+
+      const tierName = tierNameField?.value ?? "";
+      const tierTag = tierTagField?.value ?? "";
+      const discountPercentage =
+        discountPercentageField?.value != null
+          ? parseFloat(discountPercentageField.value)
+          : 0;
+
+      await prisma.pricingTier.upsert({
+        where: { metaobjectId: metaobject.id },
+        update: {
+          tierName,
+          tierTag,
+          discountPercentage,
+          updatedAt: metaobject.updatedAt
+            ? new Date(metaobject.updatedAt)
+            : undefined,
+        },
+        create: {
+          metaobjectId: metaobject.id,
+          tierName,
+          tierTag,
+          discountPercentage,
+        },
+      });
+
+      tiersUpserted++;
+    }
+
+    return {
+      success: true,
+      customerPricing: { count: customerPricingMetaobjects.length, upserted },
+      pricingTiers: {
+        count: pricingTierMetaobjects.length,
+        upserted: tiersUpserted,
+      },
+    };
   } catch (error) {
     console.error("User metaobject sync failed:", error);
     return { success: false, error };

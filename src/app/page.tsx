@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import Navbar from "@/components/navbar";
 import HeaderCarousel from "@/components/header-carousel";
 import MiniPaginationGroup from "@/components/mini-pagination-group";
@@ -5,8 +6,24 @@ import Footer from "@/components/footer";
 import Image from "next/image";
 import CountUp from "@/components/count-up";
 import InstagramStories from "@/components/instagram-stories";
+import { connectDB } from "@/lib/mongoose/instance";
+import Collection from "@/schemas/mongoose/collection";
 
-export default function Page() {
+export default async function Page() {
+  // fetch all collections (server-side) and render a section per collection
+  async function fetchAllCollections() {
+    try {
+      await connectDB();
+      const results = await Collection.find({}).sort({ createdAt: -1 }).lean();
+      return Array.isArray(results) ? results : [];
+    } catch (e) {
+      console.error("fetchAllCollections error:", e);
+      return [];
+    }
+  }
+
+  const collections = await fetchAllCollections();
+
   return (
     <>
       <main className="h-full flex flex-col">
@@ -18,9 +35,15 @@ export default function Page() {
         {/* main content */}
         <div className="flex-1 flex bg-[#f3f3f3] flex-col gap-4 items-center w-full px-4 md:px-10 lg:px-20">
           <div className="w-full my-12 max-w-screen-2xl">
-            <MiniPaginationGroup title="Best Sellers" />
-            <MiniPaginationGroup title="Most Liked" />
-            <MiniPaginationGroup title="New Arrivals" />
+            {collections &&
+              collections.length > 0 &&
+              collections.map((c: any) => (
+                <MiniPaginationGroup
+                  key={String(c.shopifyId ?? c._id ?? c.raw?.handle)}
+                  title={c?.raw?.title ?? c?.raw?.name ?? "Collection"}
+                  collectionHandle={c?.raw?.handle ?? c?.handle}
+                />
+              ))}
           </div>
         </div>
         <InstagramStories />

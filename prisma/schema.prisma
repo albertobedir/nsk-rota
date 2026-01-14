@@ -46,6 +46,10 @@ model User {
   creditLimit     Decimal  @db.Decimal(10, 2) @default(0.00)
   creditUsed      Decimal  @db.Decimal(10, 2) @default(0.00)
   creditRemaining Decimal  @db.Decimal(10, 2) @default(0.00)
+  
+  // Shopify customer fields
+  shopifyTags    Json?
+  tier           String?
 }
 
 model CustomerPricing {
@@ -75,6 +79,18 @@ model Customer {
   updatedAt       DateTime @updatedAt
 
   @@index([shopifyId])
+}
+
+model PricingTier {
+  id                 String   @id @default(cuid())
+  metaobjectId       String   @unique
+  tierName           String
+  tierTag            String   @unique
+  discountPercentage Float
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([tierTag])
 }
 
 

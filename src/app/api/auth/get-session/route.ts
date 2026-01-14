@@ -41,6 +41,48 @@ export async function GET(req: NextRequest) {
       }
     };
 
+    // normalize shopify tags (stored as JSON or comma string)
+    const normalizeTags = (raw: any) => {
+      try {
+        if (!raw) return [];
+        if (Array.isArray(raw))
+          return raw.map((s) => String(s).trim()).filter(Boolean);
+        if (typeof raw === "string")
+          return String(raw)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+        return [];
+      } catch {
+        return [];
+      }
+    };
+
+    const tagsArray = normalizeTags(user.shopifyTags ?? null);
+
+    // compute tier similarly to webhook/session store
+    const computeTier = (tgs: string[] = []) => {
+      try {
+        if (!tgs || tgs.length === 0) return null;
+        const normalized = tgs
+          .map((s) =>
+            String(s ?? "")
+              .toLowerCase()
+              .trim()
+          )
+          .map((s) => s.replace(/[\s_]+/g, "-"));
+        if (normalized.some((s) => /tier[-]?3$/.test(s) || s === "tier3"))
+          return "tier-3";
+        if (normalized.some((s) => /tier[-]?2$/.test(s) || s === "tier2"))
+          return "tier-2";
+        return null;
+      } catch {
+        return null;
+      }
+    };
+
+    const inferredTier = computeTier(tagsArray);
+
     const sessionUser = {
       id: user.id,
       email: user.email,
@@ -65,6 +107,9 @@ export async function GET(req: NextRequest) {
       creditLimit: safeNumber(user.creditLimit),
       creditUsed: safeNumber(user.creditUsed),
       creditRemaining: safeNumber(user.creditRemaining),
+      // include shopify tags + inferred tier for client
+      tags: tagsArray,
+      tier: user.tier ?? inferredTier ?? null,
     };
 
     return NextResponse.json({ user: sessionUser });

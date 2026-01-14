@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
@@ -25,19 +26,141 @@ export default function MiniPaginationGroup({
   title,
   products,
   pageSize = 5,
+  collectionHandle,
 }: {
   title: string;
   products?: Product[];
   pageSize?: number;
+  collectionHandle?: string;
 }) {
   const [fetched, setFetched] = useState<Product[] | null>(null);
   const [page, setPage] = useState(1);
+  // helper to extract rota number from metafields
+  const extractRotaNo = (metafields: any[] = []) => {
+    try {
+      const direct = metafields.find((m) => m.key === "rota_no")?.value;
+      if (direct) return direct;
+
+      const candidate = metafields.find(
+        (m) =>
+          m.key === "oem_info" ||
+          m.key === "brand_info" ||
+          (m.namespace === "custom" && /(oem|brand)/i.test(m.key))
+      );
+
+      if (candidate) {
+        try {
+          const parsed = JSON.parse(candidate.value);
+          if (Array.isArray(parsed) && parsed[0]) {
+            return (
+              parsed[0].RotaNo ||
+              parsed[0].rotaNo ||
+              parsed[0].Rota ||
+              parsed[0].rota ||
+              undefined
+            );
+          }
+          if (parsed && typeof parsed === "object") {
+            return parsed.RotaNo || parsed.rotaNo || parsed.Rota || parsed.rota;
+          }
+        } catch (e) {
+          const m = String(candidate.value).match(/\d{3,}/);
+          if (m) return m[0];
+        }
+      }
+
+      return undefined;
+    } catch (e) {
+      return undefined;
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
 
     async function loadAll() {
       try {
+        // If a collection handle was provided, fetch that collection and map its products
+        if (collectionHandle) {
+          const creq = await fetch(
+            `/api/collections/gets?handle=${encodeURIComponent(
+              collectionHandle
+            )}&page=1&limit=1000`
+          );
+          const cjson = await creq.json();
+          if (!mounted) return;
+
+          if (cjson?.ok && Array.isArray(cjson.results) && cjson.results[0]) {
+            const coll = cjson.results[0];
+            const source =
+              Array.isArray(coll.productsFull) && coll.productsFull.length > 0
+                ? coll.productsFull
+                : coll.products || [];
+
+            const mapped: Product[] = source.map((r: any, i: number) => {
+              const raw = r.raw ?? {};
+              const rotaNo =
+                raw?.metafields && Array.isArray(raw.metafields)
+                  ? extractRotaNo(raw.metafields)
+                  : undefined;
+              const codeVal =
+                rotaNo ??
+                raw?.handle ??
+                String(r.shopifyId ?? r.id ?? `p-${i}`);
+              const image =
+                (raw?.images && raw.images[0] && raw.images[0].src) ||
+                raw?.image ||
+                "/cr2.jfif";
+              const priceStr =
+                (r.currentPrice as any) ??
+                raw?.variants?.[0]?.price ??
+                raw?.variants?.[0]?.price_amount ??
+                0;
+              const price =
+                typeof priceStr === "string"
+                  ? parseFloat(priceStr) || 0
+                  : Number(priceStr) || 0;
+
+              const oemsArr =
+                raw?.metafields && Array.isArray(raw.metafields)
+                  ? raw.metafields
+                      .filter(
+                        (m: any) =>
+                          /(oem|brand)/i.test(m.key) ||
+                          (m.namespace === "custom" &&
+                            /(oem|brand)/i.test(m.key))
+                      )
+                      .map((m: any) => m.value)
+                  : [];
+
+              const firstVariantId =
+                raw?.variants && raw.variants[0] && raw.variants[0].id;
+
+              return {
+                id: codeVal,
+                code: codeVal,
+                title: raw?.title ?? raw?.name ?? r.title ?? `Product ${i + 1}`,
+                price,
+                image,
+                oems: oemsArr,
+                productRaw: raw,
+                location: "",
+                inStock: true,
+                stock: 0,
+                variantId: firstVariantId
+                  ? `gid://shopify/ProductVariant/${firstVariantId}`
+                  : undefined,
+              } as Product;
+            });
+
+            setFetched(mapped);
+            return;
+          }
+
+          setFetched([]);
+          return;
+        }
+
         // fetch many items for now — adjust limit as needed
         const res = await fetch(`/api/products/gets?page=1&limit=10000`);
         const json = await res.json();

@@ -59,6 +59,14 @@ interface SessionState {
 
   cartTotalItems: () => number;
   cartTotalPrice: () => number;
+  /* PRICING TIERS + CUSTOMER TAGS */
+  customerTags: string[] | null;
+  setCustomerTags: (tags: string[] | null) => void;
+  tierTag: string | null;
+  setTierTag: (t: string | null) => void;
+  pricingTiers: any[];
+  setPricingTiers: (t: any[]) => void;
+  getDiscountForTier: (tier?: string | null) => number | null;
 }
 
 const useSessionStore = create<SessionState>()(
@@ -120,6 +128,48 @@ const useSessionStore = create<SessionState>()(
 
       cartTotalPrice: () =>
         get().cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+
+      /* -------------------- PRICING TIERS + CUSTOMER TAGS -------------------- */
+      customerTags: null,
+      setCustomerTags: (tags) =>
+        set({
+          customerTags: tags,
+          tierTag: (() => {
+            try {
+              if (!tags || tags.length === 0) return null;
+              if (tags.includes("tier-3")) return "tier-3";
+              if (tags.includes("tier-2")) return "tier-2";
+              return null;
+            } catch (e) {
+              return null;
+            }
+          })(),
+        }),
+
+      tierTag: null,
+      setTierTag: (t) => set({ tierTag: t }),
+
+      pricingTiers: [],
+      setPricingTiers: (t) => set({ pricingTiers: t }),
+
+      getDiscountForTier: (tier) => {
+        try {
+          const tt = tier ?? get().tierTag;
+          if (!tt) return null;
+          const tiers = get().pricingTiers || [];
+          for (const m of tiers) {
+            const fm = m.fieldsMap || {};
+            if (fm.tier_tag === tt || fm.tier === tt) {
+              const dp = fm.discount_percentage ?? fm.discount ?? fm.percentage;
+              const n = Number(dp);
+              if (!Number.isNaN(n)) return n;
+            }
+          }
+          return null;
+        } catch (e) {
+          return null;
+        }
+      },
     }),
     {
       name: "rota-session-storage", // both user + cart stored here

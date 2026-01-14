@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { connectDB } from "@/lib/mongoose/instance";
 import Collection from "@/schemas/mongoose/collection";
 import crypto from "crypto";
@@ -19,6 +20,54 @@ function verifyShopifyWebhook(req: NextRequest, rawBody: string) {
   return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(hmacHeader));
 }
 
+async function fetchCollectionProducts(collectionGid: string) {
+  const query = `
+    query getCollectionProducts($id: ID!) {
+      collection(id: $id) {
+        products(first: 250) {
+          edges {
+            node {
+              id
+              legacyResourceId
+              title
+              handle
+            }
+          }
+          pageInfo {
+            hasNextPage
+          }
+        }
+      }
+    }
+  `;
+
+  const response = await fetch(
+    `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/graphql.json`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!,
+      },
+      body: JSON.stringify({
+        query,
+        variables: { id: collectionGid },
+      }),
+    }
+  );
+
+  const { data } = await response.json();
+
+  return (
+    data?.collection?.products?.edges?.map((edge: any) => ({
+      id: parseInt(edge.node.legacyResourceId),
+      title: edge.node.title,
+      handle: edge.node.handle,
+      gid: edge.node.id,
+    })) || []
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
@@ -31,21 +80,48 @@ export async function POST(req: NextRequest) {
     const collectionData = JSON.parse(rawBody);
     console.log("Collection updated - ID:", collectionData.id);
 
+    await connectDB();
+
+    // 1. Collection meta verilerini kaydet
     const full = {
       ...collectionData,
-      updatedAt: new Date(),
+      receivedAt: new Date(),
     };
-
-    await connectDB();
 
     await Collection.updateOne(
       { shopifyId: collectionData.id },
-      { $set: { raw: full } },
+      { $set: { raw: full, updatedAt: new Date() } },
       { upsert: true }
     );
 
+    // 2. Güncel ürünleri Shopify'dan çek
+    const products = await fetchCollectionProducts(
+      collectionData.admin_graphql_api_id
+    );
+
+    // 3. Ürünleri MongoDB'ye kaydet
+    await Collection.updateOne(
+      { shopifyId: collectionData.id },
+      {
+        $set: {
+          products,
+          productCount: products.length,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    console.log(
+      `Collection ${collectionData.id} updated with ${products.length} products`
+    );
+
     return NextResponse.json(
-      { status: "ok", action: "updated", collectionId: collectionData.id },
+      {
+        status: "ok",
+        action: "updated",
+        collectionId: collectionData.id,
+        productCount: products.length,
+      },
       { status: 200 }
     );
   } catch (err) {

@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
           email
           firstName
           lastName
+          tags
         }
       }
     `;
@@ -117,6 +118,16 @@ export async function POST(request: NextRequest) {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        // include Shopify tags if available so client can populate zustand
+        tags: shopifyCustomer.tags ?? [],
+        tier:
+          Array.isArray(shopifyCustomer.tags) &&
+          shopifyCustomer.tags.includes("tier-3")
+            ? "tier-3"
+            : Array.isArray(shopifyCustomer.tags) &&
+              shopifyCustomer.tags.includes("tier-2")
+            ? "tier-2"
+            : null,
       },
     });
 
