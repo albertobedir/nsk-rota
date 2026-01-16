@@ -29,7 +29,7 @@ export default async function Page() {
       <main className="h-full flex flex-col">
         <Navbar />
         {/* full-width header carousel */}
-        <div className="p-4 md:px-20 lg:px-53">
+        <div className="p-4">
           <HeaderCarousel />
         </div>
         {/* main content */}
@@ -97,14 +97,14 @@ export default async function Page() {
                     end: 2400000,
                     suffix: "+",
                     label: "PIECE PRODUCTS",
-                    icon: "piece-prod.svg",
+                    icon: "kısarot.svg",
                   },
                   {
                     id: 5,
                     end: 250,
                     suffix: "+",
                     label: "WAREHOUSES",
-                    icon: "customers.svg",
+                    icon: "depo.svg",
                   },
                   {
                     id: 6,
