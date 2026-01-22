@@ -53,7 +53,7 @@ export default function SingleProdCard({
   const getDiscountForTier = useSessionStore((s) => s.getDiscountForTier);
   const discountPercentage = getDiscountForTier();
   const [prismaDiscount, setPrismaDiscount] = React.useState<number | null>(
-    null
+    null,
   );
 
   const effectiveDiscount = prismaDiscount ?? discountPercentage ?? null;
@@ -83,6 +83,30 @@ export default function SingleProdCard({
     return String(id ?? "unknown");
   })();
 
+  // Prefer an image from productRaw.images that contains `/files/<digits>` (4+ digits)
+  // when there are multiple images. Fall back to the `image` prop.
+  const displayImage = (() => {
+    try {
+      const imgs = productRaw?.images;
+      if (Array.isArray(imgs) && imgs.length > 0) {
+        if (imgs.length > 1) {
+          // find image whose src contains `/files/` followed by 4 or more digits
+          const matched = imgs.find((it: any) => {
+            const src = String(it?.src || it?.url || "");
+            return /\/files\/(\d{4,})/.test(src);
+          });
+          if (matched) return String(matched?.src || matched?.url || image);
+        }
+        // fallback to first image entry
+        const first = imgs[0];
+        return String(first?.src || first?.url || image);
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
+    return image;
+  })();
+
   // Fetch pricing tiers from Prisma-backed API and log discount for current tierTag
   React.useEffect(() => {
     let mounted = true;
@@ -101,14 +125,14 @@ export default function SingleProdCard({
           (t) =>
             String(t.tierTag ?? "")
               .toLowerCase()
-              .trim() === normalized
+              .trim() === normalized,
         );
         const discount = found ? Number(found.discountPercentage) : null;
         if (mounted) {
           setPrismaDiscount(discount);
           console.log(
             `[single-prod-cart] prisma discountPercentage for ${tag}:`,
-            discount
+            discount,
           );
         }
       } catch (e) {
@@ -238,8 +262,8 @@ export default function SingleProdCard({
               isExact
                 ? " text-green-700"
                 : isPartial
-                ? " text-yellow-700"
-                : " text-orange-700"
+                  ? " text-yellow-700"
+                  : " text-orange-700"
             }`}
           >
             <span
@@ -247,8 +271,8 @@ export default function SingleProdCard({
                 isExact
                   ? "bg-green-600 text-white"
                   : isPartial
-                  ? "bg-yellow-500 text-white"
-                  : "bg-orange-500 text-white"
+                    ? "bg-yellow-500 text-white"
+                    : "bg-orange-500 text-white"
               }`}
             >
               {isExact ? (
@@ -264,13 +288,12 @@ export default function SingleProdCard({
               {isExact
                 ? "Exact match"
                 : isPartial
-                ? "Partial match"
-                : "Partial match"}
+                  ? "Partial match"
+                  : "Partial match"}
             </span>
           </div>
         ) : null}
-
-        {!image ? (
+        {!displayImage ? (
           <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5 rounded-[inherit]">
             <ImageIcon size={48} className="text-muted-foreground" />
           </div>
@@ -279,7 +302,7 @@ export default function SingleProdCard({
             alt={title}
             fill
             className="rounded-[inherit] object-contain"
-            src={image}
+            src={displayImage}
           />
         )}
       </div>
@@ -312,7 +335,7 @@ export default function SingleProdCard({
                       </span>
                     ) : (
                       <span key={idx}>{part}</span>
-                    )
+                    ),
                   );
                 })()
               ) : (
