@@ -46,6 +46,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="icon" href="https://nskgroup.com.tr/favicon.ico" />
+        <meta name="theme-color" content="#0a66c2" />
+      </head>
       <body className={`${mainFont.className} antialiased`}>
         <Provider>{children}</Provider>
       </body>
