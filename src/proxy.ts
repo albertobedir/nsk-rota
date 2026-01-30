@@ -14,6 +14,12 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Public routes that should be accessible with or without session
+  const public_routes = ["/add-member"];
+  if (public_routes.includes(pathname)) {
+    return NextResponse.next();
+  }
+
   // App Router route'ları tam path olarak tanımlanmalı
   const auth_routes = ["/auth/login", "/auth/subscribe", "/auth/logout"];
   const protected_routes = [
@@ -54,7 +60,7 @@ export function proxy(req: NextRequest) {
   if (!is_authenticated && !is_auth_route) {
     const callback = pathname; // tekrar geri dönecek adres
     return NextResponse.redirect(
-      new URL(`/auth/login?redirect=${callback}`, req.url)
+      new URL(`/auth/login?redirect=${callback}`, req.url),
     );
   }
 

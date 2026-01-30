@@ -5,64 +5,179 @@ export const fetchCache = "force-no-store";
 export const revalidate = 0;
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
+import Link from "next/link";
+import Image from "next/image";
 
 export default function AddMemberPageClient() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [success, setSuccess] = useState<boolean | null>(null);
+  const [email, setEmail] = useState<string>("");
+  const [firstName, setFirstName] = useState<string>("");
+  const [lastName, setLastName] = useState<string>("");
+  const router = useRouter();
 
   useEffect(() => {
-    async function createUser() {
-      const email = searchParams.get("email") || "";
-      const firstName = searchParams.get("firstName") || "";
-      const lastName = searchParams.get("lastName") || "";
-
-      if (!email || !firstName || !lastName) {
-        setMessage("Missing parameters: email, firstName, or lastName");
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch("/api/auth/add-member", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email, firstName, lastName }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          setMessage(data.message || "Something went wrong");
-        } else {
-          setMessage(data.message || "User created successfully");
-        }
-      } catch {
-        setMessage("A server error occurred");
-      } finally {
-        setLoading(false);
-      }
+    function initFromParams() {
+      const e = searchParams.get("email") || "";
+      const f = searchParams.get("firstName") || "";
+      const l = searchParams.get("lastName") || "";
+      setEmail(e);
+      setFirstName(f);
+      setLastName(l);
+      setLoading(false);
     }
 
-    createUser();
+    initFromParams();
   }, [searchParams]);
 
+  async function createUserConfirmed() {
+    if (!email || !firstName || !lastName) {
+      setMessage("Missing parameter: email, firstName or lastName");
+      setSuccess(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/add-member", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, firstName, lastName }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(data.message || "An error occurred");
+        setSuccess(false);
+      } else {
+        setMessage(data.message || "Member created successfully");
+        setSuccess(true);
+      }
+    } catch (e) {
+      setMessage("A server error occurred");
+      setSuccess(false);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <section className="flex flex-col items-center justify-center min-h-screen p-4">
-      {loading ? (
-        <div className="flex flex-col items-center gap-4">
-          <Spinner />
-          <p>Creating member...</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header / breadcrumb like product page */}
+      <div className="bg-[#f3f3f3] py-10">
+        <div className="w-full max-w-[1540px]  px-6 md:px-27 mx-auto">
+          <h1 className="font-bold text-center sm:text-start text-4xl md:text-5xl text-[#1f1f1f]">
+            Add Member
+          </h1>
+
+          <div className="flex flex-col md:flex-row gap-2 items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="text-[#1f1f1f] font-semibold">Home</span>
+              <span className="opacity-60">/</span>
+              <span className="text-[#1f1f1f] font-semibold">Members</span>
+              <span className="opacity-60">/</span>
+              <span className="text-[#1f1f1f]">Add Member</span>
+            </div>
+            <Image
+              className="sm:-mt-[5rem] mt-5"
+              src="/tecdoc.png"
+              alt="TecDoc Data Supplier"
+              width={180}
+              height={52}
+              priority
+            />
+          </div>
         </div>
-      ) : (
-        <div className="text-center p-5 rounded-lg flex items-center justify-center bg-[#e8e8e8]">
-          <p className="mb-4">{message}</p>
+      </div>
+
+      {/* Main content */}
+      <section className="flex items-start justify-center py-16 px-6">
+        <div className="w-full max-w-2xl">
+          <div className="bg-white shadow-lg rounded-lg p-8">
+            {loading ? (
+              <div className="flex flex-col items-center gap-4">
+                <Spinner label="Loading..." />
+                <p className="text-sm text-muted-foreground">Please wait</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {!email || !firstName || !lastName ? (
+                  <div className="p-4 rounded-md border bg-rose-50 border-rose-200">
+                    <h3 className="text-lg font-medium mb-2">
+                      Missing Parameter
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      URL parameters are missing. Please include email,
+                      firstName and lastName parameters.
+                    </p>
+                    <div className="mt-4 flex gap-3">
+                      <Link
+                        href="/"
+                        className="px-4 py-2 bg-slate-800 text-white rounded-md"
+                      >
+                        Home
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-xl font-semibold mb-3">
+                      New Member Details
+                    </h3>
+                    <div className="text-sm text-muted-foreground mb-4">
+                      <div>
+                        <strong>Name:</strong> {firstName} {lastName}
+                      </div>
+                      <div>
+                        <strong>Email:</strong> {email}
+                      </div>
+                    </div>
+
+                    <p className="text-sm mb-4">
+                      Do you want to save this user to the system?
+                    </p>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => createUserConfirmed()}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-md"
+                      >
+                        Yes, Save
+                      </button>
+                      <button
+                        onClick={() => router.push("/")}
+                        className="px-4 py-2 bg-white border rounded-md"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    {success !== null && (
+                      <div
+                        className={`mt-4 w-full p-4 rounded-md border ${success ? "bg-emerald-50 border-emerald-200" : "bg-rose-50 border-rose-200"}`}
+                      >
+                        <h4 className="font-medium">
+                          {success ? "Success" : "Error"}
+                        </h4>
+                        <p className="text-sm text-muted-foreground">
+                          {message}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      )}
-    </section>
+      </section>
+    </div>
   );
 }
