@@ -5,6 +5,7 @@ import { subscribeSchema } from "@/schemas/subscribe.schema";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 // import nodemailer from "nodemailer";
+import nodemailer from "nodemailer";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
           error: "VALIDATION_ERROR",
           details: parsed.error.format(),
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
     if (existingUser) {
       return NextResponse.json(
         { error: "EMAIL_EXISTS", message: "Bu e-posta zaten kayıtlı." },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
     if (!adminEmail) {
       return NextResponse.json(
         { error: "CONFIG_ERROR", message: "ADMIN_EMAIL eksik." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -69,11 +70,11 @@ export async function POST(req: Request) {
         </table>
 
         <p style="margin-top:20px;">
-          <a href="http://localhost:3000/add-member?email=${encodeURIComponent(
-            normalizedEmail
+          <a href="https://rota-usa.com/add-member?email=${encodeURIComponent(
+            normalizedEmail,
           )}&firstName=${encodeURIComponent(
-      firstName
-    )}&lastName=${encodeURIComponent(lastName)}"
+            firstName,
+          )}&lastName=${encodeURIComponent(lastName)}"
              style="
                display:inline-block;
                padding:10px 20px;
@@ -93,40 +94,40 @@ export async function POST(req: Request) {
       </div>
     `;
 
-    await resend.emails.send({
-      from: "Acme <onboarding@resend.dev>",
-      to: adminEmail,
-      subject: "Yeni Üyelik Başvurusu",
-      html,
-    });
-
-    // const transporter = nodemailer.createTransport({
-    //   host: process.env.SMTP_HOST,
-    //   port: Number(process.env.SMTP_PORT),
-    //   secure: false, // 587 için false olacak
-    //   auth: {
-    //     user: process.env.SMTP_USER,
-    //     pass: process.env.SMTP_PASS || "",
-    //   },
-    // });
-
-    // await transporter.sendMail({
-    //   from: process.env.MAIL_FROM,
+    // await resend.emails.send({
+    //   from: "Acme <onboarding@resend.dev>",
     //   to: adminEmail,
     //   subject: "Yeni Üyelik Başvurusu",
     //   html,
     // });
 
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT),
+      secure: false, // 587 için false olacak
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS || "",
+      },
+    });
+
+    await transporter.sendMail({
+      from: process.env.FROM_EMAIL,
+      to: adminEmail,
+      subject: "Yeni Üyelik Başvurusu",
+      html,
+    });
+
     return NextResponse.json(
       { message: "Üyelik isteğiniz başarıyla iletildi." },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Subscribe API Error:", error);
 
     return NextResponse.json(
       { error: "SERVER_ERROR", message: "Bir hata oluştu." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

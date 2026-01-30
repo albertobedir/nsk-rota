@@ -29,7 +29,7 @@ export async function POST(req: Request) {
       console.error("Step 1 Error: Missing required fields", body);
       return NextResponse.json(
         { message: "Missing required fields", received: body },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       console.error("Step 4 Error: Shopify customer creation failed", errors);
       return NextResponse.json(
         { message: "Failed to create customer in Shopify", errors },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -121,16 +121,16 @@ export async function POST(req: Request) {
       </div>
     `;
 
-    await resend.emails.send({
-      from: "Acme <onboarding@resend.dev>",
-      // to: user.email,
-      to: "phontemalberto@gmail.com",
-      subject: "Yeni Hesap Bilgileriniz",
-      html,
-    });
+    // await resend.emails.send({
+    //   from: "Acme <onboarding@resend.dev>",
+    //   // to: user.email,
+    //   to: "phontemalberto@gmail.com",
+    //   subject: "Yeni Hesap Bilgileriniz",
+    //   html,
+    // });
 
     await transporter.sendMail({
-      from: process.env.MAIL_FROM,
+      from: process.env.FROM_EMAIL,
       to: user.email,
       subject: "Yeni Hesap Bilgileriniz",
       html,
@@ -140,7 +140,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       { message: "User created & email sent", user },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (err) {
     console.error("Step 0 Error: Unexpected server error", err);
@@ -149,7 +149,7 @@ export async function POST(req: Request) {
         message: "Server error",
         details: err instanceof Error ? err.message : JSON.stringify(err),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
