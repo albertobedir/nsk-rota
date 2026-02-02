@@ -27,11 +27,13 @@ export default function MiniPaginationGroup({
   products,
   pageSize = 5,
   collectionHandle,
+  collectionId,
 }: {
   title: string;
   products?: Product[];
   pageSize?: number;
   collectionHandle?: string;
+  collectionId?: string;
 }) {
   const [fetched, setFetched] = useState<Product[] | null>(null);
   const [page, setPage] = useState(1);
@@ -45,7 +47,7 @@ export default function MiniPaginationGroup({
         (m) =>
           m.key === "oem_info" ||
           m.key === "brand_info" ||
-          (m.namespace === "custom" && /(oem|brand)/i.test(m.key))
+          (m.namespace === "custom" && /(oem|brand)/i.test(m.key)),
       );
 
       if (candidate) {
@@ -84,8 +86,8 @@ export default function MiniPaginationGroup({
         if (collectionHandle) {
           const creq = await fetch(
             `/api/collections/gets?handle=${encodeURIComponent(
-              collectionHandle
-            )}&page=1&limit=1000`
+              collectionHandle,
+            )}&page=1&limit=1000`,
           );
           const cjson = await creq.json();
           if (!mounted) return;
@@ -128,7 +130,7 @@ export default function MiniPaginationGroup({
                         (m: any) =>
                           /(oem|brand)/i.test(m.key) ||
                           (m.namespace === "custom" &&
-                            /(oem|brand)/i.test(m.key))
+                            /(oem|brand)/i.test(m.key)),
                       )
                       .map((m: any) => m.value)
                   : [];
@@ -176,7 +178,7 @@ export default function MiniPaginationGroup({
                 (m) =>
                   m.key === "oem_info" ||
                   m.key === "brand_info" ||
-                  (m.namespace === "custom" && /(oem|brand)/i.test(m.key))
+                  (m.namespace === "custom" && /(oem|brand)/i.test(m.key)),
               );
 
               if (candidate) {
@@ -239,7 +241,8 @@ export default function MiniPaginationGroup({
                     .filter(
                       (m: any) =>
                         /(oem|brand)/i.test(m.key) ||
-                        (m.namespace === "custom" && /(oem|brand)/i.test(m.key))
+                        (m.namespace === "custom" &&
+                          /(oem|brand)/i.test(m.key)),
                     )
                     .map((m: any) => m.value)
                 : [];
@@ -282,7 +285,7 @@ export default function MiniPaginationGroup({
   }, []);
 
   const allProducts =
-    products && products.length > 0 ? products : fetched ?? [];
+    products && products.length > 0 ? products : (fetched ?? []);
   const total = allProducts.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const pageItems = allProducts.slice((page - 1) * pageSize, page * pageSize);
@@ -291,11 +294,29 @@ export default function MiniPaginationGroup({
     setPage(Math.min(Math.max(1, p), totalPages));
   }
 
+  const slugify = (s: string) =>
+    String(s)
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-_]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$|^$/g, "");
+
+  const targetCollection = `/collections/${encodeURIComponent(
+    (collectionId && String(collectionId)) ||
+      (collectionHandle && String(collectionHandle)) ||
+      slugify(title),
+  )}`;
+
   return (
     <section className="w-full px-4 md:px-6 lg:px-12 py-6">
       <div className="flex items-center justify-between mb-4 w-full">
         <h3 className="text-xl font-semibold">{title}</h3>
-        <Link href="#" className="text-sm text-primary hover:underline">
+        <Link
+          href={targetCollection}
+          className="text-sm text-primary hover:underline"
+        >
           See All
         </Link>
       </div>
@@ -341,7 +362,7 @@ export default function MiniPaginationGroup({
               total: number,
               current: number,
               edge = 3,
-              around = 1
+              around = 1,
             ): PageToken[] {
               if (total <= edge * 2 + around * 2 + 3) {
                 return Array.from({ length: total }, (_, i) => i + 1);

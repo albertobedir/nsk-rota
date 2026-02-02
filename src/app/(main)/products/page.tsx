@@ -171,7 +171,7 @@ export default function ProductsPage() {
               v.title ??
               v.value ??
               v.code ??
-              JSON.stringify(v)
+              JSON.stringify(v),
           );
         }
         return null;
@@ -193,7 +193,7 @@ export default function ProductsPage() {
       key: "model",
       label: "Model",
       options: (filters.brand
-        ? maps.modelsByBrand[filters.brand] ?? []
+        ? (maps.modelsByBrand[filters.brand] ?? [])
         : []
       ).map((o) => (typeof o === "string" ? o : JSON.stringify(o))),
       disabled: !filters.brand,
@@ -202,7 +202,7 @@ export default function ProductsPage() {
       key: "type",
       label: "Type",
       options: (filters.brand && filters.model
-        ? maps.typesByBrandModel[`${filters.brand}||${filters.model}`] ?? []
+        ? (maps.typesByBrandModel[`${filters.brand}||${filters.model}`] ?? [])
         : []
       ).map((o) => (typeof o === "string" ? o : JSON.stringify(o))),
       disabled: !filters.model,
@@ -211,9 +211,9 @@ export default function ProductsPage() {
       key: "desc",
       label: "Description",
       options: (filters.brand && filters.model && filters.type
-        ? maps.descsByBrandModelType[
+        ? (maps.descsByBrandModelType[
             `${filters.brand}||${filters.model}||${filters.type}`
-          ] ?? []
+          ] ?? [])
         : []
       ).map((o) => (typeof o === "string" ? o : JSON.stringify(o))),
       disabled: !filters.type,
@@ -407,7 +407,7 @@ export default function ProductsPage() {
           />
 
           {/* STOCK SWITCH (no card) */}
-          <div className="flex items-center bg justify-start gap-3">
+          <div className="flex sm:ml-5 items-center bg justify-start gap-3">
             <span className="hidden sm:inline text-[15px] text-[#6f6f6f] font-medium scale-120">
               Stock
             </span>
@@ -515,7 +515,7 @@ export default function ProductsPage() {
                           onClick={async () => {
                             try {
                               const ta = document.getElementById(
-                                "product-request-message"
+                                "product-request-message",
                               ) as HTMLTextAreaElement | null;
                               const message = ta
                                 ? ta.value
@@ -531,12 +531,12 @@ export default function ProductsPage() {
                                     query: searchTerm,
                                     message,
                                   }),
-                                }
+                                },
                               );
                               if (resp.ok) {
                                 toast.success("Request submitted");
                                 const close = document.querySelector(
-                                  '[data-slot="sheet-close"]'
+                                  '[data-slot="sheet-close"]',
                                 ) as HTMLElement | null;
                                 if (close) close.click();
                               } else {
@@ -555,7 +555,7 @@ export default function ProductsPage() {
                           variant="ghost"
                           onClick={() => {
                             const close = document.querySelector(
-                              '[data-slot="sheet-close"]'
+                              '[data-slot="sheet-close"]',
                             ) as HTMLElement | null;
                             if (close) close.click();
                           }}
@@ -595,7 +595,7 @@ export default function ProductsPage() {
                       onClick={async () => {
                         try {
                           const ta = document.getElementById(
-                            "product-request-message-desktop"
+                            "product-request-message-desktop",
                           ) as HTMLTextAreaElement | null;
                           const message = ta
                             ? ta.value
@@ -652,7 +652,7 @@ export default function ProductsPage() {
 
               const extractRotaNoFromMetafields = (metafields: any[] = []) => {
                 const direct = metafields.find(
-                  (m) => m.key === "rota_no"
+                  (m) => m.key === "rota_no",
                 )?.value;
                 if (direct) return direct;
 
@@ -660,7 +660,7 @@ export default function ProductsPage() {
                   (m) =>
                     m.key === "oem_info" ||
                     m.key === "brand_info" ||
-                    (m.namespace === "custom" && /(oem|brand)/i.test(m.key))
+                    (m.namespace === "custom" && /(oem|brand)/i.test(m.key)),
                 );
 
                 if (candidate) {
@@ -700,7 +700,7 @@ export default function ProductsPage() {
                   ?.filter(
                     (m: any) =>
                       /(oem|brand)/i.test(m.key) ||
-                      (m.namespace === "custom" && /(oem|brand)/i.test(m.key))
+                      (m.namespace === "custom" && /(oem|brand)/i.test(m.key)),
                   )
                   ?.map((m: any) => m.value) ?? [];
 

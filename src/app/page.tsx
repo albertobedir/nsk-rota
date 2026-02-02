@@ -9,6 +9,9 @@ import InstagramStories from "@/components/instagram-stories";
 import { connectDB } from "@/lib/mongoose/instance";
 import Collection from "@/schemas/mongoose/collection";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export default async function Page() {
   // fetch all collections (server-side) and render a section per collection
   async function fetchAllCollections() {
@@ -42,6 +45,9 @@ export default async function Page() {
                   key={String(c.shopifyId ?? c._id ?? c.raw?.handle)}
                   title={c?.raw?.title ?? c?.raw?.name ?? "Collection"}
                   collectionHandle={c?.raw?.handle ?? c?.handle}
+                  collectionId={String(
+                    c?.shopifyId ?? c?._id ?? c?.raw?.handle,
+                  )}
                 />
               ))}
           </div>

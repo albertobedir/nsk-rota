@@ -61,22 +61,11 @@ export default function SingleProdCard({
     ? Number((Number(price) * (1 - effectiveDiscount / 100)).toFixed(2))
     : null;
 
-  // Build product detail link id: prefer variant id (numeric part of `variantId`),
-  // fallback to numeric `id` or `code`.
+  // Use rota/code as product link identifier (prefer `code` always)
   const productLinkId = (() => {
     try {
-      if (variantId) {
-        const s = String(variantId);
-        const m = s.match(/(\d+)$/);
-        if (m) return m[1];
-        if (/^\d+$/.test(s)) return s;
-      }
-
-      if (typeof id === "number") return String(id);
-      if (typeof id === "string" && /^\d{6,}$/.test(id)) return id;
-
-      if (code && typeof code === "string") return code;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      if (code && (typeof code === "string" || typeof code === "number"))
+        return String(code);
     } catch (e) {
       /* ignore */
     }
@@ -309,7 +298,10 @@ export default function SingleProdCard({
 
       <div className="flex flex-col bg-white gap-2 p-3 flex-1 overflow-hidden">
         {/* Product Title */}
-        <Link href={`/products/${productLinkId}`} className="hover:underline">
+        <Link
+          href={`/products/${encodeURIComponent(String(productLinkId))}`}
+          className="hover:underline"
+        >
           <div>
             {/* Prominent code (styled for exact/partial matches) */}
             <p
