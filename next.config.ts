@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
       },
     ],
     dangerouslyAllowSVG: true,
+    unoptimized: true,
   },
 };
 
