@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     if (!email || !password) {
       return NextResponse.json(
         { message: "Email ve şifre gereklidir." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     if (!shopifyCustomer) {
       return NextResponse.json(
         { message: "Customer found but data unavailable." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -102,12 +102,12 @@ export async function POST(request: NextRequest) {
     const accessToken = jwt.sign(
       { id: user.id, email: user.email },
       ACCESS_TOKEN_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "1h" },
     );
     const refreshToken = jwt.sign(
       { id: user.id, email: user.email },
       REFRESH_TOKEN_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     const res = NextResponse.json({
@@ -125,11 +125,14 @@ export async function POST(request: NextRequest) {
           shopifyCustomer.tags.includes("tier-3")
             ? "tier-3"
             : Array.isArray(shopifyCustomer.tags) &&
-              shopifyCustomer.tags.includes("tier-2")
-            ? "tier-2"
-            : null,
+                shopifyCustomer.tags.includes("tier-2")
+              ? "tier-2"
+              : null,
       },
     });
+    // res.headers.set("Access-Control-Allow-Origin", "https://www.rota-usa.com");
+    // res.headers.set("Access-Control-Allow-Credentials", "true");
+    // res.headers.set("Vary", "Origin");
 
     res.cookies.set("access_token", accessToken, {
       httpOnly: true,
@@ -209,7 +212,7 @@ export async function POST(request: NextRequest) {
         message: "Bir hata oluştu.",
         details: err instanceof Error ? err.message : JSON.stringify(err),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

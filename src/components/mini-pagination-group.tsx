@@ -37,6 +37,7 @@ export default function MiniPaginationGroup({
 }) {
   const [fetched, setFetched] = useState<Product[] | null>(null);
   const [page, setPage] = useState(1);
+  const [isCompact, setIsCompact] = useState(false);
   // helper to extract rota number from metafields
   const extractRotaNo = (metafields: any[] = []) => {
     try {
@@ -78,6 +79,27 @@ export default function MiniPaginationGroup({
   };
 
   useEffect(() => {
+    const mq =
+      typeof window !== "undefined" && window.matchMedia
+        ? window.matchMedia("(max-width: 640px)")
+        : null;
+
+    const onChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      try {
+        setIsCompact(Boolean((e as any).matches));
+      } catch (err) {
+        setIsCompact(false);
+      }
+    };
+
+    if (mq) {
+      onChange(mq);
+      // modern browsers support addEventListener, others use addListener
+      if (typeof mq.addEventListener === "function")
+        mq.addEventListener("change", onChange as any);
+      else if (typeof mq.addListener === "function")
+        mq.addListener(onChange as any);
+    }
     let mounted = true;
 
     async function loadAll() {
@@ -281,13 +303,19 @@ export default function MiniPaginationGroup({
 
     return () => {
       mounted = false;
+      if (mq) {
+        if (typeof mq.removeEventListener === "function")
+          mq.removeEventListener("change", onChange as any);
+        else if (typeof mq.removeListener === "function")
+          mq.removeListener(onChange as any);
+      }
     };
   }, []);
 
   const allProducts =
     products && products.length > 0 ? products : (fetched ?? []);
   const total = allProducts.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const totalPages = 20;
   const pageItems = allProducts.slice((page - 1) * pageSize, page * pageSize);
 
   function goto(p: number) {
@@ -345,85 +373,130 @@ export default function MiniPaginationGroup({
         ))}
       </div>
 
-      <div className="mt-4 flex items-center justify-center gap-3">
-        <button
-          onClick={() => goto(page - 1)}
-          disabled={page <= 1}
-          className="px-3 py-1 rounded-md bg-white border shadow-sm disabled:opacity-50"
-        >
-          Prev
-        </button>
+      <div className="mt-4 w-full flex items-center justify-center">
+        <div className="flex items-center gap-3 w-full max-w-full sm:max-w-[600px] justify-center px-2 mini-pagination-scroll overflow-x-auto sm:overflow-visible">
+          <button
+            onClick={() => goto(page - 1)}
+            disabled={page <= 1}
+            aria-label="Previous page"
+            className="px-2 sm:px-3 py-1 rounded-md text-sm bg-white border shadow-sm disabled:opacity-50"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              className="w-4 h-4"
+            >
+              <path
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 18l-6-6 6-6"
+              />
+            </svg>
+          </button>
 
-        <div className="flex items-center gap-2">
-          {(() => {
-            type PageToken = number | "ellipsis";
+          <div className="flex items-center gap-2 flex-nowrap">
+            {(() => {
+              type PageToken = number | "ellipsis";
 
-            function buildPagination(
-              total: number,
-              current: number,
-              edge = 3,
-              around = 1,
-            ): PageToken[] {
-              if (total <= edge * 2 + around * 2 + 3) {
-                return Array.from({ length: total }, (_, i) => i + 1);
+              function buildPagination(
+                total: number,
+                current: number,
+                edge = 3,
+                around = 1,
+              ): PageToken[] {
+                if (total <= edge * 2 + around * 2 + 3) {
+                  return Array.from({ length: total }, (_, i) => i + 1);
+                }
+
+                const pages = new Set<number>();
+                for (let i = 1; i <= Math.min(edge, total); i++) pages.add(i);
+                for (let i = Math.max(1, total - edge + 1); i <= total; i++)
+                  pages.add(i);
+                for (
+                  let i = Math.max(1, current - around);
+                  i <= Math.min(total, current + around);
+                  i++
+                )
+                  pages.add(i);
+
+                const arr = Array.from(pages).sort((a, b) => a - b);
+                const out: PageToken[] = [];
+                for (let i = 0; i < arr.length; i++) {
+                  out.push(arr[i]);
+                  if (i < arr.length - 1 && arr[i + 1] - arr[i] > 1)
+                    out.push("ellipsis");
+                }
+                return out;
               }
 
-              const pages = new Set<number>();
-              for (let i = 1; i <= Math.min(edge, total); i++) pages.add(i);
-              for (let i = Math.max(1, total - edge + 1); i <= total; i++)
-                pages.add(i);
-              for (
-                let i = Math.max(1, current - around);
-                i <= Math.min(total, current + around);
-                i++
-              )
-                pages.add(i);
-
-              const arr = Array.from(pages).sort((a, b) => a - b);
-              const out: PageToken[] = [];
-              for (let i = 0; i < arr.length; i++) {
-                out.push(arr[i]);
-                if (i < arr.length - 1 && arr[i + 1] - arr[i] > 1)
-                  out.push("ellipsis");
-              }
-              return out;
-            }
-
-            const tokens = buildPagination(totalPages, page, 3, 1);
-
-            return tokens.map((t, idx) => {
-              if (t === "ellipsis") {
-                return (
-                  <span key={`e-${idx}`} className="px-2 text-sm">
-                    ...
-                  </span>
-                );
-              }
-
-              const p = t as number;
-              return (
-                <button
-                  key={p}
-                  onClick={() => goto(p)}
-                  className={`px-3 py-1 rounded-md ${
-                    p === page ? "bg-secondary text-white" : "bg-white border"
-                  }`}
-                >
-                  {p}
-                </button>
+              const tokens = buildPagination(
+                totalPages,
+                page,
+                isCompact ? 2 : 3,
+                isCompact ? 0 : 1,
               );
-            });
-          })()}
-        </div>
 
-        <button
-          onClick={() => goto(page + 1)}
-          disabled={page >= totalPages}
-          className="px-3 py-1 rounded-md bg-white border shadow-sm disabled:opacity-50"
-        >
-          Next
-        </button>
+              return tokens.map((t, idx) => {
+                if (t === "ellipsis") {
+                  return (
+                    <span key={`e-${idx}`} className="px-2 text-sm text-muted">
+                      /
+                    </span>
+                  );
+                }
+
+                const p = t as number;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => goto(p)}
+                    aria-current={p === page ? "page" : undefined}
+                    className={`px-2 sm:px-3 py-1 rounded-md text-sm ${
+                      p === page ? "bg-secondary text-white" : "bg-white border"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                );
+              });
+            })()}
+          </div>
+
+          <button
+            onClick={() => goto(page + 1)}
+            disabled={page >= totalPages}
+            className="px-3 py-1 rounded-md bg-white border shadow-sm disabled:opacity-50"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              className="w-4 h-4"
+            >
+              <path
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 6l6 6-6 6"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
+
+      <style jsx>{`
+        .mini-pagination-scroll {
+          -ms-overflow-style: none; /* IE and Edge */
+          scrollbar-width: none; /* Firefox */
+        }
+        .mini-pagination-scroll::-webkit-scrollbar {
+          display: none; /* Chrome, Safari, Opera */
+        }
+      `}</style>
     </section>
   );
 }
