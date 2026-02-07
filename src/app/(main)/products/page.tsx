@@ -227,6 +227,8 @@ export default function ProductsPage() {
 
   useEffect(() => {
     // On mount: fetch dynamic filter options and restore any URL params.
+    // Returns an object with restored filters/page when available so caller
+    // can use them immediately for the first products fetch.
     const fetchOptions = async () => {
       try {
         const res = await fetch("/api/products/options");
@@ -263,25 +265,50 @@ export default function ProductsPage() {
           if (v) restore[k] = v;
         }
         const p = params.get("page");
-        if (Object.keys(restore).length)
+        if (Object.keys(restore).length) {
           setFilters((prev) => ({ ...prev, ...restore }));
-        if (p) setPage(Number(p));
+          if (p) setPage(Number(p));
+          return { filters: { ...restore }, page: p ? Number(p) : undefined };
+        }
+
+        // If no URL params, try restoring from localStorage
+        try {
+          const saved = localStorage.getItem("products_filters");
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed?.filters)
+              setFilters((prev) => ({ ...prev, ...parsed.filters }));
+            if (parsed?.page) setPage(Number(parsed.page) || 1);
+            return {
+              filters: parsed.filters ?? undefined,
+              page: parsed.page ?? undefined,
+            };
+          }
+        } catch (e) {
+          /* ignore */
+        }
+        return {};
       } catch (e) {
         /* ignore */
       }
     };
 
-    fetchOptions();
+    (async () => {
+      const restored = await fetchOptions();
 
-    // If there's an active searchTerm (coming from another page),
-    // fetch the paginated search results instead of the default listing.
-    if (searchTerm && searchTerm.trim() !== "") {
-      searchProducts(searchTerm, page, perPage);
-      return;
-    }
+      // If there's an active searchTerm (coming from another page),
+      // fetch the paginated search results instead of the default listing.
+      if (searchTerm && searchTerm.trim() !== "") {
+        searchProducts(searchTerm, restored?.page ?? page, perPage);
+        return;
+      }
 
-    // initial load (no filter-auto-fetch): fetch current page with current filters
-    fetchProducts(page, perPage, filters);
+      // Use restored filters/page when available to fetch the correct listing
+      const useFilters = restored?.filters ?? filters;
+      const usePage = restored?.page ?? page;
+      fetchProducts(usePage, perPage, useFilters);
+    })();
+
     // Only re-run when page or searchTerm changes — filters won't auto-trigger searches
   }, [page, searchTerm, fetchProducts, searchProducts]);
 
@@ -319,6 +346,11 @@ export default function ProductsPage() {
     };
     setFilters(cleared);
     try {
+      localStorage.removeItem("products_filters");
+    } catch (e) {
+      /* ignore */
+    }
+    try {
       const params = new URLSearchParams();
       params.set("page", "1");
       const newUrl = `${window.location.pathname}?${params.toString()}`;
@@ -344,6 +376,16 @@ export default function ProductsPage() {
       params.set("page", String(pageNum));
       const newUrl = `${window.location.pathname}?${params.toString()}`;
       window.history.replaceState({}, "", newUrl);
+    } catch (e) {
+      /* ignore */
+    }
+
+    // persist current filters/page so returning to this page restores them
+    try {
+      localStorage.setItem(
+        "products_filters",
+        JSON.stringify({ filters, page: pageNum }),
+      );
     } catch (e) {
       /* ignore */
     }
