@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(lineItems) || lineItems.length === 0) {
       return NextResponse.json(
         { message: "No items provided" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         if (computedTotal > remaining) {
           return NextResponse.json(
             { message: "Insufficient credit" },
-            { status: 402 }
+            { status: 402 },
           );
         }
       } catch (e) {
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
       // metaobjectId is stored in DB; we expose it keyed by metaobjectId
       customerPrices = Object.fromEntries(
-        rows.map((r) => [r.metaobjectId, Number(r.price)])
+        rows.map((r) => [r.metaobjectId, Number(r.price)]),
       );
     }
 
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     console.error("/api/cart/checkout error:", err);
     return NextResponse.json(
       { message: "Error creating draft" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

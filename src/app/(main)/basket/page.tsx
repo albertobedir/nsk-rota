@@ -24,7 +24,7 @@ export default function BasketPage() {
 
   // map of itemId -> available stock (number)
   const [stockMap, setStockMap] = useState<Record<string, number | undefined>>(
-    {}
+    {},
   );
 
   // Clear entire cart both locally and on server
@@ -51,6 +51,8 @@ export default function BasketPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            customerEmail: sessionUser?.email,
+            customerId: sessionUser?.id, // 👈 Eğer varsa ekleyin
             lineItems: cart.map((i) => ({
               merchandiseId: i.variantId,
               quantity: i.quantity,
@@ -62,27 +64,30 @@ export default function BasketPage() {
 
         if (!resp.ok) {
           const err = await resp.json().catch(() => null);
-          throw new Error(err?.message || "Failed to create draft");
+          throw new Error(err?.message || "Failed to create order");
         }
 
         const json = await resp.json();
-        const draft = json?.created?.draftOrder ?? null;
-        const invoiceUrl = draft?.invoiceUrl ?? null;
+        const order = json?.order;
+        const invoiceUrl = json?.created?.draftOrder?.invoiceUrl;
 
-        if (invoiceUrl) {
-          // open invoice (Shopify admin/customer invoice) in new tab
-          window.open(invoiceUrl, "_blank");
-          toast.success("Draft order created");
-        } else if (json?.created?.userErrors?.length) {
-          toast.error(
-            json.created.userErrors[0].message || "Draft created with errors"
-          );
+        if (order) {
+          toast.success(`Order ${order.name} created!`);
+          // Yönlendirme yapabilirsiniz:
+          // window.location.href = "/invoices";
+          // veya invoice URL'i açabilirsiniz:
+          if (invoiceUrl) {
+            window.open(invoiceUrl, "_blank");
+          }
         } else {
           toast.success("Draft created");
+          if (invoiceUrl) {
+            window.open(invoiceUrl, "_blank");
+          }
         }
       } catch (e) {
         console.error("Get offer failed:", e);
-        toast.error("Failed to create order draft");
+        toast.error("Failed to create order");
       }
     })();
   };
@@ -200,7 +205,7 @@ export default function BasketPage() {
                 : String(v);
               if (!vid) return [String(item.id), undefined] as const;
               const resp = await fetch(
-                `/api/products/gets?variantId=${encodeURIComponent(vid)}`
+                `/api/products/gets?variantId=${encodeURIComponent(vid)}`,
               );
               const json = await resp.json().catch(() => null);
               const found = json?.results?.[0] ?? null;
@@ -214,7 +219,7 @@ export default function BasketPage() {
                 if (Array.isArray(invs) && invs.length > 0) {
                   const preferred = invs[1] ?? invs[0];
                   const q = Number(
-                    preferred?.available ?? preferred?.quantity ?? 0
+                    preferred?.available ?? preferred?.quantity ?? 0,
                   );
                   if (!Number.isNaN(q)) avail = q;
                 }
@@ -230,7 +235,7 @@ export default function BasketPage() {
             } catch {
               return [String(item.id), undefined] as const;
             }
-          })
+          }),
         );
 
         if (!mounted) return;
@@ -685,7 +690,7 @@ export default function BasketPage() {
 
                   {(() => {
                     const remaining = Number(
-                      sessionUser?.creditRemaining ?? Number.POSITIVE_INFINITY
+                      sessionUser?.creditRemaining ?? Number.POSITIVE_INFINITY,
                     );
                     const disabledByCredit = cartTotalPrice() > remaining;
 

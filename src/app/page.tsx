@@ -107,8 +107,8 @@ export default async function Page() {
                   },
                   {
                     id: 5,
-                    end: 250,
-                    suffix: "+",
+                    end: "Chicago & São Paulo",
+                    suffix: "",
                     label: "WAREHOUSES",
                     icon: "depo.svg",
                   },
@@ -159,13 +159,18 @@ export default async function Page() {
                           />
                           {s.unit}
                         </span>
-                      ) : (
+                      ) : Number.isFinite(Number(s.end as any)) ? (
                         <CountUp
-                          end={s.end}
+                          end={Number(s.end as any)}
                           duration={800 + idx * 60}
                           delay={idx * 80}
                           suffix={s.suffix}
                         />
+                      ) : (
+                        <span className="text-[1.6rem]">
+                          {String(s.end)}
+                          {s.suffix ?? ""}
+                        </span>
                       )}
                     </div>
 

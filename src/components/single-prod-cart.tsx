@@ -47,7 +47,101 @@ export default function SingleProdCard({
   // use string so user can clear the field while typing (e.g. replace "1" with "300")
   const [qty, setQty] = useState<string>("1");
 
-  const isExact = matchType === "exact";
+  // determine exact match also when OEM number equals searchTerm
+  const extractOemNo = (entry: any) => {
+    try {
+      if (!entry) return null;
+      if (typeof entry === "object") {
+        return (
+          entry.OemNo ||
+          entry.OEMNo ||
+          entry.oemNo ||
+          entry.Oem ||
+          entry.RotaNo ||
+          entry.rotaNo ||
+          entry.Rota ||
+          entry.rota ||
+          null
+        );
+      }
+      const s = String(entry).trim();
+      if (s.startsWith("[") || s.startsWith("{")) {
+        const parsed = JSON.parse(s);
+        const obj = Array.isArray(parsed) ? parsed[0] : parsed;
+        if (obj && typeof obj === "object") {
+          return (
+            obj.OemNo ||
+            obj.OEMNo ||
+            obj.oemNo ||
+            obj.Oem ||
+            obj.RotaNo ||
+            obj.rotaNo ||
+            null
+          );
+        }
+      }
+      return s || null;
+    } catch {
+      return String(entry || "");
+    }
+  };
+
+  const oemExactMatch = React.useMemo(() => {
+    try {
+      const terms = String(searchTerm ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => s.toLowerCase());
+      if (terms.length === 0) return false;
+      if (!Array.isArray(oems)) return false;
+      return oems.some((e) => {
+        const val = String(extractOemNo(e) ?? "")
+          .trim()
+          .toLowerCase();
+        return terms.some((t) => val === t);
+      });
+    } catch {
+      return false;
+    }
+  }, [oems, searchTerm]);
+
+  const oemPartialMatch = React.useMemo(() => {
+    try {
+      const terms = String(searchTerm ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => s.toLowerCase());
+      if (terms.length === 0) return false;
+      if (!Array.isArray(oems)) return false;
+      return oems.some((e) => {
+        const val = String(extractOemNo(e) ?? "")
+          .trim()
+          .toLowerCase();
+        return terms.some((t) => val.includes(t) && val !== t);
+      });
+    } catch {
+      return false;
+    }
+  }, [oems, searchTerm]);
+  const searchTerms = React.useMemo(
+    () =>
+      String(searchTerm ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => s.toLowerCase()),
+    [searchTerm],
+  );
+
+  const isExactBadge = matchType === "exact" || oemExactMatch;
+  const isPartialBadge =
+    matchType === "partial" || (!isExactBadge && oemPartialMatch);
+  const isExactTitle =
+    matchType === "exact" ||
+    (searchTerms.length > 0 &&
+      searchTerms.includes(String(code).toLowerCase()));
   const isPartial = matchType === "partial";
   const tierTag = useSessionStore((s) => s.tierTag);
   const getDiscountForTier = useSessionStore((s) => s.getDiscountForTier);
@@ -192,6 +286,46 @@ export default function SingleProdCard({
   const renderOemEntry = (entry: any) => {
     try {
       if (!entry) return null;
+
+      // Highlight only the OEM number when it matches the search term.
+      const highlightOem = (text?: string | null) => {
+        if (!text) return null;
+        const terms = String(searchTerm ?? "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map((s) => s.toLowerCase());
+        if (terms.length === 0) return text;
+        try {
+          const esc = terms
+            .map((t) => t.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&"))
+            .join("|");
+          const parts = String(text).split(new RegExp(`(${esc})`, "gi"));
+          const oemLower = String(text).trim().toLowerCase();
+          const isThisExact = terms.includes(oemLower);
+          return parts.map((part: string, idx: number) => {
+            const lower = part.toLowerCase();
+            if (terms.includes(lower)) {
+              return (
+                <span
+                  key={idx}
+                  className={
+                    isThisExact
+                      ? "bg-green-200 inline-block px-1 rounded"
+                      : "bg-yellow-200 inline-block px-1 rounded"
+                  }
+                >
+                  {part}
+                </span>
+              );
+            }
+            return <span key={idx}>{part}</span>;
+          });
+        } catch {
+          return text;
+        }
+      };
+
       if (typeof entry === "string") {
         const s = entry.trim();
         // try parse JSON
@@ -205,16 +339,18 @@ export default function SingleProdCard({
               obj.MarkaDescription || obj.BrandDescription || obj.Brand || "";
             return (
               <div className="leading-tight">
-                <div className="font-semibold">{rota ?? ""}</div>
                 <div className="text-sm text-muted-foreground">
-                  {oemno && <span>{oemno}</span>}
+                  {oemno && <span>{highlightOem(String(oemno)) ?? oemno}</span>}
                   {oemno && brand && <span className="px-2">•</span>}
-                  {brand && <span>{brand}</span>}
+                  {brand && <span>{String(brand)}</span>}
                 </div>
               </div>
             );
           }
         }
+
+        // fallback for plain string entry — don't highlight rota/brand here
+        return <span className="font-normal">{String(entry)}</span>;
       }
 
       if (typeof entry === "object") {
@@ -225,11 +361,10 @@ export default function SingleProdCard({
           obj.MarkaDescription || obj.BrandDescription || obj.Brand || "";
         return (
           <div className="leading-tight">
-            <div className="font-semibold">{rota ?? ""}</div>
             <div className="text-sm text-muted-foreground">
-              {oemno && <span>{oemno}</span>}
+              {oemno && <span>{highlightOem(String(oemno)) ?? oemno}</span>}
               {oemno && brand && <span className="px-2">•</span>}
-              {brand && <span>{brand}</span>}
+              {brand && <span>{String(brand)}</span>}
             </div>
           </div>
         );
@@ -245,26 +380,26 @@ export default function SingleProdCard({
     <Card className="shadow-none bg-white flex flex-col gap-0 rounded-md w-full p-0 border-2 h-full">
       <div className="relative w-full rounded-t-[inherit] h-48 md:h-56 lg:h-64">
         {/* Match badge overlay (top-left) */}
-        {matchType ? (
+        {isExactBadge || isPartialBadge ? (
           <div
             className={`absolute left-3 top-3 z-10 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-2 ${
-              isExact
+              isExactBadge
                 ? " text-green-700"
-                : isPartial
+                : isPartialBadge
                   ? " text-yellow-700"
                   : " text-orange-700"
             }`}
           >
             <span
               className={`inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold ${
-                isExact
+                isExactBadge
                   ? "bg-green-600 text-white"
-                  : isPartial
+                  : isPartialBadge
                     ? "bg-yellow-500 text-white"
                     : "bg-orange-500 text-white"
               }`}
             >
-              {isExact ? (
+              {isExactBadge ? (
                 <span className="flex items-center gap-0">
                   <Check size={12} className="text-white" />
                   <Check size={10} className="-ml-1 text-white" />
@@ -274,9 +409,9 @@ export default function SingleProdCard({
               )}
             </span>
             <span className="text-[1rem]">
-              {isExact
+              {isExactBadge
                 ? "Exact match"
-                : isPartial
+                : isPartialBadge
                   ? "Partial match"
                   : "Partial match"}
             </span>
@@ -306,22 +441,28 @@ export default function SingleProdCard({
             {/* Prominent code (styled for exact/partial matches) */}
             <p
               className={`font-extrabold text-2xl md:text-3xl leading-none mb-1 ${
-                isExact ? "text-[#1f1f1f]" : "text-[#1f1f1f]"
+                isExactTitle ? "text-[#1f1f1f]" : "text-[#1f1f1f]"
               }`}
             >
-              {isExact ? (
+              {isExactTitle ? (
                 <span className="bg-green-200 inline-block px-2 py-0.5 rounded ">
                   {code}
                 </span>
               ) : isPartial && searchTerm ? (
-                // highlight only matching substrings for partial match
+                // highlight only matching substrings for partial match (support multiple comma-separated terms)
                 (() => {
-                  const q = String(searchTerm).trim();
-                  if (!q) return code;
-                  const esc = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                  const terms = String(searchTerm ?? "")
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)
+                    .map((s) => s.toLowerCase());
+                  if (terms.length === 0) return code;
+                  const esc = terms
+                    .map((t) => t.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&"))
+                    .join("|");
                   const parts = code.split(new RegExp(`(${esc})`, "gi"));
                   return parts.map((part, idx) =>
-                    part.toLowerCase() === q.toLowerCase() ? (
+                    terms.includes(part.toLowerCase()) ? (
                       <span key={idx} className="bg-yellow-200  px-1 rounded">
                         {part}
                       </span>

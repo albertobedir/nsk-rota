@@ -140,7 +140,7 @@ export async function POST(req: Request) {
             </table>
 
             <p style="margin-top:20px;">
-              <a href="https://your-portal.com/auth/login" style="display:inline-block; padding:12px 20px; background:#0a66c2; color:#fff; text-decoration:none; border-radius:8px; font-weight:700;">Giriş Yap</a>
+              <a href="https://rota-usa.com/auth/login" style="display:inline-block; padding:12px 20px; background:#0a66c2; color:#fff; text-decoration:none; border-radius:8px; font-weight:700;">Giriş Yap</a>
             </p>
 
             <p style="margin-top:18px; font-size:13px; color:#6b7280;">Bu e‑posta otomatik olarak gönderilmiştir. Şifrenizi güvenli bir yerde saklayın. Yardım için <a href="mailto:support@rota-usa.com" style="color:#0a66c2; text-decoration:none;">support@rota-usa.com</a>.</p>
