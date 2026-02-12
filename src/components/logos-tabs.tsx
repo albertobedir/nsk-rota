@@ -126,14 +126,18 @@ export default function LogosTabs({ logos }: Props) {
         </h2>
 
         <nav
-          ref={(el) => { navRef.current = el }}
+          ref={(el) => {
+            navRef.current = el;
+          }}
           className="relative mb-8 overflow-x-auto scrollbar-hide"
         >
           <div className="inline-flex items-center gap-6 px-2">
             {categories.map((cat) => (
               <button
                 key={cat.key}
-                ref={(el) => { btnRefs.current[cat.key] = el }}
+                ref={(el) => {
+                  btnRefs.current[cat.key] = el;
+                }}
                 onClick={() => setActive(cat.key)}
                 className={`inline-block flex-shrink-0 relative text-base md:text-lg lg:text-xl px-4 py-3 text-gray-900 outline-none focus:outline-none transition-opacity duration-200`}
                 style={{ opacity: active === cat.key ? 1 : 0.45 }}
