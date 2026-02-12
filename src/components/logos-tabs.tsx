@@ -131,7 +131,7 @@ export default function LogosTabs({ logos }: Props) {
           }}
           className="relative mb-8 overflow-x-auto scrollbar-hide"
         >
-          <div className="inline-flex items-center gap-6 px-2">
+          <div className="inline-flex sm:w-full items-center sm:justify-center gap-6 px-2">
             {categories.map((cat) => (
               <button
                 key={cat.key}
