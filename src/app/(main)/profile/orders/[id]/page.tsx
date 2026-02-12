@@ -5,6 +5,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 
 type LineItem = {
   title: string;
@@ -206,9 +208,6 @@ export default function OrderDetailPage() {
                 node.style.top = "0";
                 node.innerHTML = html;
                 document.body.appendChild(node);
-
-                const html2canvas = (await import("html2canvas")).default;
-                const { jsPDF } = await import("jspdf");
 
                 const canvas = await html2canvas(node, {
                   scale: 2,
