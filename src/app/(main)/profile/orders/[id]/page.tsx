@@ -134,7 +134,109 @@ export default function OrderDetailPage() {
         >
           ← Back to orders
         </button>
-        <h2 className="text-xl font-semibold">Order Detail</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold">Order Detail</h2>
+          <button
+            type="button"
+            onClick={async () => {
+              const o = order;
+              if (!o) return;
+
+              // build HTML node for rendering
+              const itemsHtml = (o.lineItems?.edges || [])
+                .map((e: any) => {
+                  const n = e.node;
+                  const price = n.variant?.price?.amount
+                    ? `${n.variant.price.amount} ${n.variant.price.currencyCode}`
+                    : "";
+                  return `<tr><td style=\"padding:8px 0\">${n.title}</td><td style=\"padding:8px 0; text-align:right\">${n.quantity}</td><td style=\"padding:8px 0; text-align:right\">${price}</td></tr>`;
+                })
+                .join("");
+
+              const shipping = o.shippingAddress
+                ? `${o.shippingAddress.address1 || ""}${o.shippingAddress.city ? ", " + o.shippingAddress.city : ""}${o.shippingAddress.zip ? " " + o.shippingAddress.zip : ""}${o.shippingAddress.country ? ", " + o.shippingAddress.country : ""}`
+                : "-";
+
+              const billing = o.billingAddress || shipping;
+
+              const total = o.totalPrice?.amount
+                ? `${o.totalPrice.amount} ${o.totalPrice.currencyCode}`
+                : "-";
+
+              const html = `
+                <div style=\"font-family: Arial, Helvetica, sans-serif; color:#222; padding:24px; width:800px; background:#fff\">
+                  <div style=\"display:flex; justify-content:space-between; align-items:center\">
+                    <div style=\"font-weight:700; font-size:20px\">${location.hostname || "Store"}</div>
+                    <div style=\"color:#666\">ORDER ${o.orderNumber || o.id}</div>
+                  </div>
+                  <div style=\"font-size:20px; margin-top:18px; font-weight:700\">Thank you for your purchase!</div>
+                  <p style=\"color:#666\">We're getting your order ready to be shipped. We will notify you when it has been sent.</p>
+                  <div style=\"max-width:480px\">
+                    <h3>Order summary</h3>
+                    <table style=\"width:100%; border-collapse:collapse; margin-top:8px\">
+                      <thead>
+                        <tr><th style=\"text-align:left; padding:8px 0\">Item</th><th style=\"text-align:right; padding:8px 0\">Qty</th><th style=\"text-align:right; padding:8px 0\">Price</th></tr>
+                      </thead>
+                      <tbody>
+                        ${itemsHtml}
+                      </tbody>
+                    </table>
+                    <div style=\"margin-top:12px; text-align:right;\">
+                      <div style=\"color:#666\">Total</div>
+                      <div style=\"font-weight:700; font-size:18px\">${total}</div>
+                    </div>
+                  </div>
+                  <div style=\"display:flex; gap:40px; margin-top:24px\">
+                    <div style=\"vertical-align:top\">
+                      <h4>Shipping address</h4>
+                      <div style=\"color:#666\">${shipping}</div>
+                    </div>
+                    <div style=\"vertical-align:top\">
+                      <h4>Billing address</h4>
+                      <div style=\"color:#666\">${billing}</div>
+                    </div>
+                  </div>
+                </div>
+              `;
+
+              try {
+                const node = document.createElement("div");
+                node.style.position = "fixed";
+                node.style.left = "-9999px";
+                node.style.top = "0";
+                node.innerHTML = html;
+                document.body.appendChild(node);
+
+                const html2canvas = (await import("html2canvas")).default;
+                const { jsPDF } = await import("jspdf");
+
+                const canvas = await html2canvas(node, {
+                  scale: 2,
+                  useCORS: true,
+                });
+                const imgData = canvas.toDataURL("image/png");
+
+                const pdf = new jsPDF({
+                  unit: "pt",
+                  format: "a4",
+                  orientation: "portrait",
+                });
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const imgProps: any = pdf.getImageProperties(imgData);
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+                pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+                pdf.save(`order-${o.orderNumber || o.id}.pdf`);
+                document.body.removeChild(node);
+              } catch (e) {
+                console.error("pdf error", e);
+              }
+            }}
+            className="text-sm bg-secondary text-white px-3 py-2 rounded"
+          >
+            Download PDF
+          </button>
+        </div>
       </div>
       {loading ? (
         <div className="min-h-[20vh] flex items-center justify-center">

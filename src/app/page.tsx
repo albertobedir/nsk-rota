@@ -4,10 +4,13 @@ import HeaderCarousel from "@/components/header-carousel";
 import MiniPaginationGroup from "@/components/mini-pagination-group";
 import Footer from "@/components/footer";
 import Image from "next/image";
+import LogosTabs from "@/components/logos-tabs";
 import CountUp from "@/components/count-up";
 import InstagramStories from "@/components/instagram-stories";
 import { connectDB } from "@/lib/mongoose/instance";
 import Collection from "@/schemas/mongoose/collection";
+import { promises as fs } from "fs";
+import path from "path";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -26,6 +29,16 @@ export default async function Page() {
   }
 
   const collections = await fetchAllCollections();
+
+  // load logos from public/logos (server-side)
+  let logos: string[] = [];
+  try {
+    const logosDir = path.join(process.cwd(), "public", "logos");
+    const files = await fs.readdir(logosDir);
+    logos = files.filter((f) => /\.(png|jpe?g|svg|webp)$/i.test(f));
+  } catch (e) {
+    console.error("load logos error:", e);
+  }
 
   return (
     <>
@@ -52,6 +65,8 @@ export default async function Page() {
               ))}
           </div>
         </div>
+        {/* logos tabs component (client) */}
+        <LogosTabs logos={logos} />
         <InstagramStories />
         <section className="w-full bg-white mt-10  py-20">
           <div className="max-w-screen-2xl mx-auto sm:px-27 px-10 grid grid-cols-1 gap-8 items-center justify-center">
