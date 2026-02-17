@@ -15,7 +15,9 @@ export async function GET(req: Request) {
     let order: Record<string, any> | null = null;
     if (id) {
       try {
-        const res = await fetch(`${origin}/api/orders/${encodeURIComponent(id)}`);
+        const res = await fetch(
+          `${origin}/api/orders/${encodeURIComponent(id)}`,
+        );
         const d = await res.json().catch(() => null);
         const src = d?.data?.data?.node || d?.data || d || null;
         if (src) {
@@ -31,8 +33,10 @@ export async function GET(req: Request) {
                 variant: {
                   image: { url: li.image?.src || li.image?.url || null },
                   price: {
-                    amount: li.price || li.price_set?.shop_money?.amount || null,
-                    currencyCode: raw.currency || raw.presentment_currency || null,
+                    amount:
+                      li.price || li.price_set?.shop_money?.amount || null,
+                    currencyCode:
+                      raw.currency || raw.presentment_currency || null,
                   },
                 },
               },
@@ -42,25 +46,43 @@ export async function GET(req: Request) {
           order = {
             id: src._id?.toString?.() || src.id || src.shopifyId || raw.id,
             orderNumber:
-              src.orderNumber || src.order_number || raw.order_number || src.name,
+              src.orderNumber ||
+              src.order_number ||
+              raw.order_number ||
+              src.name,
             processedAt: src.processedAt || raw.processed_at || src.createdAt,
             financialStatus: src.financialStatus || raw.financial_status,
             fulfillmentStatus: src.fulfillmentStatus || raw.fulfillment_status,
             totalPrice: {
               amount:
-                src.totalPrice?.amount || raw.total_price || raw.current_total_price || null,
+                src.totalPrice?.amount ||
+                raw.total_price ||
+                raw.current_total_price ||
+                null,
               currencyCode:
-                src.totalPrice?.currencyCode || raw.currency || raw.presentment_currency || null,
+                src.totalPrice?.currencyCode ||
+                raw.currency ||
+                raw.presentment_currency ||
+                null,
             },
             shippingAddress:
               src.shippingAddress ||
               (raw.shipping_address
                 ? {
                     address1: raw.shipping_address.address1 || "",
-                    city: raw.shipping_address.city || raw.shipping_address.province || "",
+                    city:
+                      raw.shipping_address.city ||
+                      raw.shipping_address.province ||
+                      "",
                     zip: raw.shipping_address.zip || "",
-                    country: raw.shipping_address.country || raw.shipping_address.country_name || "",
-                    name: raw.shipping_address.name || raw.shipping_address.full_name || undefined,
+                    country:
+                      raw.shipping_address.country ||
+                      raw.shipping_address.country_name ||
+                      "",
+                    name:
+                      raw.shipping_address.name ||
+                      raw.shipping_address.full_name ||
+                      undefined,
                   }
                 : null),
             billingAddress:
@@ -68,10 +90,19 @@ export async function GET(req: Request) {
               (raw.billing_address
                 ? {
                     address1: raw.billing_address.address1 || "",
-                    city: raw.billing_address.city || raw.billing_address.province || "",
+                    city:
+                      raw.billing_address.city ||
+                      raw.billing_address.province ||
+                      "",
                     zip: raw.billing_address.zip || "",
-                    country: raw.billing_address.country || raw.billing_address.country_name || "",
-                    name: raw.billing_address.name || raw.billing_address.full_name || undefined,
+                    country:
+                      raw.billing_address.country ||
+                      raw.billing_address.country_name ||
+                      "",
+                    name:
+                      raw.billing_address.name ||
+                      raw.billing_address.full_name ||
+                      undefined,
                   }
                 : null),
             lineItems: { edges: lineItemsEdges },
