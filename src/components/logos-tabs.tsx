@@ -41,7 +41,8 @@ export default function LogosTabs({ logos = [] }: Props) {
 
     // re-measure on resize (in case layout changes)
     const onResize = () => {
-      if (groupRef.current) groupWidth = groupRef.current.offsetWidth || groupWidth;
+      if (groupRef.current)
+        groupWidth = groupRef.current.offsetWidth || groupWidth;
     };
     window.addEventListener("resize", onResize);
 
@@ -54,8 +55,17 @@ export default function LogosTabs({ logos = [] }: Props) {
   const renderGroup = (items: string[]) => (
     <div ref={groupRef} className="flex gap-8 items-center py-4">
       {items.map((file) => (
-        <div key={file} className="flex items-center justify-center p-6 bg-transparent flex-shrink-0">
-          <Image src={`/logos/${file}`} alt={file} width={220} height={110} className="object-contain max-h-28" />
+        <div
+          key={file}
+          className="flex items-center justify-center p-6 bg-transparent flex-shrink-0"
+        >
+          <Image
+            src={`/logos/${file}`}
+            alt={file}
+            width={220}
+            height={110}
+            className="object-contain max-h-28"
+          />
         </div>
       ))}
     </div>
@@ -64,12 +74,20 @@ export default function LogosTabs({ logos = [] }: Props) {
   return (
     <section className="w-full bg-white my-12 py-10">
       <div className="max-w-screen-2xl mx-auto px-6">
-        <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-center mb-6">OES Referanslar</h2>
+        <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-center mb-6">
+          OES Referanslar
+        </h2>
 
         <div ref={outerRef} className="w-full overflow-hidden">
-          <div ref={innerRef} className="flex items-center" style={{ willChange: "transform" }}>
+          <div
+            ref={innerRef}
+            className="flex items-center"
+            style={{ willChange: "transform" }}
+          >
             {logos.length === 0 ? (
-              <div className="col-span-full text-center text-gray-500 py-8">İçerik yok. Daha sonra logo ekleyeceksiniz.</div>
+              <div className="col-span-full text-center text-gray-500 py-8">
+                İçerik yok. Daha sonra logo ekleyeceksiniz.
+              </div>
             ) : (
               // duplicate group for seamless loop
               <>
