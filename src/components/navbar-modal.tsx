@@ -73,44 +73,6 @@ export default function NavbarModal({ open, setOpen }: Props) {
                 </ul>
               </div>
             ))}
-
-            {/* Mobile: show credit summary under links */}
-            <div className="w-full pt-3 border-t">
-              {(() => {
-                const creditLimit = Number(user?.creditLimit ?? 0);
-                const creditUsed = Number(user?.creditUsed ?? 0);
-                const creditRemaining = Number(
-                  user?.creditRemaining ?? Math.max(0, creditLimit - creditUsed)
-                );
-
-                return (
-                  <div className="bg-white p-3 rounded-md shadow-sm mt-3">
-                    <div className="flex items-center justify-between text-sm text-slate-400">
-                      <span>Credit</span>
-                      <span className="text-slate-600 font-medium">
-                        {fmt(creditLimit)}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm mt-2">
-                      <span className="text-orange-500 font-semibold">
-                        Used
-                      </span>
-                      <span className="text-orange-500 font-bold">
-                        {fmt(creditUsed)}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm text-slate-400 mt-2">
-                      <span>Remaining</span>
-                      <span className="text-slate-600 font-medium">
-                        {fmt(creditRemaining)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
           </div>
 
           {/* top-right X provided by SheetContent */}
@@ -136,7 +98,7 @@ export default function NavbarModal({ open, setOpen }: Props) {
               className={cn(
                 "absolute bottom-0 w-full items-start justify-center bg-white z-30 pointer-events-auto",
                 "sm:bottom-auto sm:top-[170px]",
-                "hidden sm:flex"
+                "hidden sm:flex",
               )}
             >
               <div className="grid grid-cols-4 gap-4 items-start py-6 px-6 max-w-[1200px] w-full">

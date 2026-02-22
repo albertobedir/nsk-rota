@@ -31,10 +31,10 @@ export default function InstagramStories({
   return (
     <section className="w-full py-12 bg-primary">
       <div className="max-w-screen-2xl mx-auto px-6 flex flex-col items-center gap-6">
-        <h3 className="font-extrabold text-white text-5xl mb-6">
+        <h3 className="font-extrabold text-white text-2xl sm:text-3xl lg:text-5xl mb-4 sm:mb-6 text-start sm:text-center w-full">
           Trusted by OEMs. Proven by Mechanics
         </h3>
-        <p className="text-white text-2xl max-w-4xl text-center">
+        <p className="text-white text-sm sm:text-base lg:text-2xl max-w-4xl text-start sm:text-center w-full">
           Discover real experiences from our customers and OEM partners who rely
           on ROTA’s steering and suspension parts. From long-term collaborations
           to field-proven performance, these stories reflect our commitment to

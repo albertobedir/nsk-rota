@@ -35,8 +35,14 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const perPage = 12;
 
-  const { products, total, fetchProducts, searchTerm, searchProducts } =
-    useProductsStore();
+  const {
+    products,
+    total,
+    fetchProducts,
+    searchTerm,
+    searchProducts,
+    isLoading,
+  } = useProductsStore();
 
   const [filters, setFilters] = useState({
     brand: "",
@@ -511,7 +517,11 @@ export default function ProductsPage() {
 
       {/* PRODUCT GRID */}
       <div className="mx-auto sm:px-27 w-full max-w-[1540px] px-4 py-10">
-        {searchTerm && products.length === 0 ? (
+        {isLoading ? (
+          <div className="w-full py-24 flex flex-col items-center justify-center">
+            <div className="w-10 h-10 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : searchTerm && products.length === 0 ? (
           <div className="w-full py-24 flex flex-col items-center justify-center">
             <h2 className="text-4xl font-bold">Out of stock</h2>
             <p className="text-sm text-muted-foreground mt-2">
@@ -737,14 +747,21 @@ export default function ProductsPage() {
 
               const code = extractRotaNoFromMetafields(product.raw.metafields);
 
-              const oemsArr =
-                product.raw.metafields
-                  ?.filter(
-                    (m: any) =>
-                      /(oem|brand)/i.test(m.key) ||
-                      (m.namespace === "custom" && /(oem|brand)/i.test(m.key)),
-                  )
-                  ?.map((m: any) => m.value) ?? [];
+              // Only pick the oem_info metafield (which holds ALL OEMs as a
+              // JSON array), parse it and spread into individual objects so
+              // every entry gets its own brand + OEM number in the card.
+              const oemsArr = (() => {
+                const oemMeta = product.raw.metafields?.find(
+                  (m: any) => m.namespace === "custom" && m.key === "oem_info",
+                );
+                if (!oemMeta?.value) return [];
+                try {
+                  const parsed = JSON.parse(oemMeta.value);
+                  return Array.isArray(parsed) ? parsed : [parsed];
+                } catch {
+                  return [oemMeta.value];
+                }
+              })();
 
               const shopifyId = product.shopifyId ?? (product.raw as any)?.id;
 

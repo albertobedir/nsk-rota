@@ -145,17 +145,22 @@ export default function MiniPaginationGroup({
                   ? parseFloat(priceStr) || 0
                   : Number(priceStr) || 0;
 
-              const oemsArr =
-                raw?.metafields && Array.isArray(raw.metafields)
-                  ? raw.metafields
-                      .filter(
+              const oemsArr = (() => {
+                const oemMeta =
+                  raw?.metafields && Array.isArray(raw.metafields)
+                    ? raw.metafields.find(
                         (m: any) =>
-                          /(oem|brand)/i.test(m.key) ||
-                          (m.namespace === "custom" &&
-                            /(oem|brand)/i.test(m.key)),
+                          m.namespace === "custom" && m.key === "oem_info",
                       )
-                      .map((m: any) => m.value)
-                  : [];
+                    : null;
+                if (!oemMeta?.value) return [];
+                try {
+                  const parsed = JSON.parse(oemMeta.value);
+                  return Array.isArray(parsed) ? parsed : [parsed];
+                } catch {
+                  return [oemMeta.value];
+                }
+              })();
 
               const firstVariantId =
                 raw?.variants && raw.variants[0] && raw.variants[0].id;
@@ -257,17 +262,22 @@ export default function MiniPaginationGroup({
                 ? parseFloat(priceStr) || 0
                 : Number(priceStr) || 0;
 
-            const oemsArr =
-              raw?.metafields && Array.isArray(raw.metafields)
-                ? raw.metafields
-                    .filter(
+            const oemsArr = (() => {
+              const oemMeta =
+                raw?.metafields && Array.isArray(raw.metafields)
+                  ? raw.metafields.find(
                       (m: any) =>
-                        /(oem|brand)/i.test(m.key) ||
-                        (m.namespace === "custom" &&
-                          /(oem|brand)/i.test(m.key)),
+                        m.namespace === "custom" && m.key === "oem_info",
                     )
-                    .map((m: any) => m.value)
-                : [];
+                  : null;
+              if (!oemMeta?.value) return [];
+              try {
+                const parsed = JSON.parse(oemMeta.value);
+                return Array.isArray(parsed) ? parsed : [parsed];
+              } catch {
+                return [oemMeta.value];
+              }
+            })();
 
             const firstVariantId =
               raw?.variants && raw.variants[0] && raw.variants[0].id;
@@ -315,11 +325,34 @@ export default function MiniPaginationGroup({
   const allProducts =
     products && products.length > 0 ? products : (fetched ?? []);
   const total = allProducts.length;
-  const totalPages = 20;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const pageItems = allProducts.slice((page - 1) * pageSize, page * pageSize);
 
   function goto(p: number) {
     setPage(Math.min(Math.max(1, p), totalPages));
+  }
+
+  type PageToken = number | "ellipsis";
+  function buildPageTokens(total: number, current: number): PageToken[] {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages = new Set<number>();
+    // always show first and last
+    pages.add(1);
+    pages.add(total);
+    // always show current ± 1
+    for (
+      let i = Math.max(1, current - 1);
+      i <= Math.min(total, current + 1);
+      i++
+    )
+      pages.add(i);
+    const arr = Array.from(pages).sort((a, b) => a - b);
+    const out: PageToken[] = [];
+    for (let i = 0; i < arr.length; i++) {
+      out.push(arr[i]);
+      if (i < arr.length - 1 && arr[i + 1] - arr[i] > 1) out.push("ellipsis");
+    }
+    return out;
   }
 
   const slugify = (s: string) =>
@@ -373,13 +406,69 @@ export default function MiniPaginationGroup({
         ))}
       </div>
 
-      <div className="mt-4 w-full flex items-center justify-center">
-        <div className="flex items-center gap-3 w-full max-w-full sm:max-w-[600px] justify-center px-2 mini-pagination-scroll overflow-x-auto sm:overflow-visible">
+      {/* ── PAGINATION ── */}
+      <div className="mt-6 w-full flex items-center justify-center">
+        {/* Mobile: Prev · Page X of Y · Next */}
+        <div className="flex sm:hidden items-center gap-3">
           <button
             onClick={() => goto(page - 1)}
             disabled={page <= 1}
             aria-label="Previous page"
-            className="px-2 sm:px-3 py-1 rounded-md text-sm bg-white border shadow-sm disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-white border border-gray-200 shadow-sm disabled:opacity-40 active:scale-95 transition-all"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              className="w-4 h-4 shrink-0"
+            >
+              <path
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 18l-6-6 6-6"
+              />
+            </svg>
+            Prev
+          </button>
+
+          <span className="text-sm font-semibold text-gray-800 min-w-[64px] text-center tabular-nums">
+            {page}
+            <span className="text-gray-400 font-normal"> / {totalPages}</span>
+          </span>
+
+          <button
+            onClick={() => goto(page + 1)}
+            disabled={page >= totalPages}
+            aria-label="Next page"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-white border border-gray-200 shadow-sm disabled:opacity-40 active:scale-95 transition-all"
+          >
+            Next
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              className="w-4 h-4 shrink-0"
+            >
+              <path
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 6l6 6-6 6"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* Desktop: full page buttons with ellipsis */}
+        <div className="hidden sm:flex items-center gap-1.5">
+          <button
+            onClick={() => goto(page - 1)}
+            disabled={page <= 1}
+            aria-label="Previous page"
+            className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-white shadow-sm text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -397,78 +486,39 @@ export default function MiniPaginationGroup({
             </svg>
           </button>
 
-          <div className="flex items-center gap-2 flex-nowrap">
-            {(() => {
-              type PageToken = number | "ellipsis";
-
-              function buildPagination(
-                total: number,
-                current: number,
-                edge = 3,
-                around = 1,
-              ): PageToken[] {
-                if (total <= edge * 2 + around * 2 + 3) {
-                  return Array.from({ length: total }, (_, i) => i + 1);
-                }
-
-                const pages = new Set<number>();
-                for (let i = 1; i <= Math.min(edge, total); i++) pages.add(i);
-                for (let i = Math.max(1, total - edge + 1); i <= total; i++)
-                  pages.add(i);
-                for (
-                  let i = Math.max(1, current - around);
-                  i <= Math.min(total, current + around);
-                  i++
-                )
-                  pages.add(i);
-
-                const arr = Array.from(pages).sort((a, b) => a - b);
-                const out: PageToken[] = [];
-                for (let i = 0; i < arr.length; i++) {
-                  out.push(arr[i]);
-                  if (i < arr.length - 1 && arr[i + 1] - arr[i] > 1)
-                    out.push("ellipsis");
-                }
-                return out;
-              }
-
-              const tokens = buildPagination(
-                totalPages,
-                page,
-                isCompact ? 2 : 3,
-                isCompact ? 0 : 1,
+          {buildPageTokens(totalPages, page).map((t, idx) => {
+            if (t === "ellipsis") {
+              return (
+                <span
+                  key={`e-${idx}`}
+                  className="flex items-center justify-center w-9 h-9 text-gray-400 text-sm select-none"
+                >
+                  &hellip;
+                </span>
               );
-
-              return tokens.map((t, idx) => {
-                if (t === "ellipsis") {
-                  return (
-                    <span key={`e-${idx}`} className="px-2 text-sm text-muted">
-                      /
-                    </span>
-                  );
-                }
-
-                const p = t as number;
-                return (
-                  <button
-                    key={p}
-                    onClick={() => goto(p)}
-                    aria-current={p === page ? "page" : undefined}
-                    className={`px-2 sm:px-3 py-1 rounded-md text-sm ${
-                      p === page ? "bg-secondary text-white" : "bg-white border"
-                    }`}
-                  >
-                    {p}
-                  </button>
-                );
-              });
-            })()}
-          </div>
+            }
+            const pg = t as number;
+            return (
+              <button
+                key={pg}
+                onClick={() => goto(pg)}
+                aria-current={pg === page ? "page" : undefined}
+                className={`flex items-center justify-center w-9 h-9 rounded-xl text-sm font-medium transition-colors ${
+                  pg === page
+                    ? "bg-secondary text-white shadow-sm"
+                    : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {pg}
+              </button>
+            );
+          })}
 
           <button
             onClick={() => goto(page + 1)}
             disabled={page >= totalPages}
-            className="px-3 py-1 rounded-md bg-white border shadow-sm disabled:opacity-50"
+            aria-label="Next page"
+            className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-white shadow-sm text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -487,16 +537,6 @@ export default function MiniPaginationGroup({
           </button>
         </div>
       </div>
-
-      <style jsx>{`
-        .mini-pagination-scroll {
-          -ms-overflow-style: none; /* IE and Edge */
-          scrollbar-width: none; /* Firefox */
-        }
-        .mini-pagination-scroll::-webkit-scrollbar {
-          display: none; /* Chrome, Safari, Opera */
-        }
-      `}</style>
     </section>
   );
 }

@@ -57,7 +57,7 @@ export default function LogosTabs({ logos = [] }: Props) {
       {items.map((file) => (
         <div
           key={file}
-          className="flex items-center justify-center p-6 bg-transparent flex-shrink-0"
+          className="flex items-center justify-center p-6 bg-transparent shrink-0"
         >
           <Image
             src={`/logos/${file}`}
@@ -91,8 +91,8 @@ export default function LogosTabs({ logos = [] }: Props) {
             ) : (
               // duplicate group for seamless loop
               <>
-                <div className="flex-shrink-0">{renderGroup(logos)}</div>
-                <div className="flex-shrink-0">{renderGroup(logos)}</div>
+                <div className="shrink-0">{renderGroup(logos)}</div>
+                <div className="shrink-0">{renderGroup(logos)}</div>
               </>
             )}
           </div>

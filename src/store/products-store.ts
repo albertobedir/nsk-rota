@@ -48,16 +48,17 @@ interface ProductState {
   products: IProduct[];
   total: number;
   searchTerm: string;
+  isLoading: boolean;
 
   fetchProducts: (
     page: number,
     limit: number,
-    filters?: Filters
+    filters?: Filters,
   ) => Promise<void>;
   searchProducts: (
     query: string,
     page?: number,
-    limit?: number
+    limit?: number,
   ) => Promise<void>;
 }
 
@@ -65,11 +66,13 @@ export const useProductsStore = create<ProductState>((set) => ({
   products: [],
   total: 0,
   searchTerm: "",
+  isLoading: false,
 
   /* -------------------------------------------------------
       UPDATED fetchProducts → frontend filters → API filters
   -------------------------------------------------------- */
   fetchProducts: async (page, limit, filters = {}) => {
+    set({ isLoading: true });
     const query = new URLSearchParams({
       page: String(page),
       limit: String(limit),
@@ -97,18 +100,20 @@ export const useProductsStore = create<ProductState>((set) => ({
       products: json.results ?? [],
       total: json.total ?? 0,
       searchTerm: "",
+      isLoading: false,
     });
   },
 
   /* ------------------------------- SEARCH ------------------------------- */
   searchProducts: async (query, page = 1, limit = 12) => {
+    set({ isLoading: true });
     // empty query: fallback to paged regular listing
     if (!query || query.trim() === "") {
       const res = await fetch(
         `/api/products/gets?page=${page}&limit=${limit}`,
         {
           cache: "no-store",
-        }
+        },
       );
 
       const json = await res.json();
@@ -117,6 +122,7 @@ export const useProductsStore = create<ProductState>((set) => ({
         products: json.results ?? [],
         total: json.total ?? 0,
         searchTerm: "",
+        isLoading: false,
       });
 
       return;
@@ -139,6 +145,7 @@ export const useProductsStore = create<ProductState>((set) => ({
       products: json.results ?? [],
       total: json.total ?? 0,
       searchTerm: query,
+      isLoading: false,
     });
   },
 }));

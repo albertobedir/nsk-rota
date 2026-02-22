@@ -123,18 +123,10 @@ export default function Navbar() {
           >
             <div className="col-span-6 xl:col-span-5 xl:max-w-full w-full justify-center flex relative">
               <Search />
-
-              <button
-                className="absolute top-3 right-3 md:hidden p-2"
-                onClick={() => setIsSearchOpen(false)}
-                aria-label="Close search"
-              >
-                <Icons name="x" width={20} height={20} />
-              </button>
             </div>
 
             {user ? (
-              <div className="col-span-6 xl:col-span-1 w-full flex justify-end">
+              <div className="col-span-6 xl:col-span-1 w-full justify-end hidden xl:flex">
                 <div className="bg-white p-2 rounded-xl shadow-md w-full md:w-[220px]">
                   {(() => {
                     const creditLimit = Number(user?.creditLimit ?? 0);

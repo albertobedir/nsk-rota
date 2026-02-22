@@ -89,26 +89,7 @@ const TECH_INFO: TechInfoRow[] = [
   },
 ];
 
-const SUITABLE_MODELS: SuitableModel[] = [
-  {
-    brand: "HENDRICKSON",
-    model: "FIREMAAX EX – 240–480 AIR\nSUSPENSION",
-    year: "-",
-    kw: "-",
-    hp: "US",
-    className: "-",
-    type: "TRAILER",
-  },
-  {
-    brand: "HENDRICKSON",
-    model: "FIREMAAX EX – 270–540 AIR\nSUSPENSION",
-    year: "-",
-    kw: "-",
-    hp: "US",
-    className: "-",
-    type: "TRAILER",
-  },
-];
+// SUITABLE_MODELS is now derived dynamically inside the component from the applications metafield
 
 /* ---------------------- MAIN PAGE ---------------------- */
 
@@ -139,14 +120,14 @@ export default function ProductDetailPage() {
           (t) =>
             String(t.tierTag ?? "")
               .toLowerCase()
-              .trim() === normalized
+              .trim() === normalized,
         );
         const discount = found ? Number(found.discountPercentage) : null;
         if (mounted) {
           setPrismaDiscount(discount);
           console.log(
             `[product-page] prisma discountPercentage for ${tag}:`,
-            discount
+            discount,
           );
         }
       } catch (e) {
@@ -182,7 +163,7 @@ export default function ProductDetailPage() {
         setComponentsLoading(true);
 
         const compsField = product.raw?.metafields?.find((m) =>
-          /comp$/i.test(m.key)
+          /comp$/i.test(m.key),
         );
         if (!compsField) {
           if (mounted) setComponentsProducts([]);
@@ -201,13 +182,13 @@ export default function ProductDetailPage() {
         for (const item of parsed) {
           const obj = item as Record<string, unknown>;
           const compNo = String(
-            obj.ComponentNo ?? obj.RotaNo ?? obj.Component ?? ""
+            obj.ComponentNo ?? obj.RotaNo ?? obj.Component ?? "",
           ).trim();
           if (!compNo) continue;
 
           try {
             const resp = await fetch(
-              `/api/products/gets?search=${encodeURIComponent(compNo)}`
+              `/api/products/gets?search=${encodeURIComponent(compNo)}`,
             );
             const json = await resp.json().catch(() => null);
             const found = json?.results?.[0] ?? null;
@@ -254,7 +235,7 @@ export default function ProductDetailPage() {
           const q = Number(
             firstVariant?.inventory_quantity ??
               firstVariant?.inventory_quantity ??
-              0
+              0,
           );
           if (!Number.isNaN(q)) avail = q;
         }
@@ -308,7 +289,7 @@ export default function ProductDetailPage() {
     async function fetchProduct() {
       // Try treat the route param as a Shopify product id first
       const attemptByShopify = await fetch(
-        `/api/products/gets?shopifyId=${id}`
+        `/api/products/gets?shopifyId=${id}`,
       );
       const shopifyJson = await attemptByShopify.json().catch(() => null);
       let found = shopifyJson?.results?.[0] ?? null;
@@ -316,7 +297,7 @@ export default function ProductDetailPage() {
       // Fallback: if not found, treat param as variant id and try that
       if (!found) {
         const attemptByVariant = await fetch(
-          `/api/products/gets?variantId=${id}`
+          `/api/products/gets?variantId=${id}`,
         );
         const variantJson = await attemptByVariant.json().catch(() => null);
         found = variantJson?.results?.[0] ?? null;
@@ -345,6 +326,38 @@ export default function ProductDetailPage() {
   if (!product) return <div className="p-10 text-2xl">Product not found</div>;
 
   const raw = product.raw;
+
+  // Derive SUITABLE_MODELS from applications metafield
+  const SUITABLE_MODELS: SuitableModel[] = (() => {
+    try {
+      const appField = raw.metafields?.find(
+        (m: any) => m.key === "applications",
+      );
+      if (!appField?.value) return [];
+      const apps = JSON.parse(appField.value) as any[];
+      const formatYear = (from: string, to: string) => {
+        const fmt = (s: string) =>
+          s.length >= 6 ? `${s.slice(0, 4)}/${s.slice(4, 6)}` : s;
+        const f = fmt(from);
+        const t = to ? fmt(to) : "...";
+        return f ? `${f} – ${t}` : "";
+      };
+      return apps.map((a: any) => ({
+        brand: a.BrandDescription ?? "",
+        model: a.Model2
+          ? `${a.ModelDescription ?? ""} – ${a.Model2}`
+          : (a.ModelDescription ?? ""),
+        year: formatYear(String(a.YearsFrom ?? ""), String(a.YearsTo ?? "")),
+        kw: a.Kw ?? "",
+        hp: a.Hp ?? "",
+        className: a.VehicleClass ?? "",
+        type: a.VehicleType ?? "",
+      }));
+    } catch {
+      return [];
+    }
+  })();
+
   const title = raw.title;
   const price = raw.variants?.[0]?.price ?? "0";
   const formattedPrice = Number(price).toLocaleString("en-US", {
@@ -382,7 +395,7 @@ export default function ProductDetailPage() {
           preferred.available ??
             preferred.quantity ??
             preferred.available_qty ??
-            0
+            0,
         );
         displayedStock = Number.isNaN(qty) ? undefined : qty;
       }
@@ -407,7 +420,7 @@ export default function ProductDetailPage() {
       (m) =>
         m.key === "oem_info" ||
         m.key === "brand_info" ||
-        (m.namespace === "custom" && /(oem|brand)/i.test(m.key))
+        (m.namespace === "custom" && /(oem|brand)/i.test(m.key)),
     );
 
     if (candidate) {
@@ -456,7 +469,7 @@ export default function ProductDetailPage() {
       const candidate = metafields.find(
         (m) =>
           /(technical|tech|technical_info)/i.test(m.key) ||
-          (m.namespace === "custom" && /(technical|tech)/i.test(m.key))
+          (m.namespace === "custom" && /(technical|tech)/i.test(m.key)),
       );
 
       if (!candidate) return TECH_INFO;
@@ -472,10 +485,10 @@ export default function ProductDetailPage() {
           key,
           label: mapHarfToLabel[key] ?? key,
           value_mm: asString(
-            obj.Technicalmm ?? obj.TechnicalMM ?? obj.Technical ?? ""
+            obj.Technicalmm ?? obj.TechnicalMM ?? obj.Technical ?? "",
           ),
           value_in: asString(
-            obj.Technicalinch ?? obj.TechnicalInch ?? obj.Technicalinch ?? ""
+            obj.Technicalinch ?? obj.TechnicalInch ?? obj.Technicalinch ?? "",
           ),
         } as TechInfoRow;
       });
@@ -487,12 +500,53 @@ export default function ProductDetailPage() {
   };
 
   const technicalRows = getTechnicalRows(raw.metafields);
+  // Extract ALL brand names — check raw.Brands directly first (Mongoose Mixed),
+  // then fall back to the brand_info metafield.
+  const brandsList = (() => {
+    try {
+      const rawAny = raw as any;
+
+      // 1) Direct field on raw (e.g. raw.Brands from products.json sync)
+      let arr: any[] = [];
+      if (Array.isArray(rawAny?.Brands) && rawAny.Brands.length > 0) {
+        arr = rawAny.Brands;
+      } else if (Array.isArray(rawAny?.brands) && rawAny.brands.length > 0) {
+        arr = rawAny.brands;
+      } else {
+        // 2) Fall back to metafield
+        const brandField = raw.metafields?.find(
+          (m: any) =>
+            /brand/i.test(m.key) ||
+            (m.namespace === "custom" && /brand/i.test(m.key)),
+        );
+        if (brandField?.value) {
+          const parsed = JSON.parse(brandField.value);
+          arr = Array.isArray(parsed) ? parsed : [parsed];
+        }
+      }
+
+      if (arr.length === 0) return "";
+
+      const names = arr
+        .map(
+          (b: any) =>
+            b?.BrandDescription || b?.Brand || b?.MarkaDescription || b?.brand,
+        )
+        .filter(Boolean)
+        .map((s: any) => String(s).trim().toUpperCase())
+        .filter(Boolean);
+      const uniq = Array.from(new Set(names));
+      return uniq.join(", ");
+    } catch {
+      return "";
+    }
+  })();
   const hasTechnicalInfo = (() => {
     try {
       const candidate = raw.metafields?.find(
         (m: any) =>
           /(technical|tech|technical_info)/i.test(m.key) ||
-          (m.namespace === "custom" && /(technical|tech)/i.test(m.key))
+          (m.namespace === "custom" && /(technical|tech)/i.test(m.key)),
       );
       return Boolean(candidate);
     } catch {
@@ -630,10 +684,12 @@ export default function ProductDetailPage() {
 
           {/* Badges */}
           <div className="flex flex-wrap gap-3 mt-2">
-            <div className="flex items-center gap-1 text-blue-600 font-bold">
-              <Icons name="konum" />
-              {displayedLocation ?? "—"}
-            </div>
+            {displayedLocation && (
+              <div className="flex items-center gap-1 text-blue-600 font-bold">
+                <Icons name="konum" />
+                {displayedLocation}
+              </div>
+            )}
             {(() => {
               const isInStock =
                 typeof displayedStock === "number"
@@ -723,8 +779,8 @@ export default function ProductDetailPage() {
                       {outOfStock
                         ? "Out of Stock"
                         : addingToCart
-                        ? "Adding..."
-                        : "ADD TO CART"}
+                          ? "Adding..."
+                          : "ADD TO CART"}
                     </Button>
                   </>
                 );
@@ -741,114 +797,58 @@ export default function ProductDetailPage() {
 
             {(() => {
               try {
-                const brandField = raw.metafields?.find(
-                  (m: any) =>
-                    /brand/i.test(m.key) ||
-                    (m.namespace === "custom" && /brand/i.test(m.key))
-                );
+                const rawAny = raw as any;
+                let brands: string[] = [];
 
-                const modelsField = raw.metafields?.find(
-                  (m: any) =>
-                    /models?/i.test(m.key) ||
-                    (m.namespace === "custom" && /models?/i.test(m.key))
-                );
-
-                let brand: string | undefined = undefined;
-                let models: string[] = [];
-
-                const safeStringify = (v: any): string => {
-                  if (v == null) return "";
-                  if (typeof v === "string") return v;
-                  if (Array.isArray(v)) {
-                    // join array elements (prefer primitive values or try to stringify objects)
-                    return v
-                      .map((it: any) =>
-                        typeof it === "object" ? safeStringify(it) : String(it)
+                // 1) Direct raw.Brands field
+                if (Array.isArray(rawAny?.Brands) && rawAny.Brands.length > 0) {
+                  brands = rawAny.Brands.map(
+                    (b: any) =>
+                      b?.BrandDescription ||
+                      b?.Brand ||
+                      b?.MarkaDescription ||
+                      "",
+                  )
+                    .filter(Boolean)
+                    .map((s: string) => s.trim().toUpperCase());
+                } else {
+                  // 2) Fall back to brand metafield (array of objects)
+                  const brandField = raw.metafields?.find(
+                    (m: any) =>
+                      /brand/i.test(m.key) ||
+                      (m.namespace === "custom" && /brand/i.test(m.key)),
+                  );
+                  if (brandField?.value) {
+                    const parsed = JSON.parse(brandField.value);
+                    const arr = Array.isArray(parsed) ? parsed : [parsed];
+                    brands = arr
+                      .map(
+                        (b: any) =>
+                          b?.BrandDescription ||
+                          b?.Brand ||
+                          b?.MarkaDescription ||
+                          "",
                       )
                       .filter(Boolean)
-                      .join(", ");
-                  }
-
-                  if (typeof v === "object") {
-                    // prefer common named properties, fallback to JSON
-                    const keysToTry = [
-                      "BrandDescription",
-                      "Brand",
-                      "MarkaDescription",
-                      "Brand1",
-                      "Name",
-                      "name",
-                      "brand",
-                      "description",
-                      "Manufacturer",
-                    ];
-
-                    for (const k of keysToTry) {
-                      if (v[k] != null && String(v[k]) !== "")
-                        return String(v[k]);
-                    }
-
-                    return JSON.stringify(v);
-                  }
-
-                  return String(v);
-                };
-
-                if (brandField && typeof brandField.value === "string") {
-                  try {
-                    const parsed = JSON.parse(brandField.value);
-                    if (Array.isArray(parsed) && parsed[0]) {
-                      brand = safeStringify(parsed[0]);
-                    } else if (parsed && typeof parsed === "object") {
-                      brand = safeStringify(parsed);
-                    } else {
-                      brand = String(brandField.value);
-                    }
-                  } catch {
-                    brand = String(brandField.value);
+                      .map((s: string) => s.trim().toUpperCase());
                   }
                 }
 
-                if (modelsField && typeof modelsField.value === "string") {
-                  try {
-                    const parsed = JSON.parse(modelsField.value);
-                    if (Array.isArray(parsed))
-                      models = parsed
-                        .map((x: any) => safeStringify(x))
-                        .filter(Boolean);
-                    else
-                      models = String(modelsField.value)
-                        .split(",")
-                        .map((s) => s.trim())
-                        .filter(Boolean);
-                  } catch {
-                    models = String(modelsField.value)
-                      .split(",")
-                      .map((s) => s.trim())
-                      .filter(Boolean);
-                  }
-                }
+                const uniqBrands = Array.from(new Set(brands));
 
                 return (
                   <div className="mt-3">
                     <p className="font-semibold text-black text-lg">
-                      {brand ?? raw.vendor}
+                      {uniqBrands.length > 0
+                        ? uniqBrands.join(", ")
+                        : ((raw as any).vendor ?? "—")}
                     </p>
-                    {models.length > 0 && (
-                      <div className="mt-2 text-sm space-y-1">
-                        {models.map((m: string, i: number) => (
-                          <div key={i} className="flex justify-between">
-                            <span className="font-semibold">{m}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 );
               } catch {
                 return (
                   <p className="font-semibold text-black text-lg mt-3">
-                    {raw.vendor}
+                    {(raw as any).vendor}
                   </p>
                 );
               }
@@ -865,10 +865,10 @@ export default function ProductDetailPage() {
             {(() => {
               try {
                 const compField = raw.metafields?.find((m) =>
-                  /competitor_info/i.test(m.key)
+                  /competitor_info/i.test(m.key),
                 );
                 const compsField = raw.metafields?.find((m) =>
-                  /comp$/i.test(m.key)
+                  /comp$/i.test(m.key),
                 );
 
                 const competitors = compField
@@ -880,7 +880,7 @@ export default function ProductDetailPage() {
 
                 const getFirst = (
                   obj: Record<string, unknown>,
-                  keys: string[]
+                  keys: string[],
                 ) => {
                   for (const k of keys) {
                     const v = obj[k];
@@ -983,7 +983,7 @@ export default function ProductDetailPage() {
                       )}
                     </div>
                   </CarouselItem>
-                )
+                ),
               )}
             </CarouselContent>
             <CarouselPrevious className="left-2" />
@@ -1083,69 +1083,71 @@ export default function ProductDetailPage() {
       )}
 
       {/* SUITABLE MODELS */}
-      <div className="container px-4 md:px-25 mt-20 mb-[5rem] w-full">
-        <h3 className="font-bold text-2xl inline-block">
-          Suitable Models
-          <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
-        </h3>
+      {SUITABLE_MODELS.length > 0 && (
+        <div className="container px-4 md:px-25 mt-20 mb-[5rem] w-full">
+          <h3 className="font-bold text-2xl inline-block">
+            Suitable Models
+            <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
+          </h3>
 
-        {/* Desktop header */}
-        <div className="hidden md:flex border-b pb-3 text-sm font-semibold text-gray-700 mt-4">
-          <span className="flex-1">Brand</span>
-          <span className="flex-2">Model</span>
-          <span className="flex-[0.7]">Year</span>
-          <span className="flex-[0.7]">Kw</span>
-          <span className="flex-[0.7]">Hp</span>
-          <span className="flex-[0.8]">Class</span>
-          <span className="flex-1">Type</span>
-        </div>
-
-        {SUITABLE_MODELS.map((row, i) => (
-          <div key={i}>
-            {/* Desktop */}
-            <div className="hidden md:flex bg-gray-100 py-4 px-3 mt-3 rounded-md text-sm">
-              <span className="flex-1 font-semibold">{row.brand}</span>
-              <span className="flex-2 font-semibold whitespace-pre-line">
-                {row.model}
-              </span>
-              <span className="flex-[0.7]">{row.year}</span>
-              <span className="flex-[0.7]">{row.kw}</span>
-              <span className="flex-[0.7] font-semibold">{row.hp}</span>
-              <span className="flex-[0.8]">{row.className}</span>
-              <span className="flex-1 font-semibold">{row.type}</span>
-            </div>
-
-            {/* Mobile */}
-            <div className="md:hidden bg-gray-100 p-4 rounded-lg mt-4 text-sm space-y-2">
-              <div className="font-bold">{row.brand}</div>
-              <div className="font-semibold whitespace-pre-line leading-tight">
-                {row.model}
-              </div>
-
-              <div className="flex justify-between">
-                <b>Year</b>
-                <span>{row.year}</span>
-              </div>
-              <div className="flex justify-between">
-                <b>Kw</b>
-                <span>{row.kw}</span>
-              </div>
-              <div className="flex justify-between">
-                <b>Hp</b>
-                <span>{row.hp}</span>
-              </div>
-              <div className="flex justify-between">
-                <b>Class</b>
-                <span>{row.className}</span>
-              </div>
-              <div className="flex justify-between">
-                <b>Type</b>
-                <span>{row.type}</span>
-              </div>
-            </div>
+          {/* Desktop header */}
+          <div className="hidden md:flex border-b pb-3 text-sm font-semibold text-gray-700 mt-4">
+            <span className="flex-1">Brand</span>
+            <span className="flex-2">Model</span>
+            <span className="flex-[0.7]">Year</span>
+            <span className="flex-[0.7]">Kw</span>
+            <span className="flex-[0.7]">Hp</span>
+            <span className="flex-[0.8]">Class</span>
+            <span className="flex-1">Type</span>
           </div>
-        ))}
-      </div>
+
+          {SUITABLE_MODELS.map((row, i) => (
+            <div key={i}>
+              {/* Desktop */}
+              <div className="hidden md:flex bg-gray-100 py-4 px-3 mt-3 rounded-md text-sm">
+                <span className="flex-1 font-semibold">{row.brand}</span>
+                <span className="flex-2 font-semibold whitespace-pre-line">
+                  {row.model}
+                </span>
+                <span className="flex-[0.7]">{row.year}</span>
+                <span className="flex-[0.7]">{row.kw}</span>
+                <span className="flex-[0.7] font-semibold">{row.hp}</span>
+                <span className="flex-[0.8]">{row.className}</span>
+                <span className="flex-1 font-semibold">{row.type}</span>
+              </div>
+
+              {/* Mobile */}
+              <div className="md:hidden bg-gray-100 p-4 rounded-lg mt-4 text-sm space-y-2">
+                <div className="font-bold">{row.brand}</div>
+                <div className="font-semibold whitespace-pre-line leading-tight">
+                  {row.model}
+                </div>
+
+                <div className="flex justify-between">
+                  <b>Year</b>
+                  <span>{row.year}</span>
+                </div>
+                <div className="flex justify-between">
+                  <b>Kw</b>
+                  <span>{row.kw}</span>
+                </div>
+                <div className="flex justify-between">
+                  <b>Hp</b>
+                  <span>{row.hp}</span>
+                </div>
+                <div className="flex justify-between">
+                  <b>Class</b>
+                  <span>{row.className}</span>
+                </div>
+                <div className="flex justify-between">
+                  <b>Type</b>
+                  <span>{row.type}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

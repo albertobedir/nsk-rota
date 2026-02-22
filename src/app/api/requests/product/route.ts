@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (!message || !query) {
       return NextResponse.json(
         { ok: false, error: "Missing query or message" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
           to: adminEmail,
           subject: `Product request: ${String(query)}`,
           html: `<p><strong>Query:</strong> ${escapeHtml(
-            String(query)
+            String(query),
           )}</p><p>${escapeHtml(String(message)).replace(/\n/g, "<br />")}</p>`,
         });
 
@@ -89,10 +89,10 @@ export async function POST(request: NextRequest) {
             to: adminEmail,
             subject: `Product request: ${String(query)}`,
             html: `<p><strong>Query:</strong> ${escapeHtml(
-              String(query)
+              String(query),
             )}</p><p>${escapeHtml(String(message)).replace(
               /\n/g,
-              "<br />"
+              "<br />",
             )}</p>`,
           }),
         });
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: String(e?.message ?? e) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

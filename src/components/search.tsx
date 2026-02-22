@@ -54,7 +54,16 @@ export default function Search() {
       handleSearch();
     } else {
       if (value.trim() !== "") {
-        setTags([...tags, { id: uuid(), value, editable: false }]);
+        const parts = value
+          .split(/[\s,]+/)
+          .map((v) => v.trim())
+          .filter(Boolean);
+        const newTags = parts.map((v) => ({
+          id: uuid(),
+          value: v,
+          editable: false,
+        }));
+        setTags([...tags, ...newTags]);
         setValue("");
       }
     }
@@ -67,14 +76,14 @@ export default function Search() {
   const handleDoubleClick = (tag: Tag) => {
     setTags(
       tags.map((t) =>
-        t.id === tag.id ? { ...t, editable: true } : { ...t, editable: false }
-      )
+        t.id === tag.id ? { ...t, editable: true } : { ...t, editable: false },
+      ),
     );
   };
 
   const handleChangeTagValue = (tag: Tag, value: string) => {
     setTags(
-      tags.map((t) => ({ ...t, value: t.id === tag.id ? value : t.value }))
+      tags.map((t) => ({ ...t, value: t.id === tag.id ? value : t.value })),
     );
   };
 
@@ -85,113 +94,116 @@ export default function Search() {
   }, [type]);
 
   return (
-    <div className="shadow-[0px_0px_20px_0px_#000] shadow-muted-foreground/30 rounded-xl w-full sm:flex-row flex flex-col sm:items-start">
-      {/* LEFT BUTTONS */}
-      <div className="flex sm:grid sm:grid-rows-2 sm:-mr-3 sm:pr-2 relative z-0 bg-[#e8e8e8] rounded-l-xl sm:h-[72px] h-10 overflow-hidden">
-        <button
-          className={cn(
-            "h-full w-full flex sm:pl-0 items-center gap-2 sm:px-4 pr-8 py-1 rounded-none cursor-pointer font-semibold pl-5",
-            type === "single" ? "bg-secondary text-white" : ""
-          )}
-          onClick={() => handleSetType("single")}
-        >
-          <Icons name="single-search" width={28} height={28} />
-          <span className="sm:text-[1rem] text-[0.8rem] sm:font-bold">
-            Single Search
-          </span>
-          <Icons
-            name="chevron-right"
-            width={10}
-            height={28}
-            className="ml-auto"
-          />
-        </button>
-
-        <button
-          className={cn(
-            "h-full w-full pl-5 sm:pl-0 flex items-center gap-2 sm:px-4 pr-8 py-1 rounded-none cursor-pointer font-semibold",
-            type === "multiple" ? "bg-secondary text-white" : ""
-          )}
-          onClick={() => handleSetType("multiple")}
-        >
-          <Icons name="multiple-search" width={28} height={28} />
-          <span className="sm:text-[1rem] text-[0.7rem] sm:font-bold">
-            Multiple Search
-          </span>
-          <Icons
-            name="chevron-right"
-            width={10}
-            height={28}
-            className="ml-auto"
-          />
-        </button>
-      </div>
-
-      {/* INPUT + BUTTON */}
-      <div className="flex-1 relative z-10 bg-white rounded-xl flex flex-col overflow-hidden">
-        <div className="flex items-center pr-6 sm:h-18 h-13">
-          <form className="flex-1" onSubmit={handleSubmit}>
-            <input
-              type="text"
-              placeholder={placeholder}
-              name="search"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className="w-full px-5 text-lg outline-none placeholder:text-lg h-12"
+    <div className="w-full flex flex-col gap-3">
+      {/* SEARCH BAR */}
+      <div className="shadow-[0px_0px_20px_0px_#000] shadow-muted-foreground/30 rounded-xl w-full sm:flex-row flex flex-col sm:items-start">
+        {/* LEFT BUTTONS */}
+        <div className="flex sm:grid sm:grid-rows-2 sm:-mr-3 sm:pr-2 relative z-0 bg-[#e8e8e8] rounded-l-xl sm:h-[72px] h-10 overflow-hidden">
+          <button
+            className={cn(
+              "h-full w-full flex sm:pl-0 items-center gap-2 sm:px-4 pr-8 py-1 rounded-none cursor-pointer font-semibold pl-5",
+              type === "single" ? "bg-secondary text-white" : "",
+            )}
+            onClick={() => handleSetType("single")}
+          >
+            <Icons name="single-search" width={28} height={28} />
+            <span className="sm:text-[1rem] text-[0.8rem] sm:font-bold">
+              Single Search
+            </span>
+            <Icons
+              name="chevron-right"
+              width={10}
+              height={28}
+              className="ml-auto"
             />
-          </form>
+          </button>
 
           <button
-            onClick={handleSearch}
             className={cn(
-              "p-2 bg-secondary rounded-full",
-              type === "single" && value.trim().length < 4
-                ? "opacity-50 pointer-events-none"
-                : "cursor-pointer"
+              "h-full w-full pl-5 sm:pl-0 flex items-center gap-2 sm:px-4 pr-8 py-1 rounded-none cursor-pointer font-semibold",
+              type === "multiple" ? "bg-secondary text-white" : "",
             )}
-            aria-disabled={type === "single" && value.trim().length < 4}
+            onClick={() => handleSetType("multiple")}
           >
+            <Icons name="multiple-search" width={28} height={28} />
+            <span className="sm:text-[1rem] text-[0.7rem] sm:font-bold">
+              Multiple Search
+            </span>
             <Icons
-              className="text-white"
-              width={20}
-              height={20}
-              name="search"
+              name="chevron-right"
+              width={10}
+              height={28}
+              className="ml-auto"
             />
           </button>
         </div>
 
-        {/* TAGS */}
-        {tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto px-5 py-2">
-            {tags.map((tag) => (
-              <div
-                key={tag.id}
-                className="bg-[#ddd] text-black rounded-lg pl-2 pr-1 py-0.5"
-              >
-                <input
-                  type="text"
-                  disabled={!tag.editable}
-                  value={tag.value}
-                  onChange={(e) => handleChangeTagValue(tag, e.target.value)}
-                  onDoubleClick={() => handleDoubleClick(tag)}
-                  className="outline-none bg-transparent px-0 py-0"
-                  style={{
-                    width: `${tag.value.length || 1}ch`,
-                    minWidth: "2ch",
-                    maxWidth: "100%",
-                  }}
-                />
-                <button
-                  className="cursor-pointer hover:bg-red-500/20 rounded-full p-1"
-                  onClick={() => removeTag(tag)}
-                >
-                  <Icons name="x" width={10} height={10} />
-                </button>
-              </div>
-            ))}
+        {/* INPUT + BUTTON */}
+        <div className="flex-1 relative z-10 bg-white rounded-xl overflow-hidden">
+          <div className="flex items-center pr-6 sm:h-18 h-13">
+            <form className="flex-1" onSubmit={handleSubmit}>
+              <input
+                type="text"
+                placeholder={placeholder}
+                name="search"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                className="w-full px-5 text-lg outline-none placeholder:text-lg h-12"
+              />
+            </form>
+
+            <button
+              onClick={handleSearch}
+              className={cn(
+                "p-2 bg-secondary rounded-full",
+                type === "single" && value.trim().length < 4
+                  ? "opacity-50 pointer-events-none"
+                  : "cursor-pointer",
+              )}
+              aria-disabled={type === "single" && value.trim().length < 4}
+            >
+              <Icons
+                className="text-white"
+                width={20}
+                height={20}
+                name="search"
+              />
+            </button>
           </div>
-        )}
+        </div>
       </div>
+
+      {/* TAGS — rendered below the search bar */}
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-2 px-2 sm:pl-[13rem] bg-white sm:bg-transparent">
+          {tags.map((tag) => (
+            <div
+              key={tag.id}
+              className="bg-[#ddd] text-black rounded-lg pl-2 pr-1 py-0.5"
+            >
+              <input
+                type="text"
+                disabled={!tag.editable}
+                value={tag.value}
+                onChange={(e) => handleChangeTagValue(tag, e.target.value)}
+                onDoubleClick={() => handleDoubleClick(tag)}
+                className="outline-none bg-transparent px-0 py-0"
+                style={{
+                  width: `${tag.value.length || 1}ch`,
+                  minWidth: "2ch",
+                  maxWidth: "100%",
+                }}
+              />
+              <button
+                className="cursor-pointer hover:bg-red-500/20 rounded-full p-1"
+                onClick={() => removeTag(tag)}
+              >
+                <Icons name="x" width={10} height={10} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
