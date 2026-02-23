@@ -7,7 +7,8 @@ import { useEffect, useState, useRef } from "react";
 import SingleProdCard from "@/components/single-prod-cart";
 import { useProductsStore } from "@/store/products-store";
 import { Button } from "@/components/ui/button";
-import { Search, Share2, X } from "lucide-react";
+import { Image as ImageIcon, Search, Share2, X } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import {
   Sheet,
   SheetTrigger,
@@ -229,6 +230,7 @@ export default function ProductsPage() {
   const totalPages = Math.ceil(total / perPage);
 
   const [showRequestModal, setShowRequestModal] = useState(false);
+  const [requestTerm, setRequestTerm] = useState("");
   const requestMsgRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
@@ -522,103 +524,159 @@ export default function ProductsPage() {
             <div className="w-10 h-10 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : searchTerm && products.length === 0 ? (
-          <div className="w-full py-24 flex flex-col items-center justify-center">
-            <h2 className="text-4xl font-bold">Out of stock</h2>
-            <p className="text-sm text-muted-foreground mt-2">
-              We couldn&apos;t find &quot;{searchTerm}&quot; in our available
-              stock.
-            </p>
+          <div className="w-full">
+            {/* Section header */}
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-[#1f1f1f]">
+                Not found in stock
+              </h2>
+              <p className="text-sm text-muted-foreground mt-2">
+                The following item(s) are not currently available. Request them
+                below.
+              </p>
+            </div>
 
-            <div className="mt-6 flex gap-4">
-              {/* Desktop: show modal */}
-              <div className="hidden md:block">
-                <Button
-                  className="bg-white text-secondary border"
-                  onClick={() => setShowRequestModal(true)}
-                >
-                  Request product
-                </Button>
-              </div>
-
-              {/* Mobile: Sheet trigger */}
-              <div className="md:hidden">
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button className="bg-white text-secondary border">
-                      Request product
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="max-w-lg">
-                    <SheetHeader>
-                      <SheetTitle>Request product: {searchTerm}</SheetTitle>
-                    </SheetHeader>
-
-                    <div className="p-4">
-                      <label className="block font-medium mb-2">Details</label>
-                      <Textarea
-                        id="product-request-message"
-                        defaultValue={`I'm looking for: ${searchTerm}`}
-                      />
+            {/* One card per search term — same grid as product listing */}
+            <div
+              className="
+          grid 
+          grid-cols-1 
+          sm:grid-cols-2 
+          md:grid-cols-3 
+          lg:grid-cols-4 
+          gap-6 
+          place-items-center
+        "
+            >
+              {String(searchTerm)
+                .split(",")
+                .map((t) => t.trim())
+                .filter(Boolean)
+                .map((term) => (
+                  <Card
+                    key={term}
+                    className="shadow-none bg-white flex flex-col gap-0 rounded-md w-full p-0 border-2 h-full"
+                  >
+                    {/* Placeholder image area */}
+                    <div className="relative w-full rounded-t-[inherit] h-36 md:h-56 lg:h-64 bg-muted/30 flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <ImageIcon size={48} strokeWidth={1.2} />
+                      </div>
                     </div>
 
-                    <SheetFooter>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={async () => {
-                            try {
-                              const ta = document.getElementById(
-                                "product-request-message",
-                              ) as HTMLTextAreaElement | null;
-                              const message = ta
-                                ? ta.value
-                                : `I'm looking for ${searchTerm}`;
-                              const resp = await fetch(
-                                `/api/requests/product`,
-                                {
-                                  method: "POST",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                  },
-                                  body: JSON.stringify({
-                                    query: searchTerm,
-                                    message,
-                                  }),
-                                },
-                              );
-                              if (resp.ok) {
-                                toast.success("Request submitted");
-                                const close = document.querySelector(
-                                  '[data-slot="sheet-close"]',
-                                ) as HTMLElement | null;
-                                if (close) close.click();
-                              } else {
-                                toast.error("Failed to submit request");
-                              }
-                            } catch (e) {
-                              console.error(e);
-                              toast.error("Failed to submit request");
-                            }
-                          }}
-                        >
-                          Send request
-                        </Button>
+                    {/* Card body */}
+                    <div className="flex flex-col bg-white gap-3 p-4 flex-1">
+                      {/* Code / term */}
+                      <p className="font-extrabold text-2xl md:text-3xl leading-none text-[#1f1f1f] break-all">
+                        {term}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Not available in current stock
+                      </p>
 
-                        <Button
-                          variant="ghost"
-                          onClick={() => {
-                            const close = document.querySelector(
-                              '[data-slot="sheet-close"]',
-                            ) as HTMLElement | null;
-                            if (close) close.click();
-                          }}
-                        >
-                          Cancel
-                        </Button>
+                      {/* Get Request button — desktop opens modal, mobile opens sheet */}
+                      <div className="mt-auto pt-3">
+                        {/* Desktop */}
+                        <div className="hidden md:block">
+                          <Button
+                            className="w-full bg-secondary text-white font-semibold"
+                            onClick={() => {
+                              setRequestTerm(term);
+                              setShowRequestModal(true);
+                            }}
+                          >
+                            Get Request
+                          </Button>
+                        </div>
+
+                        {/* Mobile */}
+                        <div className="md:hidden">
+                          <Sheet>
+                            <SheetTrigger asChild>
+                              <Button
+                                className="w-full bg-secondary text-white font-semibold"
+                                onClick={() => setRequestTerm(term)}
+                              >
+                                Get Request
+                              </Button>
+                            </SheetTrigger>
+                            <SheetContent side="right" className="max-w-lg">
+                              <SheetHeader>
+                                <SheetTitle>Request product: {term}</SheetTitle>
+                              </SheetHeader>
+                              <div className="p-4">
+                                <label className="block font-medium mb-2">
+                                  Details
+                                </label>
+                                <Textarea
+                                  id={`product-request-message-${term}`}
+                                  defaultValue={`I'm looking for: ${term}`}
+                                />
+                              </div>
+                              <SheetFooter>
+                                <div className="flex gap-2">
+                                  <Button
+                                    onClick={async () => {
+                                      try {
+                                        const ta = document.getElementById(
+                                          `product-request-message-${term}`,
+                                        ) as HTMLTextAreaElement | null;
+                                        const message = ta
+                                          ? ta.value
+                                          : `I'm looking for ${term}`;
+                                        const resp = await fetch(
+                                          `/api/requests/product`,
+                                          {
+                                            method: "POST",
+                                            headers: {
+                                              "Content-Type":
+                                                "application/json",
+                                            },
+                                            body: JSON.stringify({
+                                              query: term,
+                                              message,
+                                            }),
+                                          },
+                                        );
+                                        if (resp.ok) {
+                                          toast.success("Request submitted");
+                                          const close = document.querySelector(
+                                            '[data-slot="sheet-close"]',
+                                          ) as HTMLElement | null;
+                                          if (close) close.click();
+                                        } else {
+                                          toast.error(
+                                            "Failed to submit request",
+                                          );
+                                        }
+                                      } catch (e) {
+                                        console.error(e);
+                                        toast.error("Failed to submit request");
+                                      }
+                                    }}
+                                  >
+                                    Send request
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    onClick={() => {
+                                      const close = document.querySelector(
+                                        '[data-slot="sheet-close"]',
+                                      ) as HTMLElement | null;
+                                      if (close) close.click();
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </SheetFooter>
+                            </SheetContent>
+                          </Sheet>
+                        </div>
                       </div>
-                    </SheetFooter>
-                  </SheetContent>
-                </Sheet>
-              </div>
+                    </div>
+                  </Card>
+                ))}
             </div>
 
             {/* Desktop modal overlay */}
@@ -628,35 +686,31 @@ export default function ProductsPage() {
                   className="absolute inset-0 bg-black/50"
                   onClick={() => setShowRequestModal(false)}
                 />
-
                 <div className="bg-white rounded-lg max-w-lg w-full z-10 p-6">
                   <h3 className="text-lg font-semibold mb-2">
-                    Request product: {searchTerm}
+                    Request product: {requestTerm}
                   </h3>
                   <label className="block font-medium mb-2">Details</label>
                   <textarea
+                    key={requestTerm}
                     id="product-request-message-desktop"
-                    defaultValue={`I'm looking for: ${searchTerm}`}
+                    defaultValue={`I'm looking for: ${requestTerm}`}
                     ref={requestMsgRef}
                     className="border-input w-full rounded-md px-3 py-2 mb-4"
                     rows={6}
                   />
-
                   <div className="flex gap-2 justify-end">
                     <Button
                       onClick={async () => {
                         try {
-                          const ta = document.getElementById(
-                            "product-request-message-desktop",
-                          ) as HTMLTextAreaElement | null;
-                          const message = ta
-                            ? ta.value
-                            : `I'm looking for ${searchTerm}`;
+                          const message = requestMsgRef.current
+                            ? requestMsgRef.current.value
+                            : `I'm looking for ${requestTerm}`;
                           const resp = await fetch(`/api/requests/product`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                              query: searchTerm,
+                              query: requestTerm,
                               message,
                             }),
                           });
@@ -674,7 +728,6 @@ export default function ProductsPage() {
                     >
                       Send request
                     </Button>
-
                     <Button
                       variant="ghost"
                       onClick={() => setShowRequestModal(false)}

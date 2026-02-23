@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
       brand = "",
       competitor = "",
       stockStatus = "",
+      instock = "",
       location = "",
     } = Object.fromEntries(req.nextUrl.searchParams) as Record<string, string>;
 
@@ -184,6 +185,17 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // In-stock filter: only products with at least one variant having inventory_quantity > 0
+    if (instock === "IN") {
+      metafieldConditions.push({
+        "raw.variants": {
+          $elemMatch: {
+            inventory_quantity: { $gt: 0 },
+          },
+        },
+      } as any);
+    }
+
     // Location filter (stock_location metafield)
     if (location) {
       const locationRegex = new RegExp(location, "i");
@@ -226,7 +238,7 @@ export async function GET(req: NextRequest) {
     const sliceStart = ((pageNum - 1) * limitNum) % batchNum;
     const results = batchResults.slice(
       sliceStart,
-      sliceStart + limitNum
+      sliceStart + limitNum,
     ) as any[];
 
     const total = await Product.countDocuments(finalQuery);
@@ -314,7 +326,7 @@ export async function GET(req: NextRequest) {
     console.error("Products API error:", err);
     return NextResponse.json(
       { ok: false, error: (err as Error).message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

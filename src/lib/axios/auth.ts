@@ -6,7 +6,7 @@ import { Api, handleAxiosError } from "./instance";
 
 class Auth {
   subscribe = async (
-    values: z.infer<typeof subscribeSchema>
+    values: z.infer<typeof subscribeSchema>,
   ): Promise<{ message: string } | undefined> => {
     try {
       const parsed = subscribeSchema.safeParse(values);
@@ -30,13 +30,11 @@ class Auth {
 
       if (response.data.user) {
         useSessionStore.getState().setUser(response.data.user);
-        // also set customer tags + tier into session store when provided
-        if (response.data.user.tags) {
-          useSessionStore.getState().setCustomerTags(response.data.user.tags);
-          useSessionStore
-            .getState()
-            .setTierTag(response.data.user.tier ?? null);
-        }
+        // always sync tags + tier so removals (empty/null) are reflected in the store
+        useSessionStore
+          .getState()
+          .setCustomerTags(response.data.user.tags ?? null);
+        useSessionStore.getState().setTierTag(response.data.user.tier ?? null);
       }
 
       return response.data;
@@ -53,10 +51,9 @@ class Auth {
       const { user } = response.data;
       if (user) {
         useSessionStore.getState().setUser(user);
-        if (user.tags) {
-          useSessionStore.getState().setCustomerTags(user.tags);
-          useSessionStore.getState().setTierTag(user.tier ?? null);
-        }
+        // always sync tags + tier so removals (empty/null) are reflected in the store
+        useSessionStore.getState().setCustomerTags(user.tags ?? null);
+        useSessionStore.getState().setTierTag(user.tier ?? null);
       }
 
       return response.data;

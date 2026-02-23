@@ -52,6 +52,7 @@ export default function SingleProdCard({
   productRaw,
 }: ProductCardProps) {
   const addToCart = useSessionStore((s) => s.addToCart);
+  const cart = useSessionStore((s) => s.cart);
 
   // use string so user can clear the field while typing (e.g. replace "1" with "300")
   const [qty, setQty] = useState<string>("1");
@@ -644,13 +645,39 @@ export default function SingleProdCard({
                   <button
                     onClick={async () => {
                       try {
+                        const desiredQty = Number(qty || 1);
+
+                        // Stock cap: account for items already in cart
+                        if (typeof displayedStock === "number") {
+                          const avail = displayedStock;
+                          const existingInCart =
+                            cart.find((p) => p.id === String(code))?.quantity ??
+                            0;
+                          const remaining = avail - existingInCart;
+
+                          if (remaining <= 0) {
+                            toast.warning(
+                              "Maximum available stock is already in your cart",
+                            );
+                            return;
+                          }
+
+                          if (desiredQty > remaining) {
+                            setQty(String(remaining));
+                            toast.warning(
+                              `Quantity reduced to ${remaining} (maximum remaining stock). Please click Add to Cart again.`,
+                            );
+                            return;
+                          }
+                        }
+
                         if (variantId) {
                           const resp = await fetch("/api/cart/add", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
                               merchandiseId: variantId,
-                              quantity: Number(qty || 1),
+                              quantity: desiredQty,
                             }),
                           });
                           if (!resp.ok) {
@@ -665,7 +692,7 @@ export default function SingleProdCard({
                           title,
                           price: Number(tierPrice ?? Number(price)),
                           image,
-                          quantity: Number(qty || 1),
+                          quantity: desiredQty,
                           variantId: variantId ?? "",
                         });
                         toast.success("Product added to cart!");

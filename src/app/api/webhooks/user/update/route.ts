@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     try {
       console.log(
         "[webhook:user:update] parsed customer:",
-        JSON.stringify(customer)
+        JSON.stringify(customer),
       );
     } catch {
       console.log("[webhook:user:update] parsed customer (non-serializable)");
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     const metafields = await fetchCustomerMetafieldsREST(customer.id);
     console.log(
       "[webhook:user:update] fetched metafields:",
-      Array.isArray(metafields) ? metafields.length : typeof metafields
+      Array.isArray(metafields) ? metafields.length : typeof metafields,
     );
     try {
       console.log(JSON.stringify(metafields));
@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
           .map((s: any) =>
             String(s ?? "")
               .toLowerCase()
-              .trim()
+              .trim(),
           )
           .map((s) => s.replace(/[_\s]+/g, "-"));
 
@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
     if (!email) {
       console.warn(
         "Webhook: customer has no email, skipping user upsert",
-        customer.id
+        customer.id,
       );
       return NextResponse.json({ success: true });
     }
@@ -244,7 +244,7 @@ export async function POST(req: NextRequest) {
         creditLimit: toDecimalString(creditLimitNum),
         creditUsed: toDecimalString(creditUsedNum),
         creditRemaining: toDecimalString(creditRemainingNum),
-        shopifyTags: tags && tags.length > 0 ? tags : undefined,
+        shopifyTags: tags,
         tier: tierTag ?? null,
       },
       create: {
@@ -269,7 +269,7 @@ export async function POST(req: NextRequest) {
         creditLimit: toDecimalString(creditLimitNum),
         creditUsed: toDecimalString(creditUsedNum),
         creditRemaining: toDecimalString(creditRemainingNum),
-        shopifyTags: tags && tags.length > 0 ? tags : undefined,
+        shopifyTags: tags,
         tier: tierTag ?? null,
       },
     });

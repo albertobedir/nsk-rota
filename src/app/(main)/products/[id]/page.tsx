@@ -1,3 +1,4 @@
+/* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -18,6 +19,13 @@ import {
 } from "@/components/ui/carousel";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 /* ---------------------- STATIC DATA ---------------------- */
 
@@ -96,6 +104,7 @@ const TECH_INFO: TechInfoRow[] = [
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const addToCart = useSessionStore((s) => s.addToCart);
+  const cart = useSessionStore((s) => s.cart);
   // hook for computing tier discounts — must be called unconditionally
   const getDiscountForTier = useSessionStore((s) => s.getDiscountForTier);
   const tierTag = useSessionStore((s) => s.tierTag);
@@ -144,8 +153,10 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [inchMode, setInchMode] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);
+  const [showAllModels, setShowAllModels] = useState(false);
   // use string so user can clear the input while typing (e.g. replace "1" with "300")
   const [qty, setQty] = useState<string>("1");
+  const [stockModalOpen, setStockModalOpen] = useState(false);
 
   /* Components state (moved up to avoid conditional hook calls) */
   const [componentsProducts, setComponentsProducts] = useState<
@@ -162,19 +173,30 @@ export default function ProductDetailPage() {
       try {
         setComponentsLoading(true);
 
+        // 1) Try metafield with key ending in "comp"
         const compsField = product.raw?.metafields?.find((m) =>
           /comp$/i.test(m.key),
         );
-        if (!compsField) {
-          if (mounted) setComponentsProducts([]);
-          return;
-        }
+
+        // 2) Fall back to raw.Components direct field (e.g. from products.json sync)
+        const rawAny = product.raw as any;
+        const directComponents: unknown[] | null =
+          Array.isArray(rawAny?.Components) && rawAny.Components.length > 0
+            ? rawAny.Components
+            : null;
 
         let parsed: unknown[] = [];
-        try {
-          parsed = JSON.parse(compsField.value) as unknown[];
-        } catch {
-          parsed = [];
+        if (compsField) {
+          try {
+            parsed = JSON.parse(compsField.value) as unknown[];
+          } catch {
+            parsed = [];
+          }
+        } else if (directComponents) {
+          parsed = directComponents;
+        } else {
+          if (mounted) setComponentsProducts([]);
+          return;
         }
 
         const results: { prod: IProduct; qty: number }[] = [];
@@ -232,18 +254,31 @@ export default function ProductDetailPage() {
           if (!Number.isNaN(q)) avail = q;
         }
         if (avail === undefined) {
-          const q = Number(
-            firstVariant?.inventory_quantity ??
-              firstVariant?.inventory_quantity ??
-              0,
-          );
+          const q = Number(firstVariant?.inventory_quantity ?? 0);
           if (!Number.isNaN(q)) avail = q;
         }
 
-        if (avail !== undefined && desiredQty > avail) {
-          desiredQty = avail;
-          setQty(String(desiredQty));
-          toast.warning("Quantity capped to available stock");
+        if (avail !== undefined) {
+          // Account for quantity already in the cart so total never exceeds stock
+          const itemId = rotaNo || String(id);
+          const existingInCart =
+            cart.find((p) => p.id === itemId)?.quantity ?? 0;
+          const remaining = avail - existingInCart;
+
+          if (remaining <= 0) {
+            toast.warning("Maximum available stock is already in your cart");
+            setAddingToCart(false);
+            return;
+          }
+
+          if (desiredQty > remaining) {
+            setQty(String(remaining));
+            toast.warning(
+              `Quantity reduced to ${remaining} (maximum remaining stock). Please click Add to Cart again.`,
+            );
+            setAddingToCart(false);
+            return;
+          }
         }
       } catch {
         // ignore
@@ -271,7 +306,7 @@ export default function ProductDetailPage() {
         price: Number(tierPrice ?? Number(price)),
         image,
         variantId,
-        quantity: Number(qty || 1),
+        quantity: desiredQty,
       });
 
       toast.success("Product added to cart!");
@@ -404,6 +439,34 @@ export default function ProductDetailPage() {
     // ignore
   }
   const image = raw.images?.[0]?.src ?? "";
+
+  // Build display images from raw.images, moving the "rota no" image to index 0.
+  // The rota-no image is identified by its src containing /files/ followed by 4+ digits
+  // (e.g. "…/files/29016005.jpg").
+  const displayImages: ShopifyImage[] = (() => {
+    try {
+      const imgs = raw.images;
+      if (Array.isArray(imgs) && imgs.length > 0) {
+        if (imgs.length > 1) {
+          const matchedIdx = imgs.findIndex((it) => {
+            const src = String((it as any)?.src || "");
+            return /\/files\/\d{4,}/.test(src);
+          });
+          if (matchedIdx > 0) {
+            const ordered = [...imgs];
+            const [found] = ordered.splice(matchedIdx, 1);
+            ordered.unshift(found);
+            return ordered;
+          }
+        }
+        return imgs;
+      }
+    } catch {
+      // ignore – fall through
+    }
+    return [{ src: image }];
+  })();
+
   // derived availability for controls: treat 0 as out-of-stock
   const pageMaxAvailable =
     typeof displayedStock === "number"
@@ -502,6 +565,7 @@ export default function ProductDetailPage() {
   const technicalRows = getTechnicalRows(raw.metafields);
   // Extract ALL brand names — check raw.Brands directly first (Mongoose Mixed),
   // then fall back to the brand_info metafield.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const brandsList = (() => {
     try {
       const rawAny = raw as any;
@@ -561,7 +625,7 @@ export default function ProductDetailPage() {
     <div className="lg:hidden mb-8">
       <Carousel className="w-full">
         <CarouselContent>
-          {(raw.images.length ? raw.images : [{ src: image }]).map((img, i) => (
+          {displayImages.map((img, i) => (
             <CarouselItem key={i} className="min-h-[300px] md:min-h-[450px]">
               <div className="relative w-full h-[300px] md:h-[450px]">
                 {!img.src ? (
@@ -640,7 +704,7 @@ export default function ProductDetailPage() {
   console.log(product);
 
   return (
-    <div className="w-full">
+    <>
       {/* PAGE TOP - smaller header */}
       <div className="bg-[#f3f3f3] hidden md:flex">
         <div className="w-full max-w-[1500px] flex-col md:flex-row gap-2  px-6 sm:px-25 mx-auto flex items-center justify-between py-10">
@@ -735,57 +799,50 @@ export default function ProductDetailPage() {
 
           {/* ADD TO CART */}
           <div className="mt-4">
-            <div
-              className={`flex w-full border-2 ${
-                pageOutOfStock
-                  ? "border-muted-foreground/30"
-                  : "border-secondary"
-              } rounded-md overflow-hidden`}
-            >
-              {(() => {
-                const maxAvailable = pageMaxAvailable;
-                const outOfStock = pageOutOfStock;
+            {(() => {
+              const noStockInfo = pageMaxAvailable === undefined;
+              const isGetStock = pageOutOfStock || noStockInfo;
 
+              if (isGetStock) {
                 return (
-                  <>
-                    <input
-                      type="number"
-                      min={1}
-                      max={maxAvailable}
-                      disabled={outOfStock}
-                      value={qty}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v === "") return setQty("");
-                        const n = Number(v);
-                        const cap = maxAvailable ?? Number.POSITIVE_INFINITY;
-                        const parsed = Number.isNaN(n) ? 1 : n;
-                        const final = Math.max(1, Math.min(parsed, cap));
-                        setQty(String(final));
-                      }}
-                      className="w-28 h-14 px-3 text-center bg-white border-none outline-none disabled:opacity-50"
-                      aria-label="Quantity"
-                    />
-
-                    <Button
-                      onClick={handleAddToCart}
-                      className={`flex-1 font-bold h-14 ${
-                        outOfStock
-                          ? "bg-gray-300 text-gray-700 cursor-not-allowed"
-                          : "bg-secondary text-white"
-                      }`}
-                      disabled={addingToCart || outOfStock}
-                    >
-                      {outOfStock
-                        ? "Out of Stock"
-                        : addingToCart
-                          ? "Adding..."
-                          : "ADD TO CART"}
-                    </Button>
-                  </>
+                  <button
+                    onClick={() => setStockModalOpen(true)}
+                    className="w-full h-14 font-bold bg-secondary text-white rounded-md hover:brightness-110 transition"
+                  >
+                    Get Stock
+                  </button>
                 );
-              })()}
-            </div>
+              }
+
+              return (
+                <div className="flex w-full border-2 border-secondary rounded-md overflow-hidden">
+                  <input
+                    type="number"
+                    min={1}
+                    max={pageMaxAvailable}
+                    value={qty}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "") return setQty("");
+                      const n = Number(v);
+                      const cap = pageMaxAvailable ?? Number.POSITIVE_INFINITY;
+                      const parsed = Number.isNaN(n) ? 1 : n;
+                      const final = Math.max(1, Math.min(parsed, cap));
+                      setQty(String(final));
+                    }}
+                    className="w-28 h-14 px-3 text-center bg-white border-none outline-none"
+                    aria-label="Quantity"
+                  />
+                  <Button
+                    onClick={handleAddToCart}
+                    className="flex-1 font-bold h-14 bg-secondary text-white"
+                    disabled={addingToCart}
+                  >
+                    {addingToCart ? "Adding..." : "ADD TO CART"}
+                  </Button>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Suitable for */}
@@ -867,15 +924,9 @@ export default function ProductDetailPage() {
                 const compField = raw.metafields?.find((m) =>
                   /competitor_info/i.test(m.key),
                 );
-                const compsField = raw.metafields?.find((m) =>
-                  /comp$/i.test(m.key),
-                );
 
                 const competitors = compField
                   ? (JSON.parse(compField.value) as unknown[])
-                  : ([] as unknown[]);
-                const components = compsField
-                  ? (JSON.parse(compsField.value) as unknown[])
                   : ([] as unknown[]);
 
                 const getFirst = (
@@ -893,7 +944,7 @@ export default function ProductDetailPage() {
                   <div className="mt-4 space-y-3 text-lg">
                     {competitors.length > 0 && (
                       <div>
-                        {competitors.map((c, i) => {
+                        {competitors.slice(0, 5).map((c, i) => {
                           const obj = c as Record<string, unknown>;
                           return (
                             <div
@@ -916,26 +967,7 @@ export default function ProductDetailPage() {
                       </div>
                     )}
 
-                    {components.length > 0 && (
-                      <div>
-                        {components.map((c, i) => {
-                          const obj = c as Record<string, unknown>;
-                          return (
-                            <div
-                              key={`c-${i}`}
-                              className="flex justify-between"
-                            >
-                              <span className="font-semibold">Component</span>
-                              <span>
-                                {getFirst(obj, ["ComponentNo", "ReferansView"])}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {!competitors.length && !components.length && (
+                    {!competitors.length && (
                       <div className="text-sm text-muted-foreground">
                         No references available
                       </div>
@@ -962,29 +994,27 @@ export default function ProductDetailPage() {
           {/* DESKTOP CAROUSEL — FIXED */}
           <Carousel className="w-full">
             <CarouselContent>
-              {(raw.images.length ? raw.images : [{ src: image }]).map(
-                (img, i) => (
-                  <CarouselItem key={i} className="min-h-[450px]">
-                    <div className="relative w-full h-[450px]">
-                      {!img.src ? (
-                        <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5">
-                          <ImageIcon
-                            size={80}
-                            className="text-muted-foreground"
-                          />
-                        </div>
-                      ) : (
-                        <Image
-                          src={img.src}
-                          alt={title}
-                          fill
-                          className="object-contain"
+              {displayImages.map((img, i) => (
+                <CarouselItem key={i} className="min-h-[450px]">
+                  <div className="relative w-full h-[450px]">
+                    {!img.src ? (
+                      <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5">
+                        <ImageIcon
+                          size={80}
+                          className="text-muted-foreground"
                         />
-                      )}
-                    </div>
-                  </CarouselItem>
-                ),
-              )}
+                      </div>
+                    ) : (
+                      <Image
+                        src={img.src}
+                        alt={title}
+                        fill
+                        className="object-contain"
+                      />
+                    )}
+                  </div>
+                </CarouselItem>
+              ))}
             </CarouselContent>
             <CarouselPrevious className="left-2" />
             <CarouselNext className="right-2" />
@@ -1010,7 +1040,19 @@ export default function ProductDetailPage() {
             <div className="flex flex-col sm:flex-row sm:justify-start items-start gap-4 mt-6">
               {componentsProducts.map(({ prod, qty }) => {
                 const cp = prod as IProduct;
-                const img = cp.raw.images?.[0]?.src ?? "";
+                const img = (() => {
+                  const imgs = cp.raw.images;
+                  if (Array.isArray(imgs) && imgs.length > 0) {
+                    if (imgs.length > 1) {
+                      const matched = imgs.find((it) =>
+                        /\/files\/\d{4,}/.test(String((it as any)?.src || "")),
+                      );
+                      if (matched) return String((matched as any).src || "");
+                    }
+                    return String((imgs[0] as any)?.src || "");
+                  }
+                  return "";
+                })();
                 const cpRota = extractRotaNo(cp.raw.metafields);
 
                 const href = `/products/${cp.shopifyId ?? cp._id}`;
@@ -1101,53 +1143,139 @@ export default function ProductDetailPage() {
             <span className="flex-1">Type</span>
           </div>
 
-          {SUITABLE_MODELS.map((row, i) => (
-            <div key={i}>
-              {/* Desktop */}
-              <div className="hidden md:flex bg-gray-100 py-4 px-3 mt-3 rounded-md text-sm">
-                <span className="flex-1 font-semibold">{row.brand}</span>
-                <span className="flex-2 font-semibold whitespace-pre-line">
-                  {row.model}
-                </span>
-                <span className="flex-[0.7]">{row.year}</span>
-                <span className="flex-[0.7]">{row.kw}</span>
-                <span className="flex-[0.7] font-semibold">{row.hp}</span>
-                <span className="flex-[0.8]">{row.className}</span>
-                <span className="flex-1 font-semibold">{row.type}</span>
-              </div>
-
-              {/* Mobile */}
-              <div className="md:hidden bg-gray-100 p-4 rounded-lg mt-4 text-sm space-y-2">
-                <div className="font-bold">{row.brand}</div>
-                <div className="font-semibold whitespace-pre-line leading-tight">
-                  {row.model}
+          {(showAllModels ? SUITABLE_MODELS : SUITABLE_MODELS.slice(0, 3)).map(
+            (row, i) => (
+              <div key={i}>
+                {/* Desktop */}
+                <div className="hidden md:flex bg-gray-100 py-4 px-3 mt-3 rounded-md text-sm">
+                  <span className="flex-1 font-semibold">{row.brand}</span>
+                  <span className="flex-2 font-semibold whitespace-pre-line">
+                    {row.model}
+                  </span>
+                  <span className="flex-[0.7]">{row.year}</span>
+                  <span className="flex-[0.7]">{row.kw}</span>
+                  <span className="flex-[0.7] font-semibold">{row.hp}</span>
+                  <span className="flex-[0.8]">{row.className}</span>
+                  <span className="flex-1 font-semibold">{row.type}</span>
                 </div>
 
-                <div className="flex justify-between">
-                  <b>Year</b>
-                  <span>{row.year}</span>
-                </div>
-                <div className="flex justify-between">
-                  <b>Kw</b>
-                  <span>{row.kw}</span>
-                </div>
-                <div className="flex justify-between">
-                  <b>Hp</b>
-                  <span>{row.hp}</span>
-                </div>
-                <div className="flex justify-between">
-                  <b>Class</b>
-                  <span>{row.className}</span>
-                </div>
-                <div className="flex justify-between">
-                  <b>Type</b>
-                  <span>{row.type}</span>
+                {/* Mobile */}
+                <div className="md:hidden bg-gray-100 p-4 rounded-lg mt-4 text-sm space-y-2">
+                  <div className="font-bold">{row.brand}</div>
+                  <div className="font-semibold whitespace-pre-line leading-tight">
+                    {row.model}
+                  </div>
+
+                  <div className="flex justify-between">
+                    <b>Year</b>
+                    <span>{row.year}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <b>Kw</b>
+                    <span>{row.kw}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <b>Hp</b>
+                    <span>{row.hp}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <b>Class</b>
+                    <span>{row.className}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <b>Type</b>
+                    <span>{row.type}</span>
+                  </div>
                 </div>
               </div>
+            ),
+          )}
+
+          {SUITABLE_MODELS.length > 3 && (
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={() => setShowAllModels((prev) => !prev)}
+                className="flex flex-col items-center gap-1 text-sm text-muted-foreground hover:text-secondary transition-colors"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="28"
+                  height="28"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`transition-transform duration-300 ${
+                    showAllModels ? "rotate-180" : ""
+                  }`}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
             </div>
-          ))}
+          )}
         </div>
       )}
-    </div>
+      {/* GET STOCK DIALOG */}
+      <Dialog open={stockModalOpen} onOpenChange={setStockModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">
+              Request stock:{" "}
+              <span className="text-secondary">
+                {product?.raw?.title ?? rotaNo}
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="mt-2">
+            <p className="text-sm font-semibold text-gray-700 mb-2">Details</p>
+            <textarea
+              id="stock-request-message"
+              rows={4}
+              defaultValue={`I'm looking for: ${rotaNo}`}
+              className="w-full border border-gray-200 rounded-md p-3 text-sm text-secondary outline-none resize-y"
+            />
+          </div>
+
+          <DialogFooter className="flex gap-2 justify-end mt-2">
+            <Button
+              onClick={async () => {
+                try {
+                  const ta = document.getElementById(
+                    "stock-request-message",
+                  ) as HTMLTextAreaElement | null;
+                  const message = ta ? ta.value : `I'm looking for ${rotaNo}`;
+                  const resp = await fetch(`/api/requests/product`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      query: rotaNo,
+                      message,
+                    }),
+                  });
+                  if (resp.ok) {
+                    toast.success("Request submitted");
+                    setStockModalOpen(false);
+                  } else {
+                    toast.error("Failed to submit request");
+                  }
+                } catch (e) {
+                  console.error(e);
+                  toast.error("Failed to submit request");
+                }
+              }}
+            >
+              Send request
+            </Button>
+            <Button variant="ghost" onClick={() => setStockModalOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

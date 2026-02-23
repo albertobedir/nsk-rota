@@ -148,6 +148,23 @@ export default function Search() {
                 name="search"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
+                onPaste={(e) => {
+                  if (type !== "multiple") return;
+                  const pasted = e.clipboardData.getData("text");
+                  const parts = pasted
+                    .split(/[\s,]+/)
+                    .map((v) => v.trim())
+                    .filter(Boolean);
+                  if (parts.length === 0) return;
+                  e.preventDefault();
+                  const newTags = parts.map((v) => ({
+                    id: uuid(),
+                    value: v,
+                    editable: false,
+                  }));
+                  setTags((prev) => [...prev, ...newTags]);
+                  setValue("");
+                }}
                 className="w-full px-5 text-lg outline-none placeholder:text-lg h-12"
               />
             </form>

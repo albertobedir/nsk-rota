@@ -30,11 +30,17 @@ export async function POST(request: NextRequest) {
     // Normalize
     const lines = lineItems as IncomingLine[];
 
+    // Normalize customerId: strip GID prefix if present
+    // Webhook stores plain numeric id (e.g. "8356960632903") but client may
+    // send the full Shopify GID ("gid://shopify/Customer/8356960632903")
+    const normalizeShopifyId = (id: string) =>
+      id.includes("/") ? id.split("/").pop()! : id;
+
     // Server-side credit check: if customerId provided, ensure customer's creditRemaining covers cart total
     if (customerId) {
       try {
         const customer = await prisma.customer.findFirst({
-          where: { shopifyId: String(customerId) },
+          where: { shopifyId: normalizeShopifyId(String(customerId)) },
           select: { creditRemaining: true },
         });
         const remaining = Number(customer?.creditRemaining ?? 0);
@@ -45,6 +51,9 @@ export async function POST(request: NextRequest) {
             Number(li.customPrice ?? li.originalUnitPrice ?? 0) || 0;
           return sum + price * qty;
         }, 0);
+        console.log("Customer Credit:", remaining);
+        console.log("Cart Total:", computedTotal);
+        console.log("Line Items:", lines);
 
         if (computedTotal > remaining) {
           return NextResponse.json(
