@@ -4,26 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const { method } = req;
-  const res = NextResponse.next();
-
-  // Allow all origins (disable CORS restrictions)
-  res.headers.set("Access-Control-Allow-Origin", "*");
-  res.headers.set(
-    "Access-Control-Allow-Methods",
-    "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-  );
-  res.headers.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With",
-  );
-  res.headers.set("Access-Control-Allow-Credentials", "true");
-
-  // Handle preflight requests
-  if (method === "OPTIONS") {
-    return new NextResponse(null, { status: 204, headers: res.headers });
-  }
-
   // static & api dosyalarını atla
   if (
     pathname.startsWith("/api") ||

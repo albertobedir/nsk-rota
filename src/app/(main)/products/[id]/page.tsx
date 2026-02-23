@@ -921,57 +921,56 @@ export default function ProductDetailPage() {
 
             {(() => {
               try {
-                const compField = raw.metafields?.find((m) =>
-                  /competitor_info/i.test(m.key),
-                );
+                const rawAny = raw as any;
 
-                const competitors = compField
-                  ? (JSON.parse(compField.value) as unknown[])
-                  : ([] as unknown[]);
-
-                const getFirst = (
-                  obj: Record<string, unknown>,
-                  keys: string[],
-                ) => {
-                  for (const k of keys) {
-                    const v = obj[k];
-                    if (v != null && String(v) !== "") return String(v);
+                // 1) Direct raw.Oems field
+                let oems: Array<{ OemNo: string; MarkaDescription: string }> =
+                  [];
+                if (Array.isArray(rawAny?.Oems) && rawAny.Oems.length > 0) {
+                  oems = rawAny.Oems;
+                } else {
+                  // 2) Fall back to oem_info metafield
+                  const oemField = raw.metafields?.find((m) =>
+                    /oem_info/i.test(m.key),
+                  );
+                  if (oemField?.value) {
+                    const parsed = JSON.parse(oemField.value);
+                    oems = Array.isArray(parsed) ? parsed : [];
                   }
-                  return "";
-                };
+                }
+
+                if (oems.length === 0) {
+                  return (
+                    <div className="mt-4 text-sm text-muted-foreground">
+                      No references available
+                    </div>
+                  );
+                }
+
+                // Group OEM numbers by MarkaDescription
+                const grouped: Record<string, string[]> = {};
+                for (const oem of oems) {
+                  const brand = String(oem.MarkaDescription || "")
+                    .trim()
+                    .toUpperCase();
+                  const no = String(oem.OemNo || "").trim();
+                  if (!brand || !no) continue;
+                  if (!grouped[brand]) grouped[brand] = [];
+                  grouped[brand].push(no);
+                }
+
+                const entries = Object.entries(grouped);
 
                 return (
                   <div className="mt-4 space-y-3 text-lg">
-                    {competitors.length > 0 && (
-                      <div>
-                        {competitors.slice(0, 5).map((c, i) => {
-                          const obj = c as Record<string, unknown>;
-                          return (
-                            <div
-                              key={`comp-${i}`}
-                              className="flex justify-between"
-                            >
-                              <span className="font-semibold">
-                                {getFirst(obj, [
-                                  "CompetitorName",
-                                  "Competitor",
-                                  "CompetitorId",
-                                ])}
-                              </span>
-                              <span>
-                                {getFirst(obj, ["ReferansView", "Referans"])}
-                              </span>
-                            </div>
-                          );
-                        })}
+                    {entries.map(([brand, nos]) => (
+                      <div key={brand} className="flex justify-between gap-4">
+                        <span className="font-semibold shrink-0">{brand}</span>
+                        <span className="text-right break-all">
+                          {nos.join(" - ")}
+                        </span>
                       </div>
-                    )}
-
-                    {!competitors.length && (
-                      <div className="text-sm text-muted-foreground">
-                        No references available
-                      </div>
-                    )}
+                    ))}
                   </div>
                 );
               } catch {

@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Trash2 } from "lucide-react";
@@ -20,6 +21,7 @@ export default function BasketPage() {
 
   const clearCartStore = useSessionStore((s) => s.clearCart);
   const sessionUser = useSessionStore((s) => s.user);
+  const router = useRouter();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // map of itemId -> available stock (number)
@@ -84,6 +86,9 @@ export default function BasketPage() {
           if (invoiceUrl) {
             window.open(invoiceUrl, "_blank");
           }
+          await fetch("/api/cart/clear", { method: "POST" }).catch(() => null);
+          clearCartStore();
+          router.push("/profile/open-orders");
         }
       } catch (e) {
         console.error("Get offer failed:", e);

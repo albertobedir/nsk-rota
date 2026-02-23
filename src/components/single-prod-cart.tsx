@@ -3,6 +3,49 @@
 "use client";
 
 import React, { useState } from "react";
+
+// ── Singleton cache for DB pricing tiers ─────────────────────────────────────
+// Shared across all card instances so only ONE fetch fires per page, and
+// subsequent tierTag changes resolve from cache with zero network delay.
+type _TiersDbCache = {
+  tiers: any[] | null;
+  fetchedAt: number;
+  inflight: Promise<any[]> | null;
+};
+const _tiersDb: _TiersDbCache = { tiers: null, fetchedAt: 0, inflight: null };
+const TIERS_TTL_MS = 30_000; // 30 s — short enough to catch admin changes quickly
+
+function fetchPricingTiersDb(): Promise<any[]> {
+  const now = Date.now();
+  // Return cached data if still fresh
+  if (_tiersDb.tiers !== null && now - _tiersDb.fetchedAt < TIERS_TTL_MS) {
+    return Promise.resolve(_tiersDb.tiers);
+  }
+  // Deduplicate concurrent requests — share the in-flight promise
+  if (_tiersDb.inflight) return _tiersDb.inflight;
+
+  _tiersDb.inflight = fetch(`/api/pricing-tiers/db`)
+    .then((r) => r.json())
+    .then((json) => {
+      _tiersDb.tiers = json?.results ?? [];
+      _tiersDb.fetchedAt = Date.now();
+      _tiersDb.inflight = null;
+      return _tiersDb.tiers!;
+    })
+    .catch(() => {
+      _tiersDb.inflight = null;
+      return _tiersDb.tiers ?? [];
+    });
+
+  return _tiersDb.inflight;
+}
+// ── call this after an admin tier change to force a fresh fetch ──
+export function invalidatePricingTiersCache() {
+  _tiersDb.tiers = null;
+  _tiersDb.fetchedAt = 0;
+  _tiersDb.inflight = null;
+}
+// ─────────────────────────────────────────────────────────────────────────────
 import { Card } from "./ui/card";
 import Image from "next/image";
 import Link from "next/link";
@@ -201,38 +244,29 @@ export default function SingleProdCard({
     return image;
   })();
 
-  // Fetch pricing tiers from Prisma-backed API and log discount for current tierTag
+  // Fetch pricing tiers via shared module-level cache — only ONE request fires
+  // across all card instances. When tierTag changes the cache is read immediately
+  // so the price update is instant with no per-card network round-trip.
   React.useEffect(() => {
     let mounted = true;
-    (async () => {
-      try {
-        const resp = await fetch(`/api/pricing-tiers/db`);
-        const json = await resp.json().catch(() => null);
-        const tiers: any[] = json?.results || [];
-        const tag = tierTag ?? null;
-        if (!tag) {
-          console.log("[single-prod-cart] no tierTag present");
-          return;
-        }
-        const normalized = String(tag).toLowerCase().trim();
-        const found = tiers.find(
-          (t) =>
-            String(t.tierTag ?? "")
-              .toLowerCase()
-              .trim() === normalized,
-        );
-        const discount = found ? Number(found.discountPercentage) : null;
-        if (mounted) {
-          setPrismaDiscount(discount);
-          console.log(
-            `[single-prod-cart] prisma discountPercentage for ${tag}:`,
-            discount,
-          );
-        }
-      } catch (e) {
-        console.warn("[single-prod-cart] pricing tiers fetch failed", e);
+
+    fetchPricingTiersDb().then((tiers) => {
+      if (!mounted) return;
+      const tag = tierTag ?? null;
+      if (!tag) {
+        setPrismaDiscount(null);
+        return;
       }
-    })();
+      const normalized = String(tag).toLowerCase().trim();
+      const found = tiers.find(
+        (t) =>
+          String(t.tierTag ?? "")
+            .toLowerCase()
+            .trim() === normalized,
+      );
+      const discount = found ? Number(found.discountPercentage) : null;
+      setPrismaDiscount(discount);
+    });
 
     return () => {
       mounted = false;

@@ -143,7 +143,7 @@ export default function OrderDetailPage() {
             }
             className="text-sm bg-blue-600 text-white px-3 py-1 rounded"
           >
-            PDF İndir
+            Download as PDF
           </button>
         </div>
       </div>

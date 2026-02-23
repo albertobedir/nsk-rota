@@ -3,6 +3,7 @@
 import { useEffect, useCallback } from "react";
 import { auth } from "@/lib/axios/auth";
 import useSessionStore from "@/store/session-store";
+import { invalidatePricingTiersCache } from "@/components/single-prod-cart";
 
 export default function SessionRefresher() {
   const refresh = useCallback(async () => {
@@ -11,9 +12,16 @@ export default function SessionRefresher() {
     // We must NOT re-fetch tags from Shopify storefront afterwards because
     // Shopify's cached tags may be stale and would overwrite the correct DB values.
     let sessionHasUser = false;
+    const prevTierTag = useSessionStore.getState().tierTag;
     try {
       const sessionData = await auth.getSession();
       sessionHasUser = !!sessionData?.user;
+      // If tierTag changed, bust the pricing tiers cache so cards re-fetch
+      // with the new tier discount immediately on next render.
+      const newTierTag = useSessionStore.getState().tierTag;
+      if (newTierTag !== prevTierTag) {
+        invalidatePricingTiersCache();
+      }
       console.debug("SessionRefresher: session refreshed");
     } catch (e) {
       console.debug("SessionRefresher: failed to refresh session", e);

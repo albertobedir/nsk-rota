@@ -5,13 +5,17 @@ import path from "path";
 
 export const runtime = "nodejs";
 
+// Use built-in PDFKit/Helvetica fonts — no DEMO font artefacts
+const FONT_REGULAR = "Helvetica";
+const FONT_BOLD = "Helvetica-Bold";
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
     const origin = url.origin;
 
-    // Try to fetch order data (if id provided) from internal API and normalize it
+    // Fetch and normalise order data
     let order: Record<string, any> | null = null;
     if (id) {
       try {
@@ -69,6 +73,10 @@ export async function GET(req: Request) {
               src.shippingAddress ||
               (raw.shipping_address
                 ? {
+                    name:
+                      raw.shipping_address.name ||
+                      raw.shipping_address.full_name ||
+                      "",
                     address1: raw.shipping_address.address1 || "",
                     city:
                       raw.shipping_address.city ||
@@ -79,16 +87,16 @@ export async function GET(req: Request) {
                       raw.shipping_address.country ||
                       raw.shipping_address.country_name ||
                       "",
-                    name:
-                      raw.shipping_address.name ||
-                      raw.shipping_address.full_name ||
-                      undefined,
                   }
                 : null),
             billingAddress:
               src.billingAddress ||
               (raw.billing_address
                 ? {
+                    name:
+                      raw.billing_address.name ||
+                      raw.billing_address.full_name ||
+                      "",
                     address1: raw.billing_address.address1 || "",
                     city:
                       raw.billing_address.city ||
@@ -99,10 +107,6 @@ export async function GET(req: Request) {
                       raw.billing_address.country ||
                       raw.billing_address.country_name ||
                       "",
-                    name:
-                      raw.billing_address.name ||
-                      raw.billing_address.full_name ||
-                      undefined,
                   }
                 : null),
             lineItems: { edges: lineItemsEdges },
@@ -114,267 +118,351 @@ export async function GET(req: Request) {
       }
     }
 
-    const doc = new PDFDocument({ autoFirstPage: true });
+    // ── Document setup ──────────────────────────────────────────────────────
+    const doc = new PDFDocument({
+      autoFirstPage: true,
+      margins: { top: 50, bottom: 50, left: 50, right: 50 },
+    });
 
-    // Register bundled fonts (regular + semibold) to use in layout
-    const fontsDir = path.join(process.cwd(), "src", "font", "biotif");
-    const regularFont = path.join(
-      fontsDir,
-      "Fontspring-DEMO-biotif-regular.otf",
-    );
-    const semiboldFont = path.join(
-      fontsDir,
-      "Fontspring-DEMO-biotif-semibold.otf",
-    );
-    if (fs.existsSync(regularFont)) doc.font(regularFont);
-
-    // Small helpers
-    const formatMoney = (amt: any, cur = "") => {
-      const n = Number(amt);
-      if (Number.isNaN(n)) return `${amt || "-"} ${cur}`;
-      return `${n.toFixed(2)} ${cur}`.trim();
-    };
-
-    const pageWidth = doc.page.width;
-    const margin = 50;
-
-    // Prepare PDF data chunks collector
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Uint8Array | Buffer) =>
       chunks.push(Buffer.from(chunk)),
     );
 
-    // Header: left=brand, right=invoice meta
-    if (fs.existsSync(semiboldFont)) doc.font(semiboldFont).fontSize(18);
-    else doc.fontSize(18).font(regularFont);
-    try {
-      const logoPath = path.join(process.cwd(), "public", "logo.webp");
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, margin, 30, { width: 140 });
-      } else {
-        doc.text("NSK Group", margin, 40);
+    const pageWidth = doc.page.width;
+    const margin = 50;
+    const contentWidth = pageWidth - margin * 2;
+
+    const formatMoney = (amt: any, cur = "") => {
+      const n = Number(amt);
+      if (Number.isNaN(n) || !amt) return `-`;
+      return `${n.toFixed(2)} ${cur}`.trim();
+    };
+
+    const formatDate = (val: any): string => {
+      if (!val) return "-";
+      const s = String(val).slice(0, 10); // "YYYY-MM-DD"
+      const [y, m, d2] = s.split("-");
+      if (!y || !m || !d2) return s;
+      return `${d2}/${m}/${y}`;
+    };
+
+    // ── Colours & sizes ─────────────────────────────────────────────────────
+    const ACCENT = "#1a3c5e";
+    const LIGHT_BG = "#f4f6f9";
+    const DIVIDER = "#dde1e8";
+    const TEXT_MUTED = "#6b7280";
+    const TEXT_DARK = "#1f2937";
+
+    // ── HEADER BAND ─────────────────────────────────────────────────────────
+    doc.rect(0, 0, pageWidth, 80).fill(ACCENT);
+
+    // Logo or company name in header
+    const logoPath = path.join(process.cwd(), "public", "logo.svg");
+    const logoWebp = path.join(process.cwd(), "public", "logo.webp");
+    let logoInserted = false;
+    for (const lp of [logoPath, logoWebp]) {
+      if (!logoInserted && fs.existsSync(lp)) {
+        try {
+          doc.image(lp, margin, 18, { height: 44, fit: [180, 44] });
+          logoInserted = true;
+        } catch (_) {
+          /* skip */
+        }
       }
-    } catch (_e) {
-      doc.text("NSK Group", margin, 40);
+    }
+    if (!logoInserted) {
+      doc
+        .font(FONT_BOLD)
+        .fontSize(22)
+        .fillColor("#ffffff")
+        .text("NSK Group", margin, 26, { width: 200 });
     }
 
-    const rightX = pageWidth - margin;
-    doc.fontSize(10);
-    const invoiceLabel = `Invoice ${order?.orderNumber || order?.id || id || "#"}`;
-    doc.text(invoiceLabel, rightX - 200, 40, { width: 200, align: "right" });
-    doc.moveDown(1);
+    // "INVOICE" label on right side of header
+    doc
+      .font(FONT_BOLD)
+      .fontSize(20)
+      .fillColor("#ffffff")
+      .text("INVOICE", pageWidth - margin - 160, 18, {
+        width: 160,
+        align: "right",
+      });
 
-    // Order metadata + payment CTA
-    doc.moveDown(0.5);
-    doc.font(regularFont).fontSize(10);
-    doc.text(`Order ID: ${order?.id || id || "-"}`, margin, doc.y);
-    doc.text(
-      `Date: ${(order?.processedAt || "").slice(0, 10) || "-"}`,
-      rightX - 200,
-      doc.y,
-      { width: 200, align: "right" },
+    const orderNum = order?.orderNumber || order?.id || id || "-";
+    doc
+      .font(FONT_REGULAR)
+      .fontSize(10)
+      .fillColor("#c8d8ea")
+      .text(`#${orderNum}`, pageWidth - margin - 160, 44, {
+        width: 160,
+        align: "right",
+      });
+
+    // ── META ROW (light bg strip) ────────────────────────────────────────────
+    const metaY = 80;
+    doc.rect(0, metaY, pageWidth, 40).fill(LIGHT_BG);
+
+    const dateStr = formatDate(order?.processedAt);
+    const statusStr =
+      order?.financialStatus ||
+      order?.fulfillmentStatus ||
+      "-";
+
+    doc
+      .font(FONT_REGULAR)
+      .fontSize(9)
+      .fillColor(TEXT_MUTED)
+      .text("ORDER ID", margin, metaY + 7)
+      .text("DATE", margin + 240, metaY + 7)
+      .text("STATUS", margin + 380, metaY + 7);
+
+    doc
+      .font(FONT_BOLD)
+      .fontSize(9)
+      .fillColor(TEXT_DARK)
+      .text(order?.id || id || "-", margin, metaY + 19)
+      .text(dateStr, margin + 240, metaY + 19)
+      .text(statusStr.toUpperCase(), margin + 380, metaY + 19);
+
+    // ── ADDRESSES ────────────────────────────────────────────────────────────
+    const addrY = metaY + 56;
+    const colW = (contentWidth - 20) / 2;
+
+    const renderAddress = (
+      label: string,
+      addr: Record<string, any> | null,
+      x: number,
+      y: number,
+    ) => {
+      doc.font(FONT_BOLD).fontSize(9).fillColor(ACCENT).text(label, x, y);
+      doc
+        .moveTo(x, y + 13)
+        .lineTo(x + colW, y + 13)
+        .strokeColor(ACCENT)
+        .lineWidth(1)
+        .stroke();
+      doc.font(FONT_REGULAR).fontSize(10).fillColor(TEXT_DARK);
+      if (!addr) {
+        doc.text("-", x, y + 18);
+        return y + 34;
+      }
+      let lineY = y + 18;
+      const lines = [
+        addr.name,
+        addr.address1,
+        [addr.city, addr.zip].filter(Boolean).join(", "),
+        addr.country,
+      ].filter(Boolean);
+      lines.forEach((l) => {
+        doc.text(l, x, lineY, { width: colW });
+        lineY += 14;
+      });
+      return lineY;
+    };
+
+    renderAddress("SHIP TO", order?.shippingAddress || null, margin, addrY);
+    renderAddress(
+      "BILL TO",
+      order?.billingAddress || order?.shippingAddress || null,
+      margin + colW + 20,
+      addrY,
     );
 
-    // No payment CTA — start summary below header/logo
-    const summaryStartY = 80;
+    // ── ITEMS TABLE ──────────────────────────────────────────────────────────
+    // Estimate address block height
+    const shipLines = order?.shippingAddress
+      ? [
+          order.shippingAddress.name,
+          order.shippingAddress.address1,
+          [order.shippingAddress.city, order.shippingAddress.zip]
+            .filter(Boolean)
+            .join(", "),
+          order.shippingAddress.country,
+        ].filter(Boolean).length
+      : 0;
+    const tableY = addrY + Math.max(shipLines, 1) * 14 + 50;
 
-    // Order Summary title
-    if (fs.existsSync(semiboldFont)) doc.font(semiboldFont).fontSize(14);
-    else doc.font(regularFont).fontSize(14);
-    doc.fillColor("black").text("Order summary", margin, summaryStartY);
+    // Table header
+    doc.rect(margin, tableY, contentWidth, 24).fill(ACCENT);
+    doc
+      .font(FONT_BOLD)
+      .fontSize(9)
+      .fillColor("#ffffff")
+      .text("ITEM", margin + 8, tableY + 7)
+      .text("QTY", margin + contentWidth - 200, tableY + 7, {
+        width: 60,
+        align: "center",
+      })
+      .text("UNIT PRICE", margin + contentWidth - 140, tableY + 7, {
+        width: 70,
+        align: "right",
+      })
+      .text("TOTAL", margin + contentWidth - 60, tableY + 7, {
+        width: 60,
+        align: "right",
+      });
 
-    // Item row (thumbnail + title + qty + price)
-    const itemY = summaryStartY + 20;
-    const thumbX = margin;
-    const thumbSize = 36;
-    const textX = thumbX + thumbSize + 12;
-    const priceX = pageWidth - margin - 60;
-
-    // Render all items with thumbnail box, title, qty and right-aligned line total
     const itemsList =
       (order?.lineItems?.edges as Array<Record<string, any>>) || [];
-    let itemsY = itemY;
+
+    let rowY = tableY + 24;
+    let subtotal = 0;
+    const currency = order?.totalPrice?.currencyCode || "";
+
     if (itemsList.length === 0) {
-      doc.font(regularFont).fontSize(10).text("- No items -", margin, itemsY);
-      itemsY += 18;
+      doc
+        .font(FONT_REGULAR)
+        .fontSize(10)
+        .fillColor(TEXT_MUTED)
+        .text("No items found.", margin + 8, rowY + 10);
+      rowY += 34;
     } else {
-      itemsList.forEach((e) => {
+      itemsList.forEach((e, idx) => {
         const node = (e?.node || e) as Record<string, any>;
         const title = node?.title || node?.name || "Item";
         const qty = Number(node?.quantity ?? node?.current_quantity ?? 1);
         const priceNum = Number(
           node?.variant?.price?.amount || node?.price || 0,
         );
-        const lineTotal = (Number.isFinite(priceNum) ? priceNum : 0) * qty;
+        const unitPrice = Number.isFinite(priceNum) ? priceNum : 0;
+        const lineTotal = unitPrice * qty;
+        subtotal += lineTotal;
 
-        // thumbnail box
+        // Alternating row background
+        if (idx % 2 === 0) {
+          doc.rect(margin, rowY, contentWidth, 32).fill(LIGHT_BG);
+        }
+
         doc
-          .rect(thumbX, itemsY, thumbSize, thumbSize)
-          .strokeColor("#d1d5db")
-          .stroke();
-        // title and qty
-        doc
-          .font(regularFont)
+          .font(FONT_REGULAR)
           .fontSize(10)
-          .fillColor("black")
-          .text(title, textX, itemsY);
+          .fillColor(TEXT_DARK)
+          .text(title, margin + 8, rowY + 10, {
+            width: contentWidth - 220,
+            ellipsis: true,
+          });
+
         doc
-          .fontSize(9)
-          .fillColor("#6b7280")
-          .text(`Qty: ${qty}`, textX, itemsY + 14);
-        // price on right
+          .font(FONT_REGULAR)
+          .fontSize(10)
+          .fillColor(TEXT_DARK)
+          .text(String(qty), margin + contentWidth - 200, rowY + 10, {
+            width: 60,
+            align: "center",
+          });
+
         doc
-          .fillColor("black")
+          .font(FONT_REGULAR)
+          .fontSize(10)
+          .fillColor(TEXT_DARK)
           .text(
-            formatMoney(
-              lineTotal,
-              node?.variant?.price?.currencyCode ||
-                order?.totalPrice?.currencyCode ||
-                "",
-            ),
-            priceX,
-            itemsY,
+            formatMoney(unitPrice, currency),
+            margin + contentWidth - 140,
+            rowY + 10,
+            { width: 70, align: "right" },
           );
 
-        itemsY += thumbSize + 12;
+        doc
+          .font(FONT_BOLD)
+          .fontSize(10)
+          .fillColor(TEXT_DARK)
+          .text(
+            formatMoney(lineTotal, currency),
+            margin + contentWidth - 60,
+            rowY + 10,
+            { width: 60, align: "right" },
+          );
+
+        rowY += 32;
       });
     }
 
-    // Horizontal divider
-    const dividerY = itemY + 54;
+    // Bottom line below items
     doc
-      .moveTo(margin, dividerY)
-      .lineTo(pageWidth - margin, dividerY)
-      .strokeColor("#e5e7eb")
+      .moveTo(margin, rowY)
+      .lineTo(pageWidth - margin, rowY)
+      .strokeColor(DIVIDER)
+      .lineWidth(1)
       .stroke();
 
-    // Totals block on right
-    const totalsX = pageWidth - margin - 200;
-    const totalsTop = dividerY + 12;
-    const shipping =
-      Number(order?.shipping || 0) ||
-      Number(order?.totalPrice?.shipping || 0) ||
-      0;
+    // ── TOTALS BLOCK ─────────────────────────────────────────────────────────
+    const totalsX = margin + contentWidth - 220;
+    const totalsW = 220;
+    const shipping = Number(order?.shipping || 0) || 0;
     const taxes = Number(order?.taxes || 0) || 0;
-    let subtotal = 0;
-    itemsList.forEach((e) => {
-      const node = (e?.node || e) as Record<string, any>;
-      const qty = Number(node?.quantity ?? node?.current_quantity ?? 1);
-      const priceNum = Number(node?.variant?.price?.amount || node?.price || 0);
-      subtotal += (Number.isFinite(priceNum) ? priceNum : 0) * qty;
-    });
+    const grandTotal =
+      Number(order?.totalPrice?.amount) || subtotal + shipping + taxes;
 
-    doc.font(regularFont).fontSize(10).fillColor("#374151");
-    doc.text("Subtotal", totalsX, totalsTop);
-    doc.text(
-      formatMoney(subtotal, order?.totalPrice?.currencyCode || ""),
-      pageWidth - margin - 10,
-      totalsTop,
-      { align: "right" },
-    );
-    doc.text("Shipping", totalsX, totalsTop + 14);
-    doc.text(
-      formatMoney(shipping, order?.totalPrice?.currencyCode || ""),
-      pageWidth - margin - 10,
-      totalsTop + 14,
-      { align: "right" },
-    );
-    doc.text("Estimated taxes", totalsX, totalsTop + 28);
-    doc.text(
-      formatMoney(taxes, order?.totalPrice?.currencyCode || ""),
-      pageWidth - margin - 10,
-      totalsTop + 28,
-      { align: "right" },
-    );
+    let totY = rowY + 14;
 
-    // Amount to pay emphasized
-    const amountY = totalsTop + 48;
-    if (fs.existsSync(semiboldFont)) doc.font(semiboldFont).fontSize(12);
-    doc.text("Amount to pay", totalsX, amountY);
-    doc.text(
-      formatMoney(
-        order?.totalPrice?.amount || subtotal + shipping + taxes,
-        order?.totalPrice?.currencyCode || "",
-      ),
-      pageWidth - margin - 10,
-      amountY,
-      { align: "right" },
-    );
-
-    // Customer information heading
-    const custY = itemsY + 24;
-    if (fs.existsSync(semiboldFont)) doc.font(semiboldFont).fontSize(12);
-    else doc.font(regularFont).fontSize(12);
-    doc.fillColor("black").text("Customer information", margin, custY);
-    doc.moveDown(0.2);
-
-    // Shipping and billing columns
-    doc.font(regularFont).fontSize(10).fillColor("#374151");
-    const leftColX = margin;
-    const rightColX = pageWidth / 2 + 10;
-    const ship = order?.shippingAddress || {};
-    const shipLines = [
-      ship.name || "",
-      ship.address1 || "",
-      `${ship.city || ""} ${ship.zip || ""}`.trim(),
-      ship.country || "",
-    ].filter(Boolean);
-    const billing = order?.billingAddress || {};
-    const billLines = [
-      billing.name || "",
-      billing.address1 || "",
-      `${billing.city || ""} ${billing.zip || ""}`.trim(),
-      billing.country || "",
-    ].filter(Boolean);
-    const addrStartY = custY + 20;
-    shipLines.forEach((l, i) => doc.text(l, leftColX, addrStartY + i * 12));
-    billLines.forEach((l, i) => doc.text(l, rightColX, addrStartY + i * 12));
-
-    // Shipping method below
-    const methodY =
-      addrStartY + Math.max(shipLines.length, billLines.length) * 12 + 14;
-    if (order?.shipping_method || order?.shipping_method_title) {
+    const totRow = (label: string, val: string, bold = false) => {
       doc
-        .font(regularFont)
+        .font(bold ? FONT_BOLD : FONT_REGULAR)
         .fontSize(10)
-        .fillColor("#374151")
-        .text("Shipping method", leftColX, methodY);
+        .fillColor(bold ? TEXT_DARK : TEXT_MUTED)
+        .text(label, totalsX, totY, { width: 120 });
       doc
-        .font(regularFont)
+        .font(bold ? FONT_BOLD : FONT_REGULAR)
         .fontSize(10)
-        .fillColor("#6b7280")
-        .text(
-          order?.shipping_method || order?.shipping_method_title || "",
-          leftColX,
-          methodY + 12,
-        );
-    } else if (shipping) {
-      doc
-        .font(regularFont)
-        .fontSize(10)
-        .fillColor("#374151")
-        .text("Shipping", leftColX, methodY);
-      doc
-        .font(regularFont)
-        .fontSize(10)
-        .fillColor("#6b7280")
-        .text(
-          formatMoney(shipping, order?.totalPrice?.currencyCode || ""),
-          leftColX,
-          methodY + 12,
-        );
-    }
+        .fillColor(TEXT_DARK)
+        .text(val, totalsX + 120, totY, { width: 100, align: "right" });
+      totY += 16;
+    };
 
-    // Finalize document
+    totRow("Subtotal", formatMoney(subtotal, currency));
+    totRow("Shipping", formatMoney(shipping, currency));
+    totRow("Tax", formatMoney(taxes, currency));
+
+    // Grand total divider
+    doc
+      .moveTo(totalsX, totY + 2)
+      .lineTo(totalsX + totalsW, totY + 2)
+      .strokeColor(ACCENT)
+      .lineWidth(1.5)
+      .stroke();
+    totY += 10;
+
+    // Grand total row on accent background
+    doc.rect(totalsX, totY, totalsW, 28).fill(ACCENT);
+    doc
+      .font(FONT_BOLD)
+      .fontSize(11)
+      .fillColor("#ffffff")
+      .text("AMOUNT TO PAY", totalsX + 8, totY + 8, { width: 110 });
+    doc
+      .font(FONT_BOLD)
+      .fontSize(11)
+      .fillColor("#ffffff")
+      .text(formatMoney(grandTotal, currency), totalsX + 120, totY + 8, {
+        width: 92,
+        align: "right",
+      });
+
+    // ── FOOTER ───────────────────────────────────────────────────────────────
+    const footerY = doc.page.height - 40;
+    doc
+      .moveTo(margin, footerY)
+      .lineTo(pageWidth - margin, footerY)
+      .strokeColor(DIVIDER)
+      .lineWidth(0.5)
+      .stroke();
+    doc
+      .font(FONT_REGULAR)
+      .fontSize(8)
+      .fillColor(TEXT_MUTED)
+      .text("NSK Group  |  Thank you for your order.", margin, footerY + 8, {
+        width: contentWidth,
+        align: "center",
+      });
+
+    // ── Finalise ─────────────────────────────────────────────────────────────
     doc.end();
 
     const pdfBuffer: Buffer = await new Promise((resolve) => {
-      doc.on("end", () => {
-        resolve(Buffer.concat(chunks));
-      });
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
     });
 
-    // Response body expects BodyInit (Uint8Array, ArrayBuffer, etc.) — provide Uint8Array
     return new Response(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {

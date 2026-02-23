@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import SingleProdCard from "./single-prod-cart";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Product = {
   id: string | number;
@@ -38,6 +38,26 @@ export default function MiniPaginationGroup({
   const [fetched, setFetched] = useState<Product[] | null>(null);
   const [page, setPage] = useState(1);
   const [isCompact, setIsCompact] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Trigger fetch only when component scrolls into view
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   // helper to extract rota number from metafields
   const extractRotaNo = (metafields: any[] = []) => {
     try {
@@ -79,6 +99,7 @@ export default function MiniPaginationGroup({
   };
 
   useEffect(() => {
+    if (!isVisible) return;
     const mq =
       typeof window !== "undefined" && window.matchMedia
         ? window.matchMedia("(max-width: 640px)")
@@ -320,7 +341,10 @@ export default function MiniPaginationGroup({
           mq.removeListener(onChange as any);
       }
     };
-  }, []);
+  }, [isVisible]);
+
+  const isLoading =
+    isVisible && fetched === null && !(products && products.length > 0);
 
   const allProducts =
     products && products.length > 0 ? products : (fetched ?? []);
@@ -371,7 +395,7 @@ export default function MiniPaginationGroup({
   )}`;
 
   return (
-    <section className="w-full px-4 md:px-6 lg:px-12 py-6">
+    <section ref={sectionRef} className="w-full px-4 md:px-6 lg:px-12 py-6">
       <div className="flex items-center justify-between mb-4 w-full">
         <h3 className="text-xl font-semibold">{title}</h3>
         <Link
@@ -383,27 +407,34 @@ export default function MiniPaginationGroup({
       </div>
 
       <div className="flex flex-row gap-3 sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 sm:gap-4 overflow-x-auto sm:overflow-visible snap-x snap-mandatory py-2">
-        {pageItems.map((p) => (
-          <div
-            key={String(p.id)}
-            className="snap-start shrink-0 w-[60%] sm:w-auto"
-          >
-            <SingleProdCard
-              id={p.id}
-              code={p.code}
-              title={p.title}
-              price={p.price}
-              image={p.image}
-              oems={p.oems}
-              productRaw={p.productRaw}
-              location={p.location}
-              inStock={p.inStock}
-              stock={p.stock}
-              variantId={p.variantId}
-              matchType={p.matchType}
-            />
-          </div>
-        ))}
+        {isLoading
+          ? Array.from({ length: pageSize }).map((_, i) => (
+              <div
+                key={i}
+                className="snap-start shrink-0 w-[60%] sm:w-auto rounded-xl bg-gray-100 animate-pulse h-64"
+              />
+            ))
+          : pageItems.map((p) => (
+              <div
+                key={String(p.id)}
+                className="snap-start shrink-0 w-[60%] sm:w-auto"
+              >
+                <SingleProdCard
+                  id={p.id}
+                  code={p.code}
+                  title={p.title}
+                  price={p.price}
+                  image={p.image}
+                  oems={p.oems}
+                  productRaw={p.productRaw}
+                  location={p.location}
+                  inStock={p.inStock}
+                  stock={p.stock}
+                  variantId={p.variantId}
+                  matchType={p.matchType}
+                />
+              </div>
+            ))}
       </div>
 
       {/* ── PAGINATION ── */}
