@@ -153,7 +153,6 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [inchMode, setInchMode] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);
-  const [showAllModels, setShowAllModels] = useState(false);
   // use string so user can clear the input while typing (e.g. replace "1" with "300")
   const [qty, setQty] = useState<string>("1");
   const [stockModalOpen, setStockModalOpen] = useState(false);
@@ -923,13 +922,14 @@ export default function ProductDetailPage() {
               try {
                 const rawAny = raw as any;
 
-                // 1) Direct raw.Oems field
+                // 1) Group OEM numbers by MarkaDescription
+                const oemGrouped: Record<string, string[]> = {};
                 let oems: Array<{ OemNo: string; MarkaDescription: string }> =
                   [];
                 if (Array.isArray(rawAny?.Oems) && rawAny.Oems.length > 0) {
                   oems = rawAny.Oems;
                 } else {
-                  // 2) Fall back to oem_info metafield
+                  // Fall back to oem_info metafield
                   const oemField = raw.metafields?.find((m) =>
                     /oem_info/i.test(m.key),
                   );
@@ -939,7 +939,56 @@ export default function ProductDetailPage() {
                   }
                 }
 
-                if (oems.length === 0) {
+                for (const oem of oems) {
+                  const brand = String(oem.MarkaDescription || "")
+                    .trim()
+                    .toUpperCase();
+                  const no = String(oem.OemNo || "").trim();
+                  if (!brand || !no) continue;
+                  if (!oemGrouped[brand]) oemGrouped[brand] = [];
+                  oemGrouped[brand].push(no);
+                }
+
+                // 2) Collect competitors with Type === "View" as individual rows
+                // First try direct raw.Competiters, then fall back to competitor_info metafield
+                const competitorRows: { name: string; ref: string }[] = [];
+                let rawCompetitors: any[] = [];
+                if (
+                  Array.isArray(rawAny?.Competiters) &&
+                  rawAny.Competiters.length > 0
+                ) {
+                  rawCompetitors = rawAny.Competiters;
+                } else {
+                  const compField = raw.metafields?.find((m) =>
+                    /competitor_info/i.test(m.key),
+                  );
+                  if (compField?.value) {
+                    try {
+                      const parsed = JSON.parse(compField.value);
+                      rawCompetitors = Array.isArray(parsed) ? parsed : [];
+                    } catch {
+                      rawCompetitors = [];
+                    }
+                  }
+                }
+                for (const c of rawCompetitors) {
+                  if (
+                    String(c?.Type || "")
+                      .trim()
+                      .toLowerCase() !== "view"
+                  )
+                    continue;
+                  const name = String(c.CompetitorName || "")
+                    .trim()
+                    .toUpperCase();
+                  const ref = String(c.ReferansView || "").trim();
+                  if (!name || !ref) continue;
+                  competitorRows.push({ name, ref });
+                }
+
+                const oemEntries = Object.entries(oemGrouped);
+
+                if (oemEntries.length === 0 && competitorRows.length === 0) {
                   return (
                     <div className="mt-4 text-sm text-muted-foreground">
                       No references available
@@ -947,28 +996,24 @@ export default function ProductDetailPage() {
                   );
                 }
 
-                // Group OEM numbers by MarkaDescription
-                const grouped: Record<string, string[]> = {};
-                for (const oem of oems) {
-                  const brand = String(oem.MarkaDescription || "")
-                    .trim()
-                    .toUpperCase();
-                  const no = String(oem.OemNo || "").trim();
-                  if (!brand || !no) continue;
-                  if (!grouped[brand]) grouped[brand] = [];
-                  grouped[brand].push(no);
-                }
-
-                const entries = Object.entries(grouped);
-
                 return (
                   <div className="mt-4 space-y-3 text-lg">
-                    {entries.map(([brand, nos]) => (
+                    {oemEntries.map(([brand, nos]) => (
                       <div key={brand} className="flex justify-between gap-4">
                         <span className="font-semibold shrink-0">{brand}</span>
                         <span className="text-right break-all">
                           {nos.join(" - ")}
                         </span>
+                      </div>
+                    ))}
+
+                    {competitorRows.map((c, i) => (
+                      <div
+                        key={`comp-${i}`}
+                        className="flex justify-between gap-4"
+                      >
+                        <span className="font-semibold shrink-0">{c.name}</span>
+                        <span className="text-right break-all">{c.ref}</span>
                       </div>
                     ))}
                   </div>
@@ -1142,79 +1187,51 @@ export default function ProductDetailPage() {
             <span className="flex-1">Type</span>
           </div>
 
-          {(showAllModels ? SUITABLE_MODELS : SUITABLE_MODELS.slice(0, 3)).map(
-            (row, i) => (
-              <div key={i}>
-                {/* Desktop */}
-                <div className="hidden md:flex bg-gray-100 py-4 px-3 mt-3 rounded-md text-sm">
-                  <span className="flex-1 font-semibold">{row.brand}</span>
-                  <span className="flex-2 font-semibold whitespace-pre-line">
-                    {row.model}
-                  </span>
-                  <span className="flex-[0.7]">{row.year}</span>
-                  <span className="flex-[0.7]">{row.kw}</span>
-                  <span className="flex-[0.7] font-semibold">{row.hp}</span>
-                  <span className="flex-[0.8]">{row.className}</span>
-                  <span className="flex-1 font-semibold">{row.type}</span>
+          {SUITABLE_MODELS.map((row, i) => (
+            <div key={i}>
+              {/* Desktop */}
+              <div className="hidden md:flex bg-gray-100 py-4 px-3 mt-3 rounded-md text-sm">
+                <span className="flex-1 font-semibold">{row.brand}</span>
+                <span className="flex-2 font-semibold whitespace-pre-line">
+                  {row.model}
+                </span>
+                <span className="flex-[0.7]">{row.year}</span>
+                <span className="flex-[0.7]">{row.kw}</span>
+                <span className="flex-[0.7] font-semibold">{row.hp}</span>
+                <span className="flex-[0.8]">{row.className}</span>
+                <span className="flex-1 font-semibold">{row.type}</span>
+              </div>
+
+              {/* Mobile */}
+              <div className="md:hidden bg-gray-100 p-4 rounded-lg mt-4 text-sm space-y-2">
+                <div className="font-bold">{row.brand}</div>
+                <div className="font-semibold whitespace-pre-line leading-tight">
+                  {row.model}
                 </div>
 
-                {/* Mobile */}
-                <div className="md:hidden bg-gray-100 p-4 rounded-lg mt-4 text-sm space-y-2">
-                  <div className="font-bold">{row.brand}</div>
-                  <div className="font-semibold whitespace-pre-line leading-tight">
-                    {row.model}
-                  </div>
-
-                  <div className="flex justify-between">
-                    <b>Year</b>
-                    <span>{row.year}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <b>Kw</b>
-                    <span>{row.kw}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <b>Hp</b>
-                    <span>{row.hp}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <b>Class</b>
-                    <span>{row.className}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <b>Type</b>
-                    <span>{row.type}</span>
-                  </div>
+                <div className="flex justify-between">
+                  <b>Year</b>
+                  <span>{row.year}</span>
+                </div>
+                <div className="flex justify-between">
+                  <b>Kw</b>
+                  <span>{row.kw}</span>
+                </div>
+                <div className="flex justify-between">
+                  <b>Hp</b>
+                  <span>{row.hp}</span>
+                </div>
+                <div className="flex justify-between">
+                  <b>Class</b>
+                  <span>{row.className}</span>
+                </div>
+                <div className="flex justify-between">
+                  <b>Type</b>
+                  <span>{row.type}</span>
                 </div>
               </div>
-            ),
-          )}
-
-          {SUITABLE_MODELS.length > 3 && (
-            <div className="flex justify-center mt-4">
-              <button
-                onClick={() => setShowAllModels((prev) => !prev)}
-                className="flex flex-col items-center gap-1 text-sm text-muted-foreground hover:text-secondary transition-colors"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="28"
-                  height="28"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`transition-transform duration-300 ${
-                    showAllModels ? "rotate-180" : ""
-                  }`}
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
             </div>
-          )}
+          ))}
         </div>
       )}
       {/* GET STOCK DIALOG */}
