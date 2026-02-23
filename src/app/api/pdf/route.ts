@@ -204,10 +204,7 @@ export async function GET(req: Request) {
     doc.rect(0, metaY, pageWidth, 40).fill(LIGHT_BG);
 
     const dateStr = formatDate(order?.processedAt);
-    const statusStr =
-      order?.financialStatus ||
-      order?.fulfillmentStatus ||
-      "-";
+    const statusStr = order?.financialStatus || order?.fulfillmentStatus || "-";
 
     doc
       .font(FONT_REGULAR)
