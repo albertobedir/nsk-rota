@@ -1009,7 +1009,8 @@ export default function ProductDetailPage() {
                         <div className="flex flex-wrap justify-end gap-x-1 gap-y-0.5">
                           {nos.map((no, idx) => (
                             <span key={idx} className="whitespace-nowrap">
-                              {no}{idx < nos.length - 1 ? " –" : ""}
+                              {no}
+                              {idx < nos.length - 1 ? " –" : ""}
                             </span>
                           ))}
                         </div>
@@ -1022,7 +1023,9 @@ export default function ProductDetailPage() {
                         className="flex justify-between gap-4"
                       >
                         <span className="font-semibold shrink-0">{c.name}</span>
-                        <span className="text-right whitespace-nowrap">{c.ref}</span>
+                        <span className="text-right whitespace-nowrap">
+                          {c.ref}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -1250,14 +1253,38 @@ export default function ProductDetailPage() {
                   onClick={() => setVisibleModelsCount((c) => c + 5)}
                   className="hover:opacity-60 transition-opacity"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="black"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
                 </button>
               ) : (
                 <button
                   onClick={() => setVisibleModelsCount(5)}
                   className="hover:opacity-60 transition-opacity"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="black"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="18 15 12 9 6 15" />
+                  </svg>
                 </button>
               )}
             </div>
