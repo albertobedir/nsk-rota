@@ -52,7 +52,7 @@ Api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export const handleAxiosError = (error: unknown) => {

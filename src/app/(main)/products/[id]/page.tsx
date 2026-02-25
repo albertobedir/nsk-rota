@@ -986,7 +986,11 @@ export default function ProductDetailPage() {
                   competitorRows.push({ name, ref });
                 }
 
-                const oemEntries = Object.entries(oemGrouped);
+                const oemEntries = Object.entries(oemGrouped).sort(([a], [b]) =>
+                  a.localeCompare(b),
+                );
+
+                competitorRows.sort((a, b) => a.name.localeCompare(b.name));
 
                 if (oemEntries.length === 0 && competitorRows.length === 0) {
                   return (
@@ -1107,7 +1111,7 @@ export default function ProductDetailPage() {
                     key={cp._id}
                     className="block bg-white rounded-lg p-4 max-w-xs"
                   >
-                    <div className="w-full h-44 relative mb-4">
+                    <div className="w-full h-44 relative mb-4 overflow-hidden rounded-lg">
                       {!img ? (
                         <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5 rounded-lg">
                           <ImageIcon

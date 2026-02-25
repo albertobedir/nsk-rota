@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
       const regexArray = searchValues.map((v) => new RegExp(v, "i"));
       const combinedPattern = searchValues.map((v) => `(${v})`).join("|");
 
-      // Match either a direct rota_no metafield OR the oem_info JSON string containing RotaNo/OemNo
+      // Match rota_no, oem_info JSON (RotaNo/OemNo) OR competitor_info JSON (ReferansView)
       metafieldConditions.push({
         $or: [
           {
@@ -96,6 +96,18 @@ export async function GET(req: NextRequest) {
               $elemMatch: {
                 namespace: "custom",
                 key: "oem_info",
+                value: {
+                  $regex: combinedPattern,
+                  $options: "i",
+                },
+              },
+            },
+          },
+          {
+            "raw.metafields": {
+              $elemMatch: {
+                namespace: "custom",
+                key: "competitor_info",
                 value: {
                   $regex: combinedPattern,
                   $options: "i",
