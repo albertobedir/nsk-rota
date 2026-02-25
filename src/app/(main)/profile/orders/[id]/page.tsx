@@ -13,6 +13,12 @@ type LineItem = {
   price?: string;
 };
 
+type ProductMeta = {
+  shopifyId: string | number;
+  rotaNo: string;
+  refNo: string;
+};
+
 export default function OrderDetailPage() {
   const params = useParams();
   const id = params?.id;
@@ -20,6 +26,10 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<any | null>(null);
+  // map of shopify product_id -> ProductMeta
+  const [productMetas, setProductMetas] = useState<Record<string, ProductMeta>>(
+    {},
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -50,6 +60,7 @@ export default function OrderDetailPage() {
             node: {
               title: li.title || li.name,
               quantity: li.quantity ?? li.current_quantity ?? 1,
+              productId: li.product_id ?? null,
               variant: {
                 image: { url: li.image?.src || li.image?.url || null },
                 price: {
@@ -121,6 +132,93 @@ export default function OrderDetailPage() {
       .catch((e) => setError(e?.message || String(e)))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Fetch product metadata (rotaNo, refNo, shopifyId) for each line item
+  useEffect(() => {
+    if (!order) return;
+    const edges: any[] = order.lineItems?.edges || [];
+    if (edges.length === 0) return;
+
+    // Build lookup entries: prefer product_id, fall back to title
+    const lookupEntries: {
+      productId: string;
+      query: string;
+      byTitle: boolean;
+    }[] = [];
+    const seenIds = new Set<string>();
+    for (const e of edges) {
+      const node = e.node;
+      if (node?.productId) {
+        const key = String(node.productId);
+        if (!seenIds.has(key)) {
+          seenIds.add(key);
+          lookupEntries.push({ productId: key, query: key, byTitle: false });
+        }
+      } else if (node?.title) {
+        const key = `title:${node.title}`;
+        if (!seenIds.has(key)) {
+          seenIds.add(key);
+          lookupEntries.push({
+            productId: key,
+            query: node.title,
+            byTitle: true,
+          });
+        }
+      }
+    }
+
+    const extractMeta = (prod: any, productId: string) => {
+      const metafields: any[] = prod.raw?.metafields ?? [];
+      const oemRaw = metafields.find(
+        (m: any) => m.namespace === "custom" && m.key === "oem_info",
+      );
+      let rotaNo = prod.raw?.variants?.[0]?.sku ?? "";
+      let refNo = "";
+      if (oemRaw?.value) {
+        try {
+          const parsed = JSON.parse(oemRaw.value);
+          const first = Array.isArray(parsed) ? parsed[0] : parsed;
+          if (!rotaNo) rotaNo = first?.RotaNo ?? "";
+          refNo = first?.OemNo ?? "";
+        } catch {
+          // ignore
+        }
+      }
+      return {
+        productId,
+        shopifyId: prod.shopifyId ?? prod.raw?.id ?? productId,
+        rotaNo,
+        refNo,
+      };
+    };
+
+    Promise.all(
+      lookupEntries.map(({ productId, query, byTitle }) => {
+        const url = byTitle
+          ? `/api/products/gets?title=${encodeURIComponent(query)}&limit=1`
+          : `/api/products/gets?shopifyId=${query}&limit=1`;
+        return fetch(url)
+          .then((r) => r.json())
+          .then((d) => {
+            const prod = d?.results?.[0] ?? null;
+            if (!prod) return null;
+            return extractMeta(prod, productId);
+          })
+          .catch(() => null);
+      }),
+    ).then((results) => {
+      const map: Record<string, ProductMeta> = {};
+      for (const r of results) {
+        if (!r) continue;
+        map[String(r.productId)] = {
+          shopifyId: r.shopifyId,
+          rotaNo: r.rotaNo,
+          refNo: r.refNo,
+        };
+      }
+      setProductMetas(map);
+    });
+  }, [order]);
 
   if (!id) return <div className="p-6">Missing order id</div>;
 
@@ -211,8 +309,16 @@ export default function OrderDetailPage() {
             <div className="divide-y">
               {(order.lineItems?.edges || []).map((e: any, idx: number) => {
                 const node = e.node;
-                return (
-                  <div key={idx} className="py-3 flex items-center gap-4">
+                const metaKey = node.productId
+                  ? String(node.productId)
+                  : node.title
+                    ? `title:${node.title}`
+                    : undefined;
+                const meta = metaKey ? productMetas[metaKey] : undefined;
+                const href = meta ? `/products/${meta.shopifyId}` : undefined;
+
+                const inner = (
+                  <div className="py-3 flex items-center gap-4">
                     {node.variant?.image?.url && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -221,8 +327,20 @@ export default function OrderDetailPage() {
                         className="w-16 h-16 object-cover rounded"
                       />
                     )}
-                    <div>
-                      <div className="font-medium">{node.title}</div>
+                    <div className="flex-1">
+                      <div className="font-medium group-hover:underline">
+                        {node.title}
+                      </div>
+                      {meta?.rotaNo && (
+                        <div className="text-sm font-semibold text-secondary">
+                          Rota No: {meta.rotaNo}
+                        </div>
+                      )}
+                      {meta?.refNo && (
+                        <div className="text-sm text-slate-500">
+                          Ref: {meta.refNo}
+                        </div>
+                      )}
                       <div className="text-sm text-slate-600">
                         Qty: {node.quantity}
                       </div>
@@ -234,6 +352,18 @@ export default function OrderDetailPage() {
                       )}
                     </div>
                   </div>
+                );
+
+                return href ? (
+                  <a
+                    key={idx}
+                    href={href}
+                    className="group block cursor-pointer hover:bg-slate-50 transition-colors rounded"
+                  >
+                    {inner}
+                  </a>
+                ) : (
+                  <div key={idx}>{inner}</div>
                 );
               })}
             </div>

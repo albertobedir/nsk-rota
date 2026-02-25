@@ -1124,7 +1124,7 @@ export default function ProductDetailPage() {
                           src={img}
                           alt={cp.raw.title}
                           fill
-                          className="object-cover"
+                          className="object-contain"
                         />
                       )}
                     </div>
@@ -1238,6 +1238,24 @@ export default function ProductDetailPage() {
           ))}
         </div>
       )}
+
+      {/* NOTE */}
+      <div className="container px-4 md:px-25 mt-10 mb-[5rem] w-full">
+        <h3 className="font-bold text-2xl inline-block">
+          Note
+          <span className="block w-full h-[3px] bg-secondary rounded-full mt-1"></span>
+        </h3>
+        <p className="mt-4 text-[1rem] text-gray-600 leading-relaxed font-medium">
+          Reference numbers and brands are provided only for comparison
+          purposes. These details are not indicated in the delivery notes and
+          invoices. All technical information and reference numbers here have
+          been provided after a careful research. ROTA disclaims any
+          responsibility for problems that arise from using these information.
+          ROTA reserves all its rights to make changes and modifications to the
+          technical information and product designs.
+        </p>
+      </div>
+
       {/* GET STOCK DIALOG */}
       <Dialog open={stockModalOpen} onOpenChange={setStockModalOpen}>
         <DialogContent className="max-w-md">

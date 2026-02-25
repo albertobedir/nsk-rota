@@ -75,7 +75,7 @@ export default function LogosTabs({ logos = [] }: Props) {
     <section className="w-full bg-white my-12 py-10">
       <div className="max-w-screen-2xl mx-auto px-6">
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-center mb-6">
-          OES Referanslar
+          OES References
         </h2>
 
         <div ref={outerRef} className="w-full overflow-hidden">

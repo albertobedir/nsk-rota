@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
       search = "",
       shopifyId = "",
       variantId = "",
+      title = "",
       page = "1",
       limit = "50",
       batchSize = "100",
@@ -60,6 +61,13 @@ export async function GET(req: NextRequest) {
         // Exact match on numeric shopifyId
         Object.assign(baseQuery, { shopifyId: num });
       }
+    }
+
+    // Title-based exact lookup (case-insensitive)
+    if (!shopifyId && !variantId && title) {
+      Object.assign(baseQuery, {
+        "raw.title": { $regex: `^${title.trim()}$`, $options: "i" },
+      });
     }
 
     // If a specific variant id is provided, search by variant id inside raw.variants

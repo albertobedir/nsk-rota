@@ -370,6 +370,35 @@ export default function ProductsPage() {
     fetchProducts(1, perPage, cleared);
   };
 
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+
+    // keep URL params in sync
+    try {
+      const params = new URLSearchParams(window.location.search);
+      params.set("page", String(newPage));
+      window.history.replaceState(
+        {},
+        "",
+        `${window.location.pathname}?${params.toString()}`,
+      );
+    } catch (e) {
+      /* ignore */
+    }
+
+    // keep localStorage in sync
+    try {
+      const saved = localStorage.getItem("products_filters");
+      const parsed = saved ? JSON.parse(saved) : {};
+      localStorage.setItem(
+        "products_filters",
+        JSON.stringify({ ...parsed, page: newPage }),
+      );
+    } catch (e) {
+      /* ignore */
+    }
+  };
+
   const applyFilters = async (pageNum = 1) => {
     setPage(pageNum);
 
@@ -861,7 +890,7 @@ export default function ProductsPage() {
         <div className="flex justify-center items-center gap-4 mt-6">
           <button
             disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
+            onClick={() => handlePageChange(page - 1)}
             className="px-4 py-2 bg-muted rounded disabled:opacity-40"
           >
             Prev
@@ -873,7 +902,7 @@ export default function ProductsPage() {
 
           <button
             disabled={page === totalPages}
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => handlePageChange(page + 1)}
             className="px-4 py-2 bg-muted rounded disabled:opacity-40"
           >
             Next
