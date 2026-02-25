@@ -156,6 +156,7 @@ export default function ProductDetailPage() {
   // use string so user can clear the input while typing (e.g. replace "1" with "300")
   const [qty, setQty] = useState<string>("1");
   const [stockModalOpen, setStockModalOpen] = useState(false);
+  const [visibleModelsCount, setVisibleModelsCount] = useState(5);
 
   /* Components state (moved up to avoid conditional hook calls) */
   const [componentsProducts, setComponentsProducts] = useState<
@@ -1005,9 +1006,13 @@ export default function ProductDetailPage() {
                     {oemEntries.map(([brand, nos]) => (
                       <div key={brand} className="flex justify-between gap-4">
                         <span className="font-semibold shrink-0">{brand}</span>
-                        <span className="text-right break-all">
-                          {nos.join(" - ")}
-                        </span>
+                        <div className="flex flex-wrap justify-end gap-x-1 gap-y-0.5">
+                          {nos.map((no, idx) => (
+                            <span key={idx} className="whitespace-nowrap">
+                              {no}{idx < nos.length - 1 ? " –" : ""}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     ))}
 
@@ -1017,7 +1022,7 @@ export default function ProductDetailPage() {
                         className="flex justify-between gap-4"
                       >
                         <span className="font-semibold shrink-0">{c.name}</span>
-                        <span className="text-right break-all">{c.ref}</span>
+                        <span className="text-right whitespace-nowrap">{c.ref}</span>
                       </div>
                     ))}
                   </div>
@@ -1191,7 +1196,7 @@ export default function ProductDetailPage() {
             <span className="flex-1">Type</span>
           </div>
 
-          {SUITABLE_MODELS.map((row, i) => (
+          {SUITABLE_MODELS.slice(0, visibleModelsCount).map((row, i) => (
             <div key={i}>
               {/* Desktop */}
               <div className="hidden md:flex bg-gray-100 py-4 px-3 mt-3 rounded-md text-sm">
@@ -1236,6 +1241,27 @@ export default function ProductDetailPage() {
               </div>
             </div>
           ))}
+
+          {/* Show more / show less */}
+          {SUITABLE_MODELS.length > 5 && (
+            <div className="flex justify-center mt-4">
+              {visibleModelsCount < SUITABLE_MODELS.length ? (
+                <button
+                  onClick={() => setVisibleModelsCount((c) => c + 5)}
+                  className="hover:opacity-60 transition-opacity"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setVisibleModelsCount(5)}
+                  className="hover:opacity-60 transition-opacity"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
