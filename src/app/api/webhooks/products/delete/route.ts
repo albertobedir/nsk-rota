@@ -19,56 +19,6 @@ function verifyShopifyWebhook(req: NextRequest, rawBody: string) {
   return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(hmacHeader));
 }
 
-async function fetchProductMetafields(productId: string) {
-  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
-  const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
-
-  const query = `
-    query getProduct($id: ID!) {
-      product(id: $id) {
-        metafields(first: 100) {
-          edges {
-            node {
-              namespace
-              key
-              value
-              type
-            }
-          }
-        }
-      }
-    }
-  `;
-
-  const response = await fetch(
-    `https://${shopifyDomain}/admin/api/2024-10/graphql.json`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": accessToken!,
-      },
-      body: JSON.stringify({ query, variables: { id: productId } }),
-    }
-  );
-
-  const data = await response.json();
-
-  if (data.errors) {
-    console.error("GraphQL errors:", data.errors);
-    return [];
-  }
-
-  if (!data.data?.product?.metafields?.edges) {
-    console.warn("No metafields found for product:", productId);
-    return [];
-  }
-
-  return data.data.product.metafields.edges.map(
-    (edge: { node: Record<string, unknown> }) => edge.node
-  );
-}
-
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
@@ -79,41 +29,23 @@ export async function POST(req: NextRequest) {
     }
 
     const productData = JSON.parse(rawBody);
-    console.log("Product updated - ID:", productData.id);
-
-    let metafields = [];
-    try {
-      metafields = await fetchProductMetafields(
-        productData.admin_graphql_api_id
-      );
-      console.log("Metafields fetched:", metafields.length);
-    } catch (metaErr) {
-      console.error("Metafield fetch error:", metaErr);
-    }
-
-    const fullProduct = {
-      ...productData,
-      metafields,
-      updatedAt: new Date(), // receivedAt yerine updatedAt
-    };
+    console.log("Product deleted - ID:", productData.id);
 
     await connectDB();
 
-    await Product.updateOne(
-      { shopifyId: productData.id },
-      { $set: { raw: fullProduct } },
-      { upsert: true }
-    );
+    const result = await Product.deleteOne({ shopifyId: productData.id });
+
+    console.log("Product deleted from DB:", result.deletedCount);
 
     return NextResponse.json(
-      { status: "ok", action: "updated", productId: productData.id },
-      { status: 200 }
+      { status: "ok", action: "deleted", productId: productData.id },
+      { status: 200 },
     );
   } catch (err) {
-    console.error("Webhook update error:", err);
+    console.error("Webhook delete error:", err);
     return NextResponse.json(
       { error: (err as Error).message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
