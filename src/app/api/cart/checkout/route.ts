@@ -83,39 +83,33 @@ export async function POST(request: NextRequest) {
     const items = lines.map((li) => {
       const qty = Number(li.quantity || 1);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const baseItem: any = {
+        quantity: qty,
+        taxable: true,
+        requiresShipping: true,
+      };
+
+      // ALWAYS include product reference so Shopify links the line item
+      if (li.merchandiseId) baseItem.variantId = li.merchandiseId;
+      else if (li.productId) baseItem.productId = li.productId;
+
       // client-side explicit override takes precedence
       const explicit = li.customPrice ?? li.originalUnitPrice;
       if (explicit != null) {
-        return {
-          title: li.title || "Custom Item",
-          quantity: qty,
-          originalUnitPrice: String(explicit),
-          taxable: true,
-          requiresShipping: true,
-        };
+        baseItem.originalUnitPrice = String(explicit);
+        return baseItem;
       }
 
-      // attempt to find a customer-specific price by matching keys
-      // Try direct merchandiseId/productId match first
+      // attempt to find a customer-specific price
       const merchKey = li.merchandiseId ?? li.productId ?? undefined;
       const custPrice = merchKey ? customerPrices[merchKey] : undefined;
 
       if (custPrice != null) {
-        return {
-          title: li.title || "Custom Priced Item",
-          quantity: qty,
-          originalUnitPrice: String(custPrice),
-          taxable: true,
-          requiresShipping: true,
-        };
+        baseItem.originalUnitPrice = String(custPrice);
       }
 
-      // fallback to normal variant/product line
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const out: any = { quantity: qty };
-      if (li.merchandiseId) out.variantId = li.merchandiseId;
-      if (li.productId) out.productId = li.productId;
-      return out;
+      return baseItem;
     });
 
     const input = {
