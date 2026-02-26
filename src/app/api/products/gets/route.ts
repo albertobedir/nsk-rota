@@ -41,6 +41,9 @@ export async function GET(req: NextRequest) {
       stockStatus = "",
       instock = "",
       location = "",
+      description = "",
+      model = "",
+      type = "",
     } = Object.fromEntries(req.nextUrl.searchParams) as Record<string, string>;
 
     const pageNum = parseInt(page, 10);
@@ -226,6 +229,55 @@ export async function GET(req: NextRequest) {
             namespace: "custom",
             key: "stock_location",
             value: locationRegex,
+          },
+        },
+      });
+    }
+
+    // Description filter — exact title match (anchored, case-insensitive)
+    // Uses word-boundary anchors so "Tie Rod End" won't match "V-Rod"
+    if (description) {
+      const escaped = description.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      metafieldConditions.push({
+        "raw.title": { $regex: `^${escaped}$`, $options: "i" },
+      } as any);
+    }
+
+    // Model filter — matched against brand_info metafield
+    if (model) {
+      const modelValues = model
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const modelPattern = modelValues
+        .map((v) => `\\b${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`)
+        .join("|");
+      metafieldConditions.push({
+        "raw.metafields": {
+          $elemMatch: {
+            namespace: "custom",
+            key: "brand_info",
+            value: { $regex: modelPattern, $options: "i" },
+          },
+        },
+      });
+    }
+
+    // Type filter — matched against brand_info metafield
+    if (type) {
+      const typeValues = type
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const typePattern = typeValues
+        .map((v) => `\\b${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`)
+        .join("|");
+      metafieldConditions.push({
+        "raw.metafields": {
+          $elemMatch: {
+            namespace: "custom",
+            key: "brand_info",
+            value: { $regex: typePattern, $options: "i" },
           },
         },
       });

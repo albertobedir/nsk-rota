@@ -125,6 +125,22 @@ export default function OrderDetailPage() {
                 }
               : null),
           lineItems: { edges: lineItemsEdges },
+          trackings: (() => {
+            const fulfillments: any[] = raw.fulfillments || [];
+            return fulfillments.flatMap((f: any) =>
+              (f.tracking_numbers || [f.tracking_number])
+                .filter(Boolean)
+                .map((_: string, i: number) => ({
+                  company: f.tracking_company || null,
+                  number:
+                    (f.tracking_numbers || [f.tracking_number])[i] || null,
+                  url:
+                    (f.tracking_urls || [f.tracking_url])[i] ||
+                    f.tracking_url ||
+                    null,
+                })),
+            );
+          })(),
         } as any;
 
         setOrder(normalized);
@@ -303,6 +319,41 @@ export default function OrderDetailPage() {
               )}
             </div>
           </div>
+
+          {order.trackings?.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold">Shipment Tracking</h3>
+              <div className="mt-2 space-y-2">
+                {order.trackings.map((t: any, i: number) => (
+                  <div
+                    key={i}
+                    className="flex flex-wrap items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
+                  >
+                    {t.company && (
+                      <span className="font-medium text-slate-700">
+                        {t.company}
+                      </span>
+                    )}
+                    {t.number && (
+                      <span className="font-mono text-sm text-slate-600">
+                        {t.number}
+                      </span>
+                    )}
+                    {t.url ? (
+                      <a
+                        href={t.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-auto inline-flex items-center gap-1 rounded bg-secondary px-3 py-1 text-sm font-semibold text-white hover:brightness-110 transition"
+                      >
+                        Track My Shipment
+                      </a>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="mt-6">
             <h3 className="text-lg font-semibold">Items</h3>

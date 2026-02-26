@@ -14,7 +14,7 @@ export async function PATCH(request: NextRequest) {
     if (!cartId)
       return NextResponse.json(
         { message: "Cart not available" },
-        { status: 400 }
+        { status: 400 },
       );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,18 +30,25 @@ export async function PATCH(request: NextRequest) {
       const current = await getCart(cartId);
 
       const edges = current?.lines?.edges ?? [];
+
+      // Normalize a Shopify GID or plain numeric id to just the numeric part for comparison
+      const extractId = (v: unknown) => {
+        const s = String(v ?? "");
+        const m = s.match(/(\d+)$/);
+        return m ? m[1] : s;
+      };
+      const targetId = extractId(body.merchandiseId);
+
       const match = edges.find(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (e: any) =>
-          e.node?.merchandise?.id === body.merchandiseId ||
-          e.node?.merchandise?.product?.id === body.merchandiseId
+          extractId(e.node?.merchandise?.id) === targetId ||
+          extractId(e.node?.merchandise?.product?.id) === targetId,
       );
 
       if (!match) {
-        return NextResponse.json(
-          { message: "No matching line found for merchandiseId" },
-          { status: 404 }
-        );
+        // Item not in Shopify cart (local-only); succeed silently so UI isn't disrupted
+        return NextResponse.json({ result: null, skipped: true });
       }
 
       result = await updateItemQuantity(cartId, match.node.id, body.quantity);
@@ -64,7 +71,7 @@ export async function PATCH(request: NextRequest) {
     console.error("PATCH /api/cart/update error:", err);
     return NextResponse.json(
       { message: "Error updating cart" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import React from "react";
 import Image from "next/image";
 import { Image as ImageIcon } from "lucide-react";
 import { useParams } from "next/navigation";
@@ -740,11 +741,13 @@ export default function ProductDetailPage() {
           <h2 className="text-2xl md:text-6xl font-semibold text-gray-700">
             {rotaNo}
           </h2>
-          <div className="text-3xl md:text-3xl font-bold">
-            <span className="text-3xl font-extrabold text-secondary">
-              ${effectiveDiscount ? formattedTierPrice : formattedPrice} USD
-            </span>
-          </div>
+          {Number(price) > 0 && (
+            <div className="text-3xl md:text-3xl font-bold">
+              <span className="text-3xl font-extrabold text-secondary">
+                ${effectiveDiscount ? formattedTierPrice : formattedPrice} USD
+              </span>
+            </div>
+          )}
 
           {/* Badges */}
           <div className="flex flex-wrap gap-3 mt-2">
@@ -1002,31 +1005,29 @@ export default function ProductDetailPage() {
                 }
 
                 return (
-                  <div className="mt-4 space-y-3 text-lg">
+                  <div className="mt-4 grid grid-cols-[max-content_1fr] gap-x-8 gap-y-3 text-lg items-start">
                     {oemEntries.map(([brand, nos]) => (
-                      <div key={brand} className="flex justify-between gap-4">
-                        <span className="font-semibold shrink-0">{brand}</span>
-                        <div className="flex flex-wrap justify-end gap-x-1 gap-y-0.5">
+                      <React.Fragment key={brand}>
+                        <span className="font-semibold whitespace-nowrap">
+                          {brand}
+                        </span>
+                        <span className="flex flex-wrap gap-x-1 gap-y-0.5 font-medium">
                           {nos.map((no, idx) => (
-                            <span key={idx} className="whitespace-nowrap">
+                            <span key={idx}>
                               {no}
                               {idx < nos.length - 1 ? " –" : ""}
                             </span>
                           ))}
-                        </div>
-                      </div>
-                    ))}
-
-                    {competitorRows.map((c, i) => (
-                      <div
-                        key={`comp-${i}`}
-                        className="flex justify-between gap-4"
-                      >
-                        <span className="font-semibold shrink-0">{c.name}</span>
-                        <span className="text-right whitespace-nowrap">
-                          {c.ref}
                         </span>
-                      </div>
+                      </React.Fragment>
+                    ))}
+                    {competitorRows.map((c, i) => (
+                      <React.Fragment key={i}>
+                        <span className="font-semibold whitespace-nowrap">
+                          {c.name}
+                        </span>
+                        <span className="font-medium">{c.ref}</span>
+                      </React.Fragment>
                     ))}
                   </div>
                 );

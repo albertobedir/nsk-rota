@@ -35,17 +35,40 @@ function getModels(tree: Tree, brand?: string) {
   return sortAlpha(Object.keys(tree[brand] ?? {}));
 }
 function getTypes(tree: Tree, brand?: string, model?: string) {
-  if (!brand || !model) return [] as string[];
-  return sortAlpha(Object.keys(tree[brand]?.[model] ?? {}));
+  if (!brand) return [] as string[];
+  const brandTree = tree[brand] ?? {};
+  // If a specific model is selected, return only its types
+  if (model && brandTree[model]) {
+    return sortAlpha(Object.keys(brandTree[model]));
+  }
+  // Otherwise return ALL types across all models for this brand
+  const all = new Set<string>();
+  for (const m of Object.values(brandTree)) {
+    for (const t of Object.keys(m)) all.add(t);
+  }
+  return sortAlpha(Array.from(all));
 }
 function getDescriptions(
   tree: Tree,
   brand?: string,
   model?: string,
-  type?: string
+  type?: string,
 ) {
-  if (!brand || !model || !type) return [] as string[];
-  return tree[brand]?.[model]?.[type] ?? [];
+  if (!brand) return [] as string[];
+  const brandTree = tree[brand] ?? {};
+  const all = new Set<string>();
+  for (const [m, typesObj] of Object.entries(brandTree)) {
+    // filter by model if selected
+    if (model && m !== model) continue;
+    for (const [t, descs] of Object.entries(
+      typesObj as Record<string, string[]>,
+    )) {
+      // filter by type if selected
+      if (type && t !== type) continue;
+      for (const d of descs) all.add(d);
+    }
+  }
+  return sortAlpha(Array.from(all));
 }
 
 export default function BrandModelTypeCombos({
@@ -74,12 +97,12 @@ export default function BrandModelTypeCombos({
   const brands = React.useMemo(() => getBrands(tree), [tree]);
   const models = React.useMemo(
     () => getModels(tree, filters.brand || undefined),
-    [tree, filters.brand]
+    [tree, filters.brand],
   );
   const types = React.useMemo(
     () =>
       getTypes(tree, filters.brand || undefined, filters.model || undefined),
-    [tree, filters.brand, filters.model]
+    [tree, filters.brand, filters.model],
   );
   const descs = React.useMemo(
     () =>
@@ -87,9 +110,9 @@ export default function BrandModelTypeCombos({
         tree,
         filters.brand || undefined,
         filters.model || undefined,
-        filters.type || undefined
+        filters.type || undefined,
       ),
-    [tree, filters.brand, filters.model, filters.type]
+    [tree, filters.brand, filters.model, filters.type],
   );
 
   const [brandOpen, setBrandOpen] = React.useState(false);
@@ -132,7 +155,7 @@ export default function BrandModelTypeCombos({
             variant="ghost"
             size="default"
             className={cn(
-              "w-[300px] justify-between text-muted-foreground h-[52px] bg-[#f3f3f3] text-[16px] p-4 text-left rounded-sm"
+              "w-[300px] justify-between text-muted-foreground h-[52px] bg-[#f3f3f3] text-[16px] p-4 text-left rounded-sm",
             )}
             aria-expanded={open}
             role="combobox"
@@ -142,7 +165,7 @@ export default function BrandModelTypeCombos({
             <ChevronDown
               className={cn(
                 "transition-transform duration-200 transform text-secondary",
-                open ? "rotate-180" : "rotate-0"
+                open ? "rotate-180" : "rotate-0",
               )}
             />
           </Button>
@@ -176,7 +199,7 @@ export default function BrandModelTypeCombos({
                     <Check
                       className={cn(
                         "ml-auto",
-                        value === opt ? "opacity-100" : "opacity-0"
+                        value === opt ? "opacity-100" : "opacity-0",
                       )}
                     />
                   </CommandItem>
@@ -227,12 +250,8 @@ export default function BrandModelTypeCombos({
           onChange={(v) => onTypeChange(v)}
           open={typeOpen}
           setOpen={setTypeOpen}
-          placeholder={
-            filters.brand && filters.model
-              ? "Select type"
-              : "Select brand & model first"
-          }
-          disabled={!filters.brand || !filters.model}
+          placeholder={filters.brand ? "Select type" : "Select brand first"}
+          disabled={!filters.brand}
         />
       </div>
 
@@ -246,11 +265,9 @@ export default function BrandModelTypeCombos({
           open={descOpen}
           setOpen={setDescOpen}
           placeholder={
-            filters.brand && filters.model && filters.type
-              ? "Select description"
-              : "Select brand, model & type first"
+            filters.brand ? "Select description" : "Select brand first"
           }
-          disabled={!filters.brand || !filters.model || !filters.type}
+          disabled={!filters.brand}
         />
       </div>
     </div>

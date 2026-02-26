@@ -179,6 +179,50 @@ export default function SingleProdCard({
       return false;
     }
   }, [oems, searchTerm]);
+  // Extract competitor ReferansView values from productRaw metafields
+  const competitorRefs = React.useMemo(() => {
+    try {
+      const metafields: any[] =
+        productRaw?.metafields ?? productRaw?.raw?.metafields ?? [];
+      const entry = metafields.find(
+        (m: any) => m?.namespace === "custom" && m?.key === "competitor_info",
+      );
+      if (!entry) return [];
+      const parsed =
+        typeof entry.value === "string" ? JSON.parse(entry.value) : entry.value;
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .map((c: any) =>
+          String(c?.ReferansView ?? "")
+            .trim()
+            .toLowerCase(),
+        )
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  }, [productRaw]);
+
+  const competitorExactMatch = React.useMemo(() => {
+    if (competitorRefs.length === 0) return false;
+    const terms = String(searchTerm ?? "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    return terms.some((t) => competitorRefs.includes(t));
+  }, [competitorRefs, searchTerm]);
+
+  const competitorPartialMatch = React.useMemo(() => {
+    if (competitorRefs.length === 0) return false;
+    const terms = String(searchTerm ?? "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    return terms.some((t) =>
+      competitorRefs.some((r) => r.includes(t) && r !== t),
+    );
+  }, [competitorRefs, searchTerm]);
+
   const searchTerms = React.useMemo(
     () =>
       String(searchTerm ?? "")
@@ -189,13 +233,24 @@ export default function SingleProdCard({
     [searchTerm],
   );
 
-  const isExactBadge = matchType === "exact" || oemExactMatch;
-  const isPartialBadge =
-    matchType === "partial" || (!isExactBadge && oemPartialMatch);
-  const isExactTitle =
+  const isCodeExactMatch =
+    searchTerms.length > 0 && searchTerms.includes(String(code).toLowerCase());
+  const isCodePartialMatch =
+    searchTerms.length > 0 &&
+    !isCodeExactMatch &&
+    searchTerms.some((t) => String(code).toLowerCase().includes(t));
+
+  const isExactBadge =
     matchType === "exact" ||
-    (searchTerms.length > 0 &&
-      searchTerms.includes(String(code).toLowerCase()));
+    oemExactMatch ||
+    isCodeExactMatch ||
+    competitorExactMatch;
+  const isPartialBadge =
+    matchType === "partial" ||
+    (!isExactBadge && oemPartialMatch) ||
+    (!isExactBadge && isCodePartialMatch) ||
+    (!isExactBadge && competitorPartialMatch);
+  const isExactTitle = matchType === "exact" || isCodeExactMatch;
   const isPartial = matchType === "partial";
   const tierTag = useSessionStore((s) => s.tierTag);
   const getDiscountForTier = useSessionStore((s) => s.getDiscountForTier);
@@ -573,16 +628,137 @@ export default function SingleProdCard({
             </div>
           )}
 
-          {/* OEM dynamic list (first 3) */}
+          {/* OEM dynamic list — grouped by brand */}
           {displayedOems && displayedOems.length > 0 ? (
             <div className="relative max-h-14 overflow-y-auto single-prod-scroll text-sm leading-[1.35] overflow-x-hidden pr-3">
-              {displayedOems
-                .slice(0, 3)
-                .map((oem: any, i: React.Key | null | undefined) => (
-                  <div key={i} className="font-semibold">
-                    {renderOemEntry(oem)}
-                  </div>
-                ))}
+              {(() => {
+                // Parse each entry into { brand, oemno }
+                const parseEntry = (
+                  entry: any,
+                ): { brand: string; oemno: string } => {
+                  try {
+                    if (!entry) return { brand: "", oemno: "" };
+                    if (typeof entry === "string") {
+                      const s = entry.trim();
+                      if (s.startsWith("[") || s.startsWith("{")) {
+                        const parsed = JSON.parse(s);
+                        const obj = Array.isArray(parsed) ? parsed[0] : parsed;
+                        if (obj && typeof obj === "object") {
+                          return {
+                            brand: String(
+                              obj.MarkaDescription ||
+                                obj.BrandDescription ||
+                                obj.Brand ||
+                                "",
+                            ),
+                            oemno: String(
+                              obj.OemNo ||
+                                obj.OEMNo ||
+                                obj.oemNo ||
+                                obj.Oem ||
+                                "",
+                            ),
+                          };
+                        }
+                      }
+                      return { brand: "", oemno: s };
+                    }
+                    if (typeof entry === "object") {
+                      return {
+                        brand: String(
+                          entry.MarkaDescription ||
+                            entry.BrandDescription ||
+                            entry.Brand ||
+                            "",
+                        ),
+                        oemno: String(
+                          entry.OemNo ||
+                            entry.OEMNo ||
+                            entry.oemNo ||
+                            entry.Oem ||
+                            "",
+                        ),
+                      };
+                    }
+                  } catch {}
+                  return { brand: "", oemno: String(entry) };
+                };
+
+                // Highlight matching OEM number
+                const hlOem = (text: string) => {
+                  const terms = String(searchTerm ?? "")
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)
+                    .map((s) => s.toLowerCase());
+                  if (terms.length === 0) return <span>{text}</span>;
+                  try {
+                    const esc = terms
+                      .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+                      .join("|");
+                    const parts = text.split(new RegExp(`(${esc})`, "gi"));
+                    const oemLower = text.trim().toLowerCase();
+                    const isExact = terms.includes(oemLower);
+                    return (
+                      <>
+                        {parts.map((part, idx) =>
+                          terms.includes(part.toLowerCase()) ? (
+                            <span
+                              key={idx}
+                              className={
+                                isExact
+                                  ? "bg-green-200 px-1 rounded"
+                                  : "bg-yellow-200 px-1 rounded"
+                              }
+                            >
+                              {part}
+                            </span>
+                          ) : (
+                            <span key={idx}>{part}</span>
+                          ),
+                        )}
+                      </>
+                    );
+                  } catch {
+                    return <span>{text}</span>;
+                  }
+                };
+
+                // Group by brand
+                const groups = new Map<string, string[]>();
+                displayedOems.forEach((entry: any) => {
+                  const { brand, oemno } = parseEntry(entry);
+                  const key = brand;
+                  if (!groups.has(key)) groups.set(key, []);
+                  if (oemno) groups.get(key)!.push(oemno);
+                });
+
+                return Array.from(groups.entries()).map(
+                  ([brand, oemnos], gi) => (
+                    <div
+                      key={gi}
+                      className="font-semibold leading-tight text-sm"
+                    >
+                      {brand && (
+                        <span className="font-semibold uppercase mr-1">
+                          {brand}
+                        </span>
+                      )}
+                      {brand && <span className="px-1">:</span>}
+                      {oemnos.map((oemno, ni) => (
+                        <React.Fragment key={ni}>
+                          {ni > 0 && (
+                            <span className="mx-1 text-gray-400">-</span>
+                          )}
+                          <span className="underline font-medium">
+                            {hlOem(oemno)}
+                          </span>
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  ),
+                );
+              })()}
             </div>
           ) : null}
 

@@ -9,10 +9,10 @@ type Order = {
   id?: string;
   invoiceNo?: string;
   b2bNo?: string;
-  packing?: boolean;
   orderDate: string;
   total: string;
   tracking?: string;
+  trackingUrl?: string;
   warehouse?: string;
   deliveryAddress?: string;
   status?: string;
@@ -91,13 +91,31 @@ export default function OpenOrdersPage() {
           o.displayFinancialStatus ||
           o.financial_status ||
           "";
+        const fulfillments: any[] = Array.isArray(o.fulfillments)
+          ? o.fulfillments
+          : [];
+        const trackingNumbers = fulfillments
+          .flatMap((f: any) =>
+            f.tracking_numbers?.length
+              ? f.tracking_numbers
+              : f.tracking_number
+                ? [f.tracking_number]
+                : [],
+          )
+          .join(", ");
+        const trackingUrl: string =
+          fulfillments.find((f: any) => f.tracking_url)?.tracking_url ||
+          fulfillments.find((f: any) => f.tracking_urls?.length)
+            ?.tracking_urls?.[0] ||
+          "";
         return {
           id,
           orderNo,
           orderDate: orderDate?.slice?.(0, 10) || orderDate,
           total,
-          tracking: "-",
-          warehouse: "-",
+          tracking: (o.tracking || trackingNumbers || "") as string,
+          trackingUrl,
+          warehouse: o.warehouse || "",
           deliveryAddress,
           status,
         } as Order;
@@ -260,9 +278,6 @@ export default function OpenOrdersPage() {
                   B2B No
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
-                  Packing
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
                   Order Date
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
@@ -307,20 +322,28 @@ export default function OpenOrdersPage() {
                     {r.b2bNo || "-"}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">
-                    {r.packing ? (
-                      <span className="text-amber-600">Yes</span>
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-700">
                     {r.orderDate}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-slate-800">
                     {r.total}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">
-                    {r.tracking || "-"}
+                    {r.tracking ? (
+                      r.trackingUrl ? (
+                        <a
+                          href={r.trackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline"
+                        >
+                          {r.tracking}
+                        </a>
+                      ) : (
+                        r.tracking
+                      )
+                    ) : (
+                      "-"
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">
                     {r.warehouse || "-"}

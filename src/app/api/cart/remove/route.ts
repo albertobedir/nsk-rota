@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import {
   removeCartLines,
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
     if (!cartId)
       return NextResponse.json(
         { message: "Cart not available" },
-        { status: 400 }
+        { status: 400 },
       );
 
     let result: any = null;
@@ -28,19 +29,27 @@ export async function POST(request: NextRequest) {
       const current = await getCart(cartId);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const edges = current?.lines?.edges ?? [];
+
+      // Normalize GID or plain numeric id to just the numeric part for comparison
+      const extractId = (v: unknown) => {
+        const s = String(v ?? "");
+        const m = s.match(/(\d+)$/);
+        return m ? m[1] : s;
+      };
+      const targetId = extractId(body.merchandiseId);
+
       const match = edges.find(
         (e: any) =>
-          e.node?.merchandise?.id === body.merchandiseId ||
-          e.node?.merchandise?.product?.id === body.merchandiseId
+          extractId(e.node?.merchandise?.id) === targetId ||
+          extractId(e.node?.merchandise?.product?.id) === targetId,
       );
-      if (match) {
-        result = await removeItemFromCart(cartId, match.node.id);
-      } else {
-        return NextResponse.json(
-          { message: "No matching line found for merchandiseId" },
-          { status: 404 }
-        );
+
+      // Item not in Shopify cart (local-only); succeed silently
+      if (!match) {
+        return NextResponse.json({ result: null, skipped: true });
       }
+
+      result = await removeItemFromCart(cartId, match.node.id);
     } else {
       return NextResponse.json({ message: "Invalid payload" }, { status: 400 });
     }
@@ -60,7 +69,7 @@ export async function POST(request: NextRequest) {
     console.error("POST /api/cart/remove error:", err);
     return NextResponse.json(
       { message: "Error removing from cart" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

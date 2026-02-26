@@ -34,7 +34,7 @@ import responseJson from "@/static/response.json";
 
 export default function ProductsPage() {
   const [page, setPage] = useState(1);
-  const perPage = 12;
+  const perPage = 16;
 
   const {
     products,
@@ -65,7 +65,15 @@ export default function ProductsPage() {
     modelsByBrand: Record<string, string[]>;
     typesByBrandModel: Record<string, string[]>;
     descsByBrandModelType: Record<string, string[]>;
-  }>({ modelsByBrand: {}, typesByBrandModel: {}, descsByBrandModelType: {} });
+    typesByBrand: Record<string, string[]>;
+    descsByBrand: Record<string, string[]>;
+  }>({
+    modelsByBrand: {},
+    typesByBrandModel: {},
+    descsByBrandModelType: {},
+    typesByBrand: {},
+    descsByBrand: {},
+  });
 
   // no modal; use cascading selects: brand -> model -> type
 
@@ -83,10 +91,16 @@ export default function ProductsPage() {
       const typesByBrandModelPlain: Record<string, string[]> = {};
       const descsByBrandModelTypePlain: Record<string, string[]> = {};
 
+      const typesByBrandPlain: Record<string, string[]> = {};
+      const descsByBrandPlain: Record<string, string[]> = {};
+
       for (const brand of brands) {
         const modelsObj = tree[brand] || {};
         const models = Object.keys(modelsObj).sort();
         modelsByBrandPlain[brand] = models;
+
+        const brandTypesSet = new Set<string>();
+        const brandDescSet = new Set<string>();
 
         for (const model of models) {
           const typesObj = modelsObj[model] || {};
@@ -94,12 +108,17 @@ export default function ProductsPage() {
           typesByBrandModelPlain[`${brand}||${model}`] = types;
 
           for (const type of types) {
+            brandTypesSet.add(type);
             const descs = Array.isArray(typesObj[type])
               ? typesObj[type].map((d: any) => String(d))
               : [];
+            descs.forEach((d: string) => brandDescSet.add(d));
             descsByBrandModelTypePlain[`${brand}||${model}||${type}`] = descs;
           }
         }
+
+        typesByBrandPlain[brand] = Array.from(brandTypesSet).sort();
+        descsByBrandPlain[brand] = Array.from(brandDescSet).sort();
       }
 
       return {
@@ -108,6 +127,8 @@ export default function ProductsPage() {
           modelsByBrand: modelsByBrandPlain,
           typesByBrandModel: typesByBrandModelPlain,
           descsByBrandModelType: descsByBrandModelTypePlain,
+          typesByBrand: typesByBrandPlain,
+          descsByBrand: descsByBrandPlain,
         },
       };
     }
@@ -161,6 +182,8 @@ export default function ProductsPage() {
         modelsByBrand: {},
         typesByBrandModel: {},
         descsByBrandModelType: {},
+        typesByBrand: {},
+        descsByBrand: {},
       },
     };
   };
@@ -208,22 +231,26 @@ export default function ProductsPage() {
     {
       key: "type",
       label: "Type",
-      options: (filters.brand && filters.model
-        ? (maps.typesByBrandModel[`${filters.brand}||${filters.model}`] ?? [])
+      options: (filters.brand
+        ? filters.model
+          ? (maps.typesByBrandModel[`${filters.brand}||${filters.model}`] ?? [])
+          : (maps.typesByBrand[filters.brand] ?? [])
         : []
       ).map((o) => (typeof o === "string" ? o : JSON.stringify(o))),
-      disabled: !filters.model,
+      disabled: !filters.brand,
     },
     {
       key: "desc",
       label: "Description",
-      options: (filters.brand && filters.model && filters.type
-        ? (maps.descsByBrandModelType[
-            `${filters.brand}||${filters.model}||${filters.type}`
-          ] ?? [])
+      options: (filters.brand
+        ? filters.brand && filters.model && filters.type
+          ? (maps.descsByBrandModelType[
+              `${filters.brand}||${filters.model}||${filters.type}`
+            ] ?? [])
+          : (maps.descsByBrand[filters.brand] ?? [])
         : []
       ).map((o) => (typeof o === "string" ? o : JSON.stringify(o))),
-      disabled: !filters.type,
+      disabled: !filters.brand,
     },
   ];
 
@@ -776,6 +803,7 @@ export default function ProductsPage() {
           sm:grid-cols-2 
           md:grid-cols-3 
           lg:grid-cols-4 
+          xl:grid-cols-4 
           gap-6 
           place-items-center
         "

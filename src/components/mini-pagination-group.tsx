@@ -411,8 +411,32 @@ export default function MiniPaginationGroup({
           ? Array.from({ length: pageSize }).map((_, i) => (
               <div
                 key={i}
-                className="snap-start shrink-0 w-[60%] sm:w-auto rounded-xl bg-gray-100 animate-pulse h-64"
-              />
+                className="snap-start shrink-0 w-[60%] sm:w-auto rounded-md border-2 border-gray-100 bg-white overflow-hidden flex flex-col animate-pulse"
+              >
+                {/* Image placeholder */}
+                <div className="w-full h-36 md:h-56 lg:h-64 bg-gray-100 rounded-t-md" />
+
+                <div className="flex flex-col gap-2 p-3 flex-1">
+                  {/* Code */}
+                  <div className="h-7 w-2/3 bg-gray-200 rounded" />
+                  {/* Title */}
+                  <div className="h-4 w-full bg-gray-100 rounded" />
+                  {/* Price */}
+                  <div className="h-5 w-1/3 bg-gray-200 rounded" />
+                  {/* OEM lines */}
+                  <div className="flex flex-col gap-1">
+                    <div className="h-3 w-4/5 bg-gray-100 rounded" />
+                    <div className="h-3 w-3/5 bg-gray-100 rounded" />
+                  </div>
+                  {/* Badges */}
+                  <div className="flex gap-2 mt-1">
+                    <div className="h-4 w-16 bg-gray-100 rounded-full" />
+                    <div className="h-4 w-20 bg-gray-100 rounded-full" />
+                  </div>
+                  {/* Button */}
+                  <div className="mt-auto h-10 w-full bg-gray-200 rounded-md" />
+                </div>
+              </div>
             ))
           : pageItems.map((p) => (
               <div
