@@ -630,7 +630,7 @@ export default function SingleProdCard({
 
           {/* OEM dynamic list — grouped by brand */}
           {displayedOems && displayedOems.length > 0 ? (
-            <div className="text-sm leading-[1.35] overflow-y-auto overflow-x-hidden single-prod-scroll">
+            <div className="text-sm leading-[1.35] overflow-y-auto overflow-x-hidden single-prod-scroll max-h-28">
               {(() => {
                 // Parse each entry into { brand, oemno }
                 const parseEntry = (
