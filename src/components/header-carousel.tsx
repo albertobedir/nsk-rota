@@ -12,9 +12,9 @@ import {
 import Image from "next/image";
 
 const banners = [
-  { bg: "none", content: "/cr1.jpg" },
+  { bg: "/cr1bg.jpg", content: "/cr1.png" },
   { bg: "/cr2bg.jpg", content: "/cr2.png" },
-  { bg: "none", content: "/cr3.jpg" },
+  { bg: "/cr3bg.jpg", content: "/cr3.png" },
 ];
 
 export default function HeaderCarousel() {

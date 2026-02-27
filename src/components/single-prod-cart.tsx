@@ -101,6 +101,19 @@ export default function SingleProdCard({
   const [qty, setQty] = useState<string>("1");
   const [offerOpen, setOfferOpen] = useState(false);
 
+  const REQUESTED_PRODUCTS_KEY = "requested_products";
+  const [alreadyRequested, setAlreadyRequested] = useState(false);
+  React.useEffect(() => {
+    try {
+      const list: string[] = JSON.parse(
+        localStorage.getItem(REQUESTED_PRODUCTS_KEY) ?? "[]",
+      );
+      setAlreadyRequested(
+        list.map((s) => s.toLowerCase()).includes((code ?? "").toLowerCase()),
+      );
+    } catch {}
+  }, [code]);
+
   // determine exact match also when OEM number equals searchTerm
   const extractOemNo = (entry: any) => {
     try {
@@ -804,10 +817,15 @@ export default function SingleProdCard({
               if (!hasStockInfo || !isActuallyInStock) {
                 return (
                   <button
-                    onClick={() => setOfferOpen(true)}
-                    className="w-full h-10 font-bold bg-secondary text-white rounded-md hover:brightness-110 transition"
+                    disabled={alreadyRequested}
+                    onClick={() => !alreadyRequested && setOfferOpen(true)}
+                    className={`w-full h-10 font-bold rounded-md transition ${
+                      alreadyRequested
+                        ? "bg-gray-400 text-white cursor-not-allowed"
+                        : "bg-secondary text-white hover:brightness-110"
+                    }`}
                   >
-                    Get Offer
+                    {alreadyRequested ? "Already Requested" : "Get Offer"}
                   </button>
                 );
               }
@@ -816,10 +834,15 @@ export default function SingleProdCard({
               if (hasStockInfo && isActuallyInStock && !hasPrice) {
                 return (
                   <button
-                    onClick={() => setOfferOpen(true)}
-                    className="w-full h-10 font-bold bg-secondary text-white rounded-md hover:brightness-110 transition"
+                    disabled={alreadyRequested}
+                    onClick={() => !alreadyRequested && setOfferOpen(true)}
+                    className={`w-full h-10 font-bold rounded-md transition ${
+                      alreadyRequested
+                        ? "bg-gray-400 text-white cursor-not-allowed"
+                        : "bg-secondary text-white hover:brightness-110"
+                    }`}
                   >
-                    Get Offer
+                    {alreadyRequested ? "Already Requested" : "Get Offer"}
                   </button>
                 );
               }
@@ -955,6 +978,23 @@ export default function SingleProdCard({
                     }),
                   });
                   if (resp.ok) {
+                    try {
+                      const list: string[] = JSON.parse(
+                        localStorage.getItem(REQUESTED_PRODUCTS_KEY) ?? "[]",
+                      );
+                      if (
+                        !list
+                          .map((s) => s.toLowerCase())
+                          .includes((code ?? "").toLowerCase())
+                      ) {
+                        list.push(code);
+                        localStorage.setItem(
+                          REQUESTED_PRODUCTS_KEY,
+                          JSON.stringify(list),
+                        );
+                      }
+                      setAlreadyRequested(true);
+                    } catch {}
                     toast.success("Request submitted");
                     setOfferOpen(false);
                   } else {

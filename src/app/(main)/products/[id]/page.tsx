@@ -159,6 +159,26 @@ export default function ProductDetailPage() {
   const [stockModalOpen, setStockModalOpen] = useState(false);
   const [visibleModelsCount, setVisibleModelsCount] = useState(5);
 
+  const REQUESTED_PRODUCTS_KEY = "requested_products";
+  const [alreadyRequested, setAlreadyRequested] = useState(false);
+  useEffect(() => {
+    if (!product) return;
+    try {
+      const metafields: any[] = (product.raw as any)?.metafields ?? [];
+      const rotaKey =
+        metafields.find((m: any) => m.key === "rota_no")?.value ??
+        (product.raw as any)?.title ??
+        "";
+      if (!rotaKey) return;
+      const list: string[] = JSON.parse(
+        localStorage.getItem(REQUESTED_PRODUCTS_KEY) ?? "[]",
+      );
+      setAlreadyRequested(
+        list.map((s) => s.toLowerCase()).includes(rotaKey.toLowerCase()),
+      );
+    } catch {}
+  }, [product]);
+
   /* Components state (moved up to avoid conditional hook calls) */
   const [componentsProducts, setComponentsProducts] = useState<
     { prod: IProduct; qty: number }[]
@@ -809,10 +829,15 @@ export default function ProductDetailPage() {
               if (isGetStock) {
                 return (
                   <button
-                    onClick={() => setStockModalOpen(true)}
-                    className="w-full h-14 font-bold bg-secondary text-white rounded-md hover:brightness-110 transition"
+                    disabled={alreadyRequested}
+                    onClick={() => !alreadyRequested && setStockModalOpen(true)}
+                    className={`w-full h-14 font-bold rounded-md transition ${
+                      alreadyRequested
+                        ? "bg-gray-400 text-white cursor-not-allowed"
+                        : "bg-secondary text-white hover:brightness-110"
+                    }`}
                   >
-                    Get Stock
+                    {alreadyRequested ? "Already Requested" : "Get Stock"}
                   </button>
                 );
               }
@@ -1349,6 +1374,23 @@ export default function ProductDetailPage() {
                     }),
                   });
                   if (resp.ok) {
+                    try {
+                      const list: string[] = JSON.parse(
+                        localStorage.getItem(REQUESTED_PRODUCTS_KEY) ?? "[]",
+                      );
+                      if (
+                        !list
+                          .map((s) => s.toLowerCase())
+                          .includes(rotaNo.toLowerCase())
+                      ) {
+                        list.push(rotaNo);
+                        localStorage.setItem(
+                          REQUESTED_PRODUCTS_KEY,
+                          JSON.stringify(list),
+                        );
+                      }
+                      setAlreadyRequested(true);
+                    } catch {}
                     toast.success("Request submitted");
                     setStockModalOpen(false);
                   } else {

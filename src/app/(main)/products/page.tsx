@@ -260,6 +260,17 @@ export default function ProductsPage() {
   const [requestTerm, setRequestTerm] = useState("");
   const requestMsgRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const REQUESTED_PRODUCTS_KEY = "requested_products";
+  const [requestedTerms, setRequestedTerms] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const list: string[] = JSON.parse(
+        localStorage.getItem(REQUESTED_PRODUCTS_KEY) ?? "[]",
+      );
+      setRequestedTerms(new Set(list.map((s) => s.toLowerCase())));
+    } catch {}
+  }, []);
+
   useEffect(() => {
     // On mount: fetch dynamic filter options and restore any URL params.
     // Returns an object with restored filters/page when available so caller
@@ -635,13 +646,22 @@ export default function ProductsPage() {
                         {/* Desktop */}
                         <div className="hidden md:block">
                           <Button
-                            className="w-full bg-secondary text-white font-semibold"
+                            disabled={requestedTerms.has(term.toLowerCase())}
+                            className={`w-full font-semibold ${
+                              requestedTerms.has(term.toLowerCase())
+                                ? "bg-gray-400 text-white cursor-not-allowed"
+                                : "bg-secondary text-white"
+                            }`}
                             onClick={() => {
+                              if (requestedTerms.has(term.toLowerCase()))
+                                return;
                               setRequestTerm(term);
                               setShowRequestModal(true);
                             }}
                           >
-                            Get Request
+                            {requestedTerms.has(term.toLowerCase())
+                              ? "Already Requested"
+                              : "Get Request"}
                           </Button>
                         </div>
 
@@ -650,10 +670,22 @@ export default function ProductsPage() {
                           <Sheet>
                             <SheetTrigger asChild>
                               <Button
-                                className="w-full bg-secondary text-white font-semibold"
-                                onClick={() => setRequestTerm(term)}
+                                disabled={requestedTerms.has(
+                                  term.toLowerCase(),
+                                )}
+                                className={`w-full font-semibold ${
+                                  requestedTerms.has(term.toLowerCase())
+                                    ? "bg-gray-400 text-white cursor-not-allowed"
+                                    : "bg-secondary text-white"
+                                }`}
+                                onClick={() =>
+                                  !requestedTerms.has(term.toLowerCase()) &&
+                                  setRequestTerm(term)
+                                }
                               >
-                                Get Request
+                                {requestedTerms.has(term.toLowerCase())
+                                  ? "Already Requested"
+                                  : "Get Request"}
                               </Button>
                             </SheetTrigger>
                             <SheetContent side="right" className="max-w-lg">
@@ -695,6 +727,31 @@ export default function ProductsPage() {
                                           },
                                         );
                                         if (resp.ok) {
+                                          try {
+                                            const list: string[] = JSON.parse(
+                                              localStorage.getItem(
+                                                REQUESTED_PRODUCTS_KEY,
+                                              ) ?? "[]",
+                                            );
+                                            if (
+                                              !list
+                                                .map((s) => s.toLowerCase())
+                                                .includes(term.toLowerCase())
+                                            ) {
+                                              list.push(term);
+                                              localStorage.setItem(
+                                                REQUESTED_PRODUCTS_KEY,
+                                                JSON.stringify(list),
+                                              );
+                                            }
+                                            setRequestedTerms(
+                                              (prev) =>
+                                                new Set([
+                                                  ...prev,
+                                                  term.toLowerCase(),
+                                                ]),
+                                            );
+                                          } catch {}
                                           toast.success("Request submitted");
                                           const close = document.querySelector(
                                             '[data-slot="sheet-close"]',
@@ -771,6 +828,27 @@ export default function ProductsPage() {
                             }),
                           });
                           if (resp.ok) {
+                            try {
+                              const list: string[] = JSON.parse(
+                                localStorage.getItem(REQUESTED_PRODUCTS_KEY) ??
+                                  "[]",
+                              );
+                              if (
+                                !list
+                                  .map((s) => s.toLowerCase())
+                                  .includes(requestTerm.toLowerCase())
+                              ) {
+                                list.push(requestTerm);
+                                localStorage.setItem(
+                                  REQUESTED_PRODUCTS_KEY,
+                                  JSON.stringify(list),
+                                );
+                              }
+                              setRequestedTerms(
+                                (prev) =>
+                                  new Set([...prev, requestTerm.toLowerCase()]),
+                              );
+                            } catch {}
                             toast.success("Request submitted");
                             setShowRequestModal(false);
                           } else {
