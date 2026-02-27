@@ -26,7 +26,6 @@ export function proxy(req: NextRequest) {
     "/basket",
     "/profile",
     "/profile/account",
-    "/profile/open-orders",
     "/profile/order-history",
     "/profile/invoices",
     "/profile/payment",

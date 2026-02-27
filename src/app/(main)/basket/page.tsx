@@ -88,7 +88,7 @@ export default function BasketPage() {
           }
           await fetch("/api/cart/clear", { method: "POST" }).catch(() => null);
           clearCartStore();
-          router.push("/profile/open-orders");
+          router.push("/profile/order-history");
         }
       } catch (e) {
         console.error("Get offer failed:", e);

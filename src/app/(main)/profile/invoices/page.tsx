@@ -202,9 +202,6 @@ export default function OrderHistoryPage() {
                   Tracking
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
-                  Warehouse
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
                   Delivery Address
                 </th>
               </tr>
@@ -256,9 +253,6 @@ export default function OrderHistoryPage() {
                     ) : (
                       "-"
                     )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-700">
-                    {r.warehouse || "-"}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">
                     {r.deliveryAddress || "-"}

@@ -461,7 +461,7 @@ export default function SingleProdCard({
                   ) : null}
                   {brand ? <span className="px-1">:</span> : null}
                   {oemno ? (
-                    <span className="underline font-medium">
+                    <span className="font-medium">
                       {highlightOem(String(oemno)) ?? oemno}
                     </span>
                   ) : null}
@@ -491,7 +491,7 @@ export default function SingleProdCard({
               ) : null}
               {brand ? <span className="px-1">:</span> : null}
               {oemno ? (
-                <span className="underline font-medium">
+                <span className="font-medium">
                   {highlightOem(String(oemno)) ?? oemno}
                 </span>
               ) : null}
@@ -630,7 +630,7 @@ export default function SingleProdCard({
 
           {/* OEM dynamic list — grouped by brand */}
           {displayedOems && displayedOems.length > 0 ? (
-            <div className="relative max-h-14 overflow-y-auto single-prod-scroll text-sm leading-[1.35] overflow-x-hidden pr-3">
+            <div className="text-sm leading-[1.35] overflow-y-auto overflow-x-hidden single-prod-scroll">
               {(() => {
                 // Parse each entry into { brand, oemno }
                 const parseEntry = (
@@ -737,22 +737,17 @@ export default function SingleProdCard({
                   ([brand, oemnos], gi) => (
                     <div
                       key={gi}
-                      className="font-semibold leading-tight text-sm"
+                      className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 font-semibold text-sm mb-4"
                     >
                       {brand && (
-                        <span className="font-semibold uppercase mr-1">
-                          {brand}
+                        <span className="font-semibold uppercase shrink-0">
+                          {brand} :
                         </span>
                       )}
-                      {brand && <span className="px-1">:</span>}
                       {oemnos.map((oemno, ni) => (
                         <React.Fragment key={ni}>
-                          {ni > 0 && (
-                            <span className="mx-1 text-gray-400">-</span>
-                          )}
-                          <span className="underline font-medium">
-                            {hlOem(oemno)}
-                          </span>
+                          {ni > 0 && <span className="text-gray-300">·</span>}
+                          <span className="font-medium">{hlOem(oemno)}</span>
                         </React.Fragment>
                       ))}
                     </div>

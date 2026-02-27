@@ -10,8 +10,7 @@ export default function TopBanner() {
       return { title: "My Account", rotaNo: "" };
     if (p.startsWith("/profile/open-orders"))
       return { title: "Open Orders", rotaNo: "" };
-    if (p.startsWith("/profile/order-history"))
-      return { title: "Order History", rotaNo: "" };
+
     if (p.startsWith("/profile/invoices"))
       return { title: "Invoices", rotaNo: "" };
     if (p.startsWith("/profile/account-statement"))

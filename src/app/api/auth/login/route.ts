@@ -46,10 +46,15 @@ export async function POST(request: NextRequest) {
     const shopifyToken = payload.customerAccessToken;
 
     if (!shopifyToken) {
-      const err = payload.customerUserErrors[0] ?? {
-        message: "Authentication failed.",
-      };
-      return NextResponse.json({ message: err.message }, { status: 401 });
+      const err = payload.customerUserErrors[0] ?? { code: "UNKNOWN" };
+      let userMessage = "Invalid email or password. Please try again.";
+      if (err.code === "CUSTOMER_DISABLED") {
+        userMessage = "Your account has been disabled. Please contact support.";
+      } else if (err.code === "THROTTLED") {
+        userMessage =
+          "Too many login attempts. Please wait a moment and try again.";
+      }
+      return NextResponse.json({ message: userMessage }, { status: 401 });
     }
 
     // Shopify customer bilgilerini al

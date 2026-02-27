@@ -9,7 +9,7 @@ type Props = { onNavigate?: () => void };
 
 const nav = [
   { label: "My Account", href: "/profile/account", icon: User },
-  { label: "Open Orders", href: "/profile/open-orders", icon: ShoppingBag },
+
   { label: "Order History", href: "/profile/order-history", icon: Receipt },
   { label: "Invoices", href: "/profile/invoices", icon: Receipt },
 ];
@@ -41,14 +41,14 @@ export default function SidebarNav({ onNavigate }: Props) {
                 "group flex items-center justify-between rounded-xl px-3 py-2 text-sm transition",
                 active
                   ? "bg-[#fff3e6] text-slate-900 ring-1 ring-[#f28c1a]/30"
-                  : "text-slate-700 hover:bg-slate-50"
+                  : "text-slate-700 hover:bg-slate-50",
               )}
             >
               <span className="flex items-center gap-2">
                 <Icon
                   className={cn(
                     "h-4 w-4",
-                    active ? "text-[#f28c1a]" : "text-slate-500"
+                    active ? "text-[#f28c1a]" : "text-slate-500",
                   )}
                 />
                 {item.label}
@@ -79,14 +79,14 @@ export default function SidebarNav({ onNavigate }: Props) {
                 "group flex items-center justify-between rounded-xl px-3 py-2 text-sm transition",
                 active
                   ? "bg-[#fff3e6] text-slate-900 ring-1 ring-[#f28c1a]/30"
-                  : "text-slate-700 hover:bg-slate-50"
+                  : "text-slate-700 hover:bg-slate-50",
               )}
             >
               <span className="flex items-center gap-2">
                 <Icon
                   className={cn(
                     "h-4 w-4",
-                    active ? "text-[#f28c1a]" : "text-slate-500"
+                    active ? "text-[#f28c1a]" : "text-slate-500",
                   )}
                 />
                 {item.label}

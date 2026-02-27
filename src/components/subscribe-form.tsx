@@ -72,9 +72,21 @@ export default function Page() {
     },
     onError: (error: unknown) => {
       if (error instanceof Error) {
-        toast(error.message);
+        toast.error(error.message);
+      } else if (error && typeof error === "object" && "data" in error) {
+        const data = (error as { data?: { error?: string; message?: string } })
+          .data;
+        if (data?.error === "EMAIL_EXISTS") {
+          toast.error("This email address is already registered.");
+        } else if (data?.error === "VALIDATION_ERROR") {
+          toast.error("Please check your input and try again.");
+        } else {
+          toast.error(
+            data?.message || "Something went wrong. Please try again.",
+          );
+        }
       } else {
-        toast("Something went wrong");
+        toast.error("Something went wrong. Please try again.");
       }
     },
   });
@@ -87,7 +99,7 @@ export default function Page() {
             onSubmit={form.handleSubmit(
               (values: z.infer<typeof subscribeSchema>) => {
                 mutate(values);
-              }
+              },
             )}
             className="flex flex-col gap-6 justify-center h-full w-full p-0"
           >

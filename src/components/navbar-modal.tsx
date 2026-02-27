@@ -17,7 +17,7 @@ const categories = [
     name: "Profile",
     items: [
       { name: "My Account", href: "/profile/account" },
-      { name: "Open Orders", href: "/profile/open-orders" },
+
       { name: "Order History", href: "/profile/order-history" },
       { name: "Invoices", href: "/profile/invoices" },
     ],

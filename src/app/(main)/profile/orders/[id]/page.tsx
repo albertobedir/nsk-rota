@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
+import { toast } from "sonner";
 
 type LineItem = {
   title: string;
@@ -243,7 +244,7 @@ export default function OrderDetailPage() {
       <div className="flex items-center justify-between">
         <button
           type="button"
-          onClick={() => router.push("/profile/open-orders")}
+          onClick={() => router.push("/profile/order-history")}
           className="text-sm text-secondary hover:underline"
         >
           ← Back to orders
@@ -255,9 +256,20 @@ export default function OrderDetailPage() {
             onClick={() =>
               window.open(`/api/pdf?id=${encodeURIComponent(id as string)}`)
             }
-            className="text-sm bg-blue-600 text-white px-3 py-1 rounded"
+            className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded"
           >
             Download as PDF
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              toast.info(
+                "Online payment is currently being processed through your account manager. Please contact us for assistance.",
+              )
+            }
+            className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded"
+          >
+            Pay Order
           </button>
         </div>
       </div>

@@ -67,9 +67,12 @@ export default function LoginForm() {
     },
     onError: (error: unknown) => {
       if (error instanceof Error) {
-        toast(error.message);
+        toast.error(error.message);
+      } else if (error && typeof error === "object" && "data" in error) {
+        const msg = (error as { data?: { message?: string } }).data?.message;
+        toast.error(msg || "Invalid email or password. Please try again.");
       } else {
-        toast("Something went wrong");
+        toast.error("Invalid email or password. Please try again.");
       }
     },
   });
@@ -90,7 +93,7 @@ export default function LoginForm() {
             onSubmit={form.handleSubmit(
               (values: z.infer<typeof loginSchema>) => {
                 mutate(values);
-              }
+              },
             )}
             className="flex flex-col gap-6 justify-center h-full w-full p-0"
           >
