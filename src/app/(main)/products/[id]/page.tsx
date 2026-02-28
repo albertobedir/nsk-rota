@@ -414,7 +414,10 @@ export default function ProductDetailPage() {
     }
   })();
 
-  const title = raw.title;
+  // Strip trailing " - CODE" suffix (e.g. "Repair Kit, Torque & V Rod - 29013744" → "Repair Kit, Torque & V Rod")
+  const title =
+    (raw.title ?? "").replace(/\s*-\s*[\w\d]+$/, "").trim() ||
+    (raw.title ?? "");
   const price = raw.variants?.[0]?.price ?? "0";
   const formattedPrice = Number(price).toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -762,10 +765,15 @@ export default function ProductDetailPage() {
             {rotaNo}
           </h2>
           {Number(price) > 0 && (
-            <div className="text-3xl md:text-3xl font-bold">
+            <div className="flex items-baseline gap-3 flex-wrap">
               <span className="text-3xl font-extrabold text-secondary">
                 ${effectiveDiscount ? formattedTierPrice : formattedPrice} USD
               </span>
+              {effectiveDiscount && (
+                <span className="text-base font-medium text-gray-400 line-through select-none">
+                  ${formattedPrice} USD
+                </span>
+              )}
             </div>
           )}
 
@@ -806,7 +814,7 @@ export default function ProductDetailPage() {
 
             <div className="flex items-center gap-1 font-bold text-orange-600">
               <Icons name="teslim" />
-              3–4 DAYS
+              1-2 DAYS
             </div>
           </div>
 

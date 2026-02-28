@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   serverExternalPackages: ["pdfkit"],
+
   images: {
     remotePatterns: [
       {
@@ -12,6 +12,22 @@ const nextConfig: NextConfig = {
     ],
     dangerouslyAllowSVG: true,
     unoptimized: true,
+  },
+
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [
+          {
+            type: "host",
+            value: "www.rota-usa.com",
+          },
+        ],
+        destination: "https://rota-usa.com/:path*",
+        permanent: true, // 308 redirect
+      },
+    ];
   },
 };
 

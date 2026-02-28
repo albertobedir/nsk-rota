@@ -621,7 +621,7 @@ export default function SingleProdCard({
               </p>
 
               <p className="text-sm font-medium text-gray-700 line-clamp-2">
-                {title}
+                {(title ?? "").replace(/\s*-\s*[\w\d]+$/, "").trim() || title}
               </p>
             </div>
           </Link>
@@ -769,6 +769,117 @@ export default function SingleProdCard({
               })()}
             </div>
           ) : null}
+
+          {/* Competitor references (Type === "View") */}
+          {(() => {
+            try {
+              const rawAny = productRaw as any;
+              let rawComps: any[] = [];
+              if (
+                Array.isArray(rawAny?.Competiters) &&
+                rawAny.Competiters.length > 0
+              ) {
+                rawComps = rawAny.Competiters;
+              } else {
+                const metafields: any[] =
+                  rawAny?.metafields ?? rawAny?.raw?.metafields ?? [];
+                const compField = metafields.find((m: any) =>
+                  /competitor_info/i.test(m?.key ?? ""),
+                );
+                if (compField?.value) {
+                  const parsed =
+                    typeof compField.value === "string"
+                      ? JSON.parse(compField.value)
+                      : compField.value;
+                  rawComps = Array.isArray(parsed) ? parsed : [];
+                }
+              }
+
+              const viewComps = rawComps.filter(
+                (c: any) =>
+                  String(c?.Type ?? "")
+                    .trim()
+                    .toLowerCase() === "view",
+              );
+              if (viewComps.length === 0) return null;
+
+              // Group by CompetitorName
+              const groups = new Map<string, string[]>();
+              for (const c of viewComps) {
+                const name = String(c.CompetitorName ?? "")
+                  .trim()
+                  .toUpperCase();
+                const ref = String(c.ReferansView ?? "").trim();
+                if (!name || !ref) continue;
+                if (!groups.has(name)) groups.set(name, []);
+                groups.get(name)!.push(ref);
+              }
+              if (groups.size === 0) return null;
+
+              // Highlight competitor ref against search terms
+              const hlRef = (text: string) => {
+                const terms = String(searchTerm ?? "")
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+                  .map((s) => s.toLowerCase());
+                if (terms.length === 0) return <span>{text}</span>;
+                try {
+                  const esc = terms
+                    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+                    .join("|");
+                  const parts = text.split(new RegExp(`(${esc})`, "gi"));
+                  const refLower = text.trim().toLowerCase();
+                  const isExact = terms.includes(refLower);
+                  return (
+                    <>
+                      {parts.map((part, idx) =>
+                        terms.includes(part.toLowerCase()) ? (
+                          <span
+                            key={idx}
+                            className={
+                              isExact
+                                ? "bg-green-200 px-1 rounded"
+                                : "bg-yellow-200 px-1 rounded"
+                            }
+                          >
+                            {part}
+                          </span>
+                        ) : (
+                          <span key={idx}>{part}</span>
+                        ),
+                      )}
+                    </>
+                  );
+                } catch {
+                  return <span>{text}</span>;
+                }
+              };
+
+              return (
+                <div className="text-sm leading-[1.35] overflow-y-auto overflow-x-hidden single-prod-scroll max-h-28">
+                  {Array.from(groups.entries()).map(([name, refs], gi) => (
+                    <div
+                      key={gi}
+                      className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 font-semibold text-sm mb-4"
+                    >
+                      <span className="font-semibold uppercase shrink-0">
+                        {name} :
+                      </span>
+                      {refs.map((ref, ri) => (
+                        <React.Fragment key={ri}>
+                          {ri > 0 && <span className="text-gray-300">·</span>}
+                          <span className="font-medium">{hlRef(ref)}</span>
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              );
+            } catch {
+              return null;
+            }
+          })()}
 
           {/* Dynamic badges (location, stock) */}
           <div className="flex flex-wrap gap-2 items-center">

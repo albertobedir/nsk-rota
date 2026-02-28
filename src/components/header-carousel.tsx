@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import type { CarouselApi } from "@/components/ui/carousel";
 import {
   Carousel,
@@ -11,16 +12,30 @@ import {
 } from "@/components/ui/carousel";
 import Image from "next/image";
 
-const banners = [
-  { bg: "/cr1bg.jpg", content: "/cr1.png" },
-  { bg: "/cr2bg.jpg", content: "/cr2.png" },
-  { bg: "/cr3bg.jpg", content: "/cr3.png" },
-];
+interface BannerItem {
+  id: string;
+  content_img: string | null;
+  bg_img: string | null;
+  type: string;
+  link: { text: string; url: string } | null;
+}
 
 export default function HeaderCarousel() {
   const [api, setApi] = React.useState<CarouselApi | null>(null);
   const [selected, setSelected] = React.useState(0);
-  const AUTOPLAY_MS = 5000; // 5 seconds
+  const [paused, setPaused] = React.useState(false);
+  const [banners, setBanners] = React.useState<BannerItem[]>([]);
+  const AUTOPLAY_MS = 6000;
+
+  // fetch banners from Shopify metaobjects
+  React.useEffect(() => {
+    fetch("/api/shopify/carousel-contents")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.results?.length) setBanners(data.results);
+      })
+      .catch((e) => console.error("[CarouselContents fetch error]", e));
+  }, []);
 
   React.useEffect(() => {
     if (!api) return;
@@ -38,9 +53,10 @@ export default function HeaderCarousel() {
 
   // autoplay: advance every AUTOPLAY_MS milliseconds
   React.useEffect(() => {
-    if (!api) return;
+    if (!api || banners.length === 0) return;
 
     const id = setInterval(() => {
+      if (paused) return;
       try {
         const next = (api.selectedScrollSnap() + 1) % banners.length;
         api.scrollTo(next);
@@ -50,48 +66,59 @@ export default function HeaderCarousel() {
     }, AUTOPLAY_MS);
 
     return () => clearInterval(id);
-  }, [api]);
+  }, [api, paused, banners.length]);
+
+  if (banners.length === 0) return null;
 
   return (
-    <div className="w-full overflow-hidden bg-transparent relative">
+    <div
+      className="w-full overflow-hidden bg-transparent relative"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
       <Carousel className="relative h-full w-full" setApi={setApi}>
         <CarouselPrevious className="absolute left-2 top-1/2 -translate-y-1/2 z-30" />
         <CarouselContent className="flex">
-          {banners.map((item, i) => (
-            <CarouselItem key={i}>
+          {banners.map((item, i) => {
+            const inner = (
               <div className="w-full relative h-64 md:h-96 lg:h-[32rem] overflow-hidden">
-                {item.bg !== "none" && (
+                {item.bg_img && (
                   <Image
-                    src={item.bg}
+                    src={item.bg_img}
                     fill
                     alt={`banner-bg-${i}`}
                     className="absolute inset-0 h-full w-full object-cover z-0"
                   />
                 )}
-
-                <Image
-                  src={item.content}
-                  fill
-                  alt={`banner-content-${i}`}
-                  className={
-                    item.bg === "none"
-                      ? "absolute inset-0 h-full w-full object-cover z-10"
-                      : "absolute inset-0 h-full w-full object-contain z-10"
-                  }
-                  style={
-                    item.bg === "none"
-                      ? undefined
-                      : { objectPosition: "center" }
-                  }
-                />
+                {item.content_img && (
+                  <Image
+                    src={item.content_img}
+                    fill
+                    alt={item.link?.text ?? `banner-content-${i}`}
+                    className="absolute inset-0 h-full w-full object-contain z-10"
+                    style={{ objectPosition: "center" }}
+                  />
+                )}
               </div>
-            </CarouselItem>
-          ))}
+            );
+
+            return (
+              <CarouselItem key={item.id}>
+                {item.type === "link" && item.link?.url ? (
+                  <Link href={item.link.url} className="block w-full">
+                    {inner}
+                  </Link>
+                ) : (
+                  inner
+                )}
+              </CarouselItem>
+            );
+          })}
         </CarouselContent>
         <CarouselNext className="absolute right-2 top-1/2 -translate-y-1/2 z-30" />
       </Carousel>
 
-      {/* indicators (absolute over image) */}
+      {/* indicators */}
       <div className="absolute left-1/2 -translate-x-1/2 bottom-6 z-30 flex items-center gap-3">
         {banners.map((_, i) => {
           const isActive = i === selected;

@@ -117,17 +117,17 @@ export default function Navbar() {
           {/* RESPONSIVE SEARCH + CREDIT BAR */}
           <div
             className={cn(
-              "lg:relative lg:px-0 px-4 absolute grid grid-cols-6 flex-1 gap-6 items-center justify-center w-full left-0 bottom-0 translate-y-[calc(100%+1.5rem)] lg:left-auto lg:bottom-auto lg:translate-y-0",
+              "lg:relative lg:px-0 px-4 absolute grid grid-cols-1 xl:grid-cols-[1fr_auto] flex-1 gap-4 items-center justify-center w-full left-0 bottom-0 translate-y-[calc(100%+1.5rem)] lg:left-auto lg:bottom-auto lg:translate-y-0",
               isSearchOpen ? "lg:grid grid" : "lg:grid hidden",
             )}
           >
-            <div className="col-span-6 xl:col-span-5 xl:max-w-full w-full justify-center flex relative">
+            <div className="col-span-1 w-full justify-center flex relative">
               <Search />
             </div>
 
             {user ? (
-              <div className="col-span-6 xl:col-span-1 w-full justify-end hidden xl:flex">
-                <div className="bg-white p-2 rounded-xl shadow-md w-full md:w-[220px]">
+              <div className="col-span-1 w-full justify-end hidden xl:flex">
+                <div className="bg-white px-3.5 py-2.5 rounded-xl border border-slate-100 shadow-sm w-[190px] shrink-0">
                   {(() => {
                     const creditLimit = Number(user?.creditLimit ?? 0);
                     const creditUsed = Number(user?.creditUsed ?? 0);
@@ -142,30 +142,30 @@ export default function Navbar() {
                       }).format(v) + " $";
 
                     return (
-                      <>
-                        <div className="flex items-center justify-between text-sm text-slate-400">
-                          <span>Credit</span>
-                          <span className="text-slate-600 font-medium">
-                            {fmt(creditLimit)}
-                          </span>
-                        </div>
+                      <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+                        <span className="text-slate-400 font-medium leading-tight self-center">
+                          Credit
+                        </span>
+                        <span className="text-slate-700 font-semibold text-right tabular-nums whitespace-nowrap leading-tight self-center">
+                          {fmt(creditLimit)}
+                        </span>
 
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-orange-500 font-semibold">
-                            Used
-                          </span>
-                          <span className="text-orange-500 font-bold">
-                            {fmt(creditUsed)}
-                          </span>
-                        </div>
+                        <span className="text-amber-500 font-medium leading-tight self-center">
+                          Used
+                        </span>
+                        <span className="text-amber-500 font-semibold text-right tabular-nums whitespace-nowrap leading-tight self-center">
+                          {fmt(creditUsed)}
+                        </span>
 
-                        <div className="flex items-center justify-between text-sm text-slate-400">
-                          <span>Remaining</span>
-                          <span className="text-slate-600 font-medium">
-                            {fmt(creditRemaining)}
-                          </span>
-                        </div>
-                      </>
+                        <div className="col-span-2 border-t border-slate-100 my-0.5" />
+
+                        <span className="text-slate-400 font-medium leading-tight self-center">
+                          Remaining
+                        </span>
+                        <span className="text-slate-700 font-semibold text-right tabular-nums whitespace-nowrap leading-tight self-center">
+                          {fmt(creditRemaining)}
+                        </span>
+                      </div>
                     );
                   })()}
                 </div>
