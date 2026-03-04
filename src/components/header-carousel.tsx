@@ -16,6 +16,7 @@ interface BannerItem {
   id: string;
   content_img: string | null;
   bg_img: string | null;
+  mobile_img: string | null;
   type: string;
   link: { text: string; url: string } | null;
 }
@@ -32,6 +33,10 @@ export default function HeaderCarousel() {
     fetch("/api/shopify/carousel-contents")
       .then((r) => r.json())
       .then((data) => {
+        console.log(
+          "[CarouselContents raw data]",
+          JSON.stringify(data, null, 2),
+        );
         if (data?.results?.length) setBanners(data.results);
       })
       .catch((e) => console.error("[CarouselContents fetch error]", e));
@@ -81,13 +86,13 @@ export default function HeaderCarousel() {
         <CarouselContent className="flex">
           {banners.map((item, i) => {
             const inner = (
-              <div className="w-full relative h-64 md:h-96 lg:h-[32rem] overflow-hidden">
+              <div className="w-full relative aspect-[4/5] md:aspect-auto md:h-96 lg:h-[32rem] overflow-hidden">
                 {item.bg_img && (
                   <Image
                     src={item.bg_img}
                     fill
                     alt={`banner-bg-${i}`}
-                    className="absolute inset-0 h-full w-full object-cover z-0"
+                    className={`absolute inset-0 h-full w-full object-cover z-0${item.mobile_img ? " hidden md:block" : ""}`}
                   />
                 )}
                 {item.content_img && (
@@ -95,7 +100,16 @@ export default function HeaderCarousel() {
                     src={item.content_img}
                     fill
                     alt={item.link?.text ?? `banner-content-${i}`}
-                    className="absolute inset-0 h-full w-full object-contain z-10"
+                    className={`absolute inset-0 h-full w-full object-contain z-10${item.mobile_img ? " hidden md:block" : ""}`}
+                    style={{ objectPosition: "center" }}
+                  />
+                )}
+                {item.mobile_img && (
+                  <Image
+                    src={item.mobile_img}
+                    fill
+                    alt={item.link?.text ?? `banner-mobile-${i}`}
+                    className="absolute inset-0 h-full w-full object-contain z-10 md:hidden"
                     style={{ objectPosition: "center" }}
                   />
                 )}

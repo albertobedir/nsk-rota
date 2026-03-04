@@ -37,6 +37,7 @@ export async function GET(_req: NextRequest) {
     for (const item of raw) {
       if (item.fieldsMap.content_img) gidSet.add(item.fieldsMap.content_img);
       if (item.fieldsMap.bg_img) gidSet.add(item.fieldsMap.bg_img);
+      if (item.fieldsMap.mobile_img) gidSet.add(item.fieldsMap.mobile_img);
     }
     const gids = Array.from(gidSet);
 
@@ -77,6 +78,7 @@ export async function GET(_req: NextRequest) {
         id: item.id,
         content_img: urlMap[fm.content_img] ?? null,
         bg_img: urlMap[fm.bg_img] ?? null,
+        mobile_img: urlMap[fm.mobile_img] ?? null,
         type: fm.type ?? "none",
         link: linkData,
       };

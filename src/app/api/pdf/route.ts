@@ -2,6 +2,7 @@
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
+import sharp from "sharp";
 
 export const runtime = "nodejs";
 
@@ -157,14 +158,18 @@ export async function GET(req: Request) {
     // ── HEADER BAND ─────────────────────────────────────────────────────────
     doc.rect(0, 0, pageWidth, 80).fill(ACCENT);
 
-    // Logo or company name in header
-    const logoPath = path.join(process.cwd(), "public", "logo.svg");
-    const logoWebp = path.join(process.cwd(), "public", "logo.webp");
+    // Logo — SVG → PNG buffer via sharp (transparent background, PDFKit supports PNG)
+    const logoSvgPath = path.join(process.cwd(), "public", "logo.svg");
+    const logoWebpPath = path.join(process.cwd(), "public", "logo.webp");
     let logoInserted = false;
-    for (const lp of [logoPath, logoWebp]) {
+    for (const lp of [logoSvgPath, logoWebpPath]) {
       if (!logoInserted && fs.existsSync(lp)) {
         try {
-          doc.image(lp, margin, 18, { height: 44, fit: [180, 44] });
+          const pngBuffer = await sharp(lp)
+            .resize({ height: 88 }) // 2× for sharpness
+            .png()
+            .toBuffer();
+          doc.image(pngBuffer, margin, 18, { height: 44, fit: [180, 44] });
           logoInserted = true;
         } catch (_) {
           /* skip */
@@ -176,7 +181,7 @@ export async function GET(req: Request) {
         .font(FONT_BOLD)
         .fontSize(22)
         .fillColor("#ffffff")
-        .text("NSK Group", margin, 26, { width: 200 });
+        .text("NSK ROTA", margin, 26, { width: 200 });
     }
 
     // "INVOICE" label on right side of header
