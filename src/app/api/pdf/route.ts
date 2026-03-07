@@ -134,13 +134,14 @@ export async function GET(req: Request) {
       chunks.push(Buffer.from(chunk)),
     );
 
-    const pageWidth = doc.page.width;   // 595
+    const pageWidth = doc.page.width; // 595
     const margin = 45;
     const contentWidth = pageWidth - margin * 2;
 
     const formatMoney = (amt: any, cur = "USD") => {
       const n = Number(amt);
-      if (Number.isNaN(n) || amt === null || amt === undefined || amt === "") return "$-";
+      if (Number.isNaN(n) || amt === null || amt === undefined || amt === "")
+        return "$-";
       return `$${n.toFixed(2)} ${cur}`.trim();
     };
 
@@ -153,13 +154,13 @@ export async function GET(req: Request) {
     };
 
     // ── Colours ─────────────────────────────────────────────────────────────
-    const ACCENT   = "#1a3b6e";   // deep navy (ROTA brand)
-    const ACCENT2  = "#2563a8";   // medium blue for rule lines
+    const ACCENT = "#1a3b6e"; // deep navy (ROTA brand)
+    const ACCENT2 = "#2563a8"; // medium blue for rule lines
     const LIGHT_BG = "#f0f4f8";
-    const DIVIDER  = "#c8d4e0";
+    const DIVIDER = "#c8d4e0";
     const TEXT_MUTED = "#6b7280";
-    const TEXT_DARK  = "#1f2937";
-    const WHITE      = "#ffffff";
+    const TEXT_DARK = "#1f2937";
+    const WHITE = "#ffffff";
 
     // ─────────────────────────────────────────────────────────────────────────
     // SECTION 1 — TOP: Logo + Company info  |  "COMMERCIAL INVOICE" + meta
@@ -167,34 +168,50 @@ export async function GET(req: Request) {
     let curY = 40;
 
     // Logo
-    const logoSvgPath  = path.join(process.cwd(), "public", "logo.svg");
+    const logoSvgPath = path.join(process.cwd(), "public", "logo.svg");
     const logoWebpPath = path.join(process.cwd(), "public", "logo.webp");
     let logoInserted = false;
     for (const lp of [logoSvgPath, logoWebpPath]) {
       if (!logoInserted && fs.existsSync(lp)) {
         try {
-          const pngBuf = await sharp(lp).resize({ height: 100 }).png().toBuffer();
+          const pngBuf = await sharp(lp)
+            .resize({ height: 100 })
+            .png()
+            .toBuffer();
           doc.image(pngBuf, margin, curY, { height: 50, fit: [160, 50] });
           logoInserted = true;
-        } catch (_) { /* skip */ }
+        } catch (_) {
+          /* skip */
+        }
       }
     }
     if (!logoInserted) {
-      doc.font(FONT_BOLD).fontSize(20).fillColor(ACCENT)
+      doc
+        .font(FONT_BOLD)
+        .fontSize(20)
+        .fillColor(ACCENT)
         .text("ROTA", margin, curY + 10, { width: 160 });
     }
 
     // "COMMERCIAL INVOICE" title — right aligned
-    doc.font(FONT_BOLD).fontSize(18).fillColor(ACCENT)
+    doc
+      .font(FONT_BOLD)
+      .fontSize(18)
+      .fillColor(ACCENT)
       .text("COMMERCIAL INVOICE", margin + contentWidth - 230, curY + 6, {
-        width: 230, align: "right",
+        width: 230,
+        align: "right",
       });
 
     curY += 60;
 
     // Thin accent rule under logo/title
-    doc.moveTo(margin, curY).lineTo(pageWidth - margin, curY)
-      .strokeColor(ACCENT2).lineWidth(1.5).stroke();
+    doc
+      .moveTo(margin, curY)
+      .lineTo(pageWidth - margin, curY)
+      .strokeColor(ACCENT2)
+      .lineWidth(1.5)
+      .stroke();
     curY += 10;
 
     // Supplier info (left) | Invoice meta (right)
@@ -203,27 +220,43 @@ export async function GET(req: Request) {
     const metaLabelW = 80;
     const metaValW = 120;
 
-    doc.font(FONT_BOLD).fontSize(9).fillColor(ACCENT).text("SUPPLIER:", supplierX, curY);
+    doc
+      .font(FONT_BOLD)
+      .fontSize(9)
+      .fillColor(ACCENT)
+      .text("SUPPLIER:", supplierX, curY);
     const supplierBodyY = curY + 13;
-    doc.font(FONT_BOLD).fontSize(9).fillColor(TEXT_DARK)
+    doc
+      .font(FONT_BOLD)
+      .fontSize(9)
+      .fillColor(TEXT_DARK)
       .text("ROTA North America, LLC", supplierX, supplierBodyY);
-    doc.font(FONT_REGULAR).fontSize(8.5).fillColor(TEXT_DARK)
+    doc
+      .font(FONT_REGULAR)
+      .fontSize(8.5)
+      .fillColor(TEXT_DARK)
       .text("10 N Martingale Rd #400", supplierX, supplierBodyY + 12)
       .text("Schaumburg, IL 60173, USA", supplierX, supplierBodyY + 23);
 
     // Meta block: Date / Invoice No / Page
     const orderNum = order?.orderNumber || order?.id || id || "-";
-    const dateStr  = formatDate(order?.processedAt);
+    const dateStr = formatDate(order?.processedAt);
 
     const metaRow = (label: string, val: string, y: number) => {
-      doc.font(FONT_BOLD).fontSize(8.5).fillColor(TEXT_DARK)
+      doc
+        .font(FONT_BOLD)
+        .fontSize(8.5)
+        .fillColor(TEXT_DARK)
         .text(label, metaX, y, { width: metaLabelW });
-      doc.font(FONT_REGULAR).fontSize(8.5).fillColor(TEXT_DARK)
+      doc
+        .font(FONT_REGULAR)
+        .fontSize(8.5)
+        .fillColor(TEXT_DARK)
         .text(val, metaX + metaLabelW, y, { width: metaValW });
     };
-    metaRow("Date:",       dateStr,    curY);
+    metaRow("Date:", dateStr, curY);
     metaRow("Invoice No:", `#${orderNum}`, curY + 13);
-    metaRow("Page:",       "1",        curY + 26);
+    metaRow("Page:", "1", curY + 26);
 
     curY += 55;
 
@@ -248,9 +281,14 @@ export async function GET(req: Request) {
     const thirdW = (contentWidth - 20) / 3;
 
     // "Bill To"
-    doc.font(FONT_BOLD).fontSize(8.5).fillColor(ACCENT)
+    doc
+      .font(FONT_BOLD)
+      .fontSize(8.5)
+      .fillColor(ACCENT)
       .text("BILL TO", margin + 8, curY + 8);
-    const billLines = buildAddrLines(order?.billingAddress || order?.shippingAddress || null);
+    const billLines = buildAddrLines(
+      order?.billingAddress || order?.shippingAddress || null,
+    );
     let lineY = curY + 21;
     doc.font(FONT_REGULAR).fontSize(8.5).fillColor(TEXT_DARK);
     billLines.forEach((l) => {
@@ -260,7 +298,10 @@ export async function GET(req: Request) {
 
     // "Ship To"
     const shipX = margin + thirdW + 10;
-    doc.font(FONT_BOLD).fontSize(8.5).fillColor(ACCENT)
+    doc
+      .font(FONT_BOLD)
+      .fontSize(8.5)
+      .fillColor(ACCENT)
       .text("SHIP TO", shipX, curY + 8);
     const shipLines = buildAddrLines(order?.shippingAddress || null);
     lineY = curY + 21;
@@ -272,20 +313,27 @@ export async function GET(req: Request) {
 
     // "Details"
     const detailX = margin + thirdW * 2 + 20;
-    doc.font(FONT_BOLD).fontSize(8.5).fillColor(ACCENT)
+    doc
+      .font(FONT_BOLD)
+      .fontSize(8.5)
+      .fillColor(ACCENT)
       .text("DETAILS", detailX, curY + 8);
     const statusStr = order?.financialStatus || order?.fulfillmentStatus || "-";
     const detailRows: [string, string][] = [
-      ["Invoice #",  `${orderNum}`],
-      ["Date",       dateStr],
-      ["Status",     statusStr.toUpperCase()],
-      ["Terms",      "Net 30"],
+      ["Invoice #", `${orderNum}`],
+      ["Date", dateStr],
+      ["Status", statusStr.toUpperCase()],
+      ["Terms", "Net 30"],
     ];
     lineY = curY + 21;
     doc.font(FONT_REGULAR).fontSize(8.5).fillColor(TEXT_DARK);
     detailRows.forEach(([lbl, val]) => {
-      doc.font(FONT_BOLD).text(lbl, detailX, lineY, { width: 55, continued: false });
-      doc.font(FONT_REGULAR).text(val, detailX + 57, lineY, { width: thirdW - 65 });
+      doc
+        .font(FONT_BOLD)
+        .text(lbl, detailX, lineY, { width: 55, continued: false });
+      doc
+        .font(FONT_REGULAR)
+        .text(val, detailX + 57, lineY, { width: thirdW - 65 });
       lineY += 12;
     });
 
@@ -296,55 +344,76 @@ export async function GET(req: Request) {
     // ─────────────────────────────────────────────────────────────────────────
     // Column widths (total = contentWidth)
     const COL = {
-      no:       28,
-      orderNo:  60,
-      custNo:   55,
-      rotaNo:   60,
-      desc:     0,   // fills remaining
-      qty:      38,
-      price:    72,
-      total:    72,
+      no: 28,
+      orderNo: 60,
+      custNo: 55,
+      rotaNo: 60,
+      desc: 0, // fills remaining
+      qty: 38,
+      price: 72,
+      total: 72,
     };
-    COL.desc = contentWidth - COL.no - COL.orderNo - COL.custNo - COL.rotaNo - COL.qty - COL.price - COL.total;
+    COL.desc =
+      contentWidth -
+      COL.no -
+      COL.orderNo -
+      COL.custNo -
+      COL.rotaNo -
+      COL.qty -
+      COL.price -
+      COL.total;
 
     const tHeaderH = 30;
     doc.rect(margin, curY, contentWidth, tHeaderH).fill(ACCENT);
 
     const thY = curY + 10;
     let cx = margin;
-    const thCell = (label: string, w: number, align: "left"|"center"|"right" = "center") => {
-      doc.font(FONT_BOLD).fontSize(7.5).fillColor(WHITE)
+    const thCell = (
+      label: string,
+      w: number,
+      align: "left" | "center" | "right" = "center",
+    ) => {
+      doc
+        .font(FONT_BOLD)
+        .fontSize(7.5)
+        .fillColor(WHITE)
         .text(label, cx + 3, thY, { width: w - 6, align });
       cx += w;
     };
     // Sub-header "UNIT PRICE\nFrom" needs two lines — handle manually
-    thCell("ITEM\nNO",       COL.no);
-    thCell("ORDER\nNO",      COL.orderNo);
-    thCell("CUSTOMER\nNO",   COL.custNo);
-    thCell("ROTA NO",        COL.rotaNo);
-    thCell("DESCRIPTION",    COL.desc, "left");
-    thCell("LOADED\nQTY.",   COL.qty);
+    thCell("ITEM\nNO", COL.no);
+    thCell("ORDER\nNO", COL.orderNo);
+    thCell("CUSTOMER\nNO", COL.custNo);
+    thCell("ROTA NO", COL.rotaNo);
+    thCell("DESCRIPTION", COL.desc, "left");
+    thCell("LOADED\nQTY.", COL.qty);
     thCell("UNIT PRICE\nFrom", COL.price);
-    thCell("TOTAL\nAMOUNT",  COL.total);
+    thCell("TOTAL\nAMOUNT", COL.total);
 
     curY += tHeaderH;
 
-    const itemsList = (order?.lineItems?.edges as Array<Record<string, any>>) || [];
+    const itemsList =
+      (order?.lineItems?.edges as Array<Record<string, any>>) || [];
     let subtotal = 0;
     const currency = order?.totalPrice?.currencyCode || "USD";
     const ROW_H = 24;
 
     if (itemsList.length === 0) {
       doc.rect(margin, curY, contentWidth, ROW_H).fill(LIGHT_BG);
-      doc.font(FONT_REGULAR).fontSize(9).fillColor(TEXT_MUTED)
+      doc
+        .font(FONT_REGULAR)
+        .fontSize(9)
+        .fillColor(TEXT_MUTED)
         .text("No items found.", margin + 8, curY + 7);
       curY += ROW_H;
     } else {
       itemsList.forEach((e, idx) => {
         const node = (e?.node || e) as Record<string, any>;
-        const title    = node?.title || node?.name || "Item";
-        const qty      = Number(node?.quantity ?? node?.current_quantity ?? 1);
-        const priceNum = Number(node?.variant?.price?.amount || node?.price || 0);
+        const title = node?.title || node?.name || "Item";
+        const qty = Number(node?.quantity ?? node?.current_quantity ?? 1);
+        const priceNum = Number(
+          node?.variant?.price?.amount || node?.price || 0,
+        );
         const unitPrice = Number.isFinite(priceNum) ? priceNum : 0;
         const lineTotal = unitPrice * qty;
         subtotal += lineTotal;
@@ -355,8 +424,11 @@ export async function GET(req: Request) {
         }
 
         // Draw thin row border
-        doc.rect(margin, curY, contentWidth, ROW_H)
-          .strokeColor(DIVIDER).lineWidth(0.4).stroke();
+        doc
+          .rect(margin, curY, contentWidth, ROW_H)
+          .strokeColor(DIVIDER)
+          .lineWidth(0.4)
+          .stroke();
 
         let rx = margin;
         const rowTextY = curY + 7;
@@ -364,7 +436,7 @@ export async function GET(req: Request) {
         const rCell = (
           txt: string,
           w: number,
-          opts: { bold?: boolean; align?: "left"|"center"|"right" } = {},
+          opts: { bold?: boolean; align?: "left" | "center" | "right" } = {},
         ) => {
           doc
             .font(opts.bold ? FONT_BOLD : FONT_REGULAR)
@@ -385,60 +457,108 @@ export async function GET(req: Request) {
         rCell(title, COL.desc, { align: "left" });
         rCell(String(qty), COL.qty);
         rCell(formatMoney(unitPrice, currency), COL.price, { align: "right" });
-        rCell(formatMoney(lineTotal, currency), COL.total, { bold: true, align: "right" });
+        rCell(formatMoney(lineTotal, currency), COL.total, {
+          bold: true,
+          align: "right",
+        });
 
         curY += ROW_H;
       });
     }
 
     const grandTotal = Number(order?.totalPrice?.amount) || subtotal;
-    const totalQty = itemsList.reduce((s, e) => s + Number((e?.node || e)?.quantity ?? 1), 0);
+    const totalQty = itemsList.reduce(
+      (s, e) => s + Number((e?.node || e)?.quantity ?? 1),
+      0,
+    );
 
     // Helper: draw a footer row with pre-computed X offsets for each column
     const footerLabelOffset = COL.no + COL.orderNo + COL.custNo + COL.rotaNo;
-    const descStart  = margin + footerLabelOffset;
-    const qtyStart   = descStart + COL.desc;
-    const priceStart = qtyStart  + COL.qty;
+    const descStart = margin + footerLabelOffset;
+    const qtyStart = descStart + COL.desc;
+    const priceStart = qtyStart + COL.qty;
     const totalStart = priceStart + COL.price;
 
     // TOTAL row
     doc.rect(margin, curY, contentWidth, ROW_H).fill(LIGHT_BG);
-    doc.rect(margin, curY, contentWidth, ROW_H).strokeColor(DIVIDER).lineWidth(0.4).stroke();
-    doc.font(FONT_BOLD).fontSize(9).fillColor(TEXT_DARK)
-      .text("TOTAL", descStart + 3, curY + 7, { width: COL.desc - 6, align: "right" });
-    doc.font(FONT_BOLD).fontSize(9).fillColor(TEXT_DARK)
-      .text(String(totalQty), qtyStart + 3, curY + 7, { width: COL.qty - 6, align: "center" });
-    doc.font(FONT_BOLD).fontSize(9).fillColor(TEXT_DARK)
-      .text(formatMoney(grandTotal, currency), totalStart + 3, curY + 7, { width: COL.total - 6, align: "right" });
+    doc
+      .rect(margin, curY, contentWidth, ROW_H)
+      .strokeColor(DIVIDER)
+      .lineWidth(0.4)
+      .stroke();
+    doc
+      .font(FONT_BOLD)
+      .fontSize(9)
+      .fillColor(TEXT_DARK)
+      .text("TOTAL", descStart + 3, curY + 7, {
+        width: COL.desc - 6,
+        align: "right",
+      });
+    doc
+      .font(FONT_BOLD)
+      .fontSize(9)
+      .fillColor(TEXT_DARK)
+      .text(String(totalQty), qtyStart + 3, curY + 7, {
+        width: COL.qty - 6,
+        align: "center",
+      });
+    doc
+      .font(FONT_BOLD)
+      .fontSize(9)
+      .fillColor(TEXT_DARK)
+      .text(formatMoney(grandTotal, currency), totalStart + 3, curY + 7, {
+        width: COL.total - 6,
+        align: "right",
+      });
     curY += ROW_H;
 
     // TOTAL DAP row
-    doc.rect(margin, curY, contentWidth, ROW_H).strokeColor(DIVIDER).lineWidth(0.4).stroke();
-    doc.font(FONT_BOLD).fontSize(9).fillColor(TEXT_DARK)
-      .text("TOTAL DAP", descStart + 3, curY + 7, { width: COL.desc - 6, align: "right" });
-    doc.font(FONT_REGULAR).fontSize(9).fillColor(TEXT_DARK)
-      .text("0", qtyStart + 3, curY + 7, { width: COL.qty - 6, align: "center" });
+    doc
+      .rect(margin, curY, contentWidth, ROW_H)
+      .strokeColor(DIVIDER)
+      .lineWidth(0.4)
+      .stroke();
+    doc
+      .font(FONT_BOLD)
+      .fontSize(9)
+      .fillColor(TEXT_DARK)
+      .text("TOTAL DAP", descStart + 3, curY + 7, {
+        width: COL.desc - 6,
+        align: "right",
+      });
+    doc
+      .font(FONT_REGULAR)
+      .fontSize(9)
+      .fillColor(TEXT_DARK)
+      .text("0", qtyStart + 3, curY + 7, {
+        width: COL.qty - 6,
+        align: "center",
+      });
     curY += ROW_H + 16;
 
     // ─────────────────────────────────────────────────────────────────────────
     // SECTION 4 — Summary fields + Totals block (right side)
     // ─────────────────────────────────────────────────────────────────────────
     const summaryLabelW = 110;
-    const summaryValW   = 140;
+    const summaryValW = 140;
     const summaryX = margin;
     const summaryRows: [string, string][] = [
-      ["DELIVERY TERM",  "DAP"],
-      ["PAYMENT TERM",   "Net 30"],
-      ["TOTAL WEIGHT",   "-"],
-      ["TOTAL PALLET",   "-"],
+      ["DELIVERY TERM", "DAP"],
+      ["PAYMENT TERM", "Net 30"],
+      ["TOTAL WEIGHT", "-"],
+      ["TOTAL PALLET", "-"],
     ];
 
     let sy = curY;
     doc.font(FONT_REGULAR).fontSize(8.5);
     summaryRows.forEach(([lbl, val]) => {
-      doc.font(FONT_BOLD).fillColor(TEXT_DARK)
+      doc
+        .font(FONT_BOLD)
+        .fillColor(TEXT_DARK)
         .text(lbl, summaryX, sy, { width: summaryLabelW });
-      doc.font(FONT_REGULAR).fillColor(TEXT_DARK)
+      doc
+        .font(FONT_REGULAR)
+        .fillColor(TEXT_DARK)
         .text(val, summaryX + summaryLabelW + 4, sy, { width: summaryValW });
       sy += 13;
     });
@@ -448,18 +568,36 @@ export async function GET(req: Request) {
     const totX = pageWidth - margin - totW;
     let totY = curY;
 
-    const totRow = (label: string, val: string, bold = false, highlight = false) => {
+    const totRow = (
+      label: string,
+      val: string,
+      bold = false,
+      highlight = false,
+    ) => {
       if (highlight) {
         doc.rect(totX, totY - 2, totW, 20).fill(ACCENT);
-        doc.font(FONT_BOLD).fontSize(9.5).fillColor(WHITE)
+        doc
+          .font(FONT_BOLD)
+          .fontSize(9.5)
+          .fillColor(WHITE)
           .text(label, totX + 6, totY + 2, { width: 120 });
-        doc.font(FONT_BOLD).fontSize(9.5).fillColor(WHITE)
-          .text(val, totX + 126, totY + 2, { width: totW - 132, align: "right" });
+        doc
+          .font(FONT_BOLD)
+          .fontSize(9.5)
+          .fillColor(WHITE)
+          .text(val, totX + 126, totY + 2, {
+            width: totW - 132,
+            align: "right",
+          });
       } else {
-        doc.font(bold ? FONT_BOLD : FONT_REGULAR).fontSize(9)
+        doc
+          .font(bold ? FONT_BOLD : FONT_REGULAR)
+          .fontSize(9)
           .fillColor(bold ? TEXT_DARK : TEXT_MUTED)
           .text(label, totX + 6, totY, { width: 120 });
-        doc.font(bold ? FONT_BOLD : FONT_REGULAR).fontSize(9)
+        doc
+          .font(bold ? FONT_BOLD : FONT_REGULAR)
+          .fontSize(9)
           .fillColor(TEXT_DARK)
           .text(val, totX + 126, totY, { width: totW - 132, align: "right" });
       }
@@ -467,13 +605,17 @@ export async function GET(req: Request) {
     };
 
     const shipping = Number(order?.shipping || 0) || 0;
-    const taxes    = Number(order?.taxes    || 0) || 0;
+    const taxes = Number(order?.taxes || 0) || 0;
     totRow("Subtotal", formatMoney(subtotal, currency));
     totRow("Sales Tax", formatMoney(taxes, currency));
     totRow("Shipping", formatMoney(shipping, currency));
     // Divider
-    doc.moveTo(totX, totY - 2).lineTo(totX + totW, totY - 2)
-      .strokeColor(ACCENT).lineWidth(1).stroke();
+    doc
+      .moveTo(totX, totY - 2)
+      .lineTo(totX + totW, totY - 2)
+      .strokeColor(ACCENT)
+      .lineWidth(1)
+      .stroke();
     totY += 4;
     totRow("Total", formatMoney(grandTotal, currency), true, true);
 
@@ -482,56 +624,94 @@ export async function GET(req: Request) {
     // ─────────────────────────────────────────────────────────────────────────
     // SECTION 5 — Payment Information
     // ─────────────────────────────────────────────────────────────────────────
-    doc.moveTo(margin, curY).lineTo(pageWidth - margin, curY)
-      .strokeColor(DIVIDER).lineWidth(0.8).stroke();
+    doc
+      .moveTo(margin, curY)
+      .lineTo(pageWidth - margin, curY)
+      .strokeColor(DIVIDER)
+      .lineWidth(0.8)
+      .stroke();
     curY += 10;
 
     const halfW = (contentWidth - 20) / 2;
 
     // Banking details (left)
-    doc.font(FONT_BOLD).fontSize(9).fillColor(ACCENT)
+    doc
+      .font(FONT_BOLD)
+      .fontSize(9)
+      .fillColor(ACCENT)
       .text("BANKING DETAILS", margin, curY);
     curY += 13;
     const bankRows: [string, string][] = [
-      ["Name:",           "ROTA NORTH AMERICA LLC"],
-      ["Bank:",           "CHASE BANK"],
-      ["Account No:",     "610891258"],
-      ["Routing No:",     "021202337"],
+      ["Name:", "ROTA NORTH AMERICA LLC"],
+      ["Bank:", "CHASE BANK"],
+      ["Account No:", "610891258"],
+      ["Routing No:", "021202337"],
     ];
     bankRows.forEach(([lbl, val]) => {
-      doc.font(FONT_BOLD).fontSize(8.5).fillColor(TEXT_DARK)
+      doc
+        .font(FONT_BOLD)
+        .fontSize(8.5)
+        .fillColor(TEXT_DARK)
         .text(lbl, margin, curY, { width: 80, continued: false });
-      doc.font(FONT_REGULAR).fontSize(8.5).fillColor(TEXT_DARK)
+      doc
+        .font(FONT_REGULAR)
+        .fontSize(8.5)
+        .fillColor(TEXT_DARK)
         .text(val, margin + 82, curY, { width: halfW - 82 });
       curY += 12;
     });
 
     // Pay by check / wire (right)
     const payX = margin + halfW + 20;
-    let payY = curY - (bankRows.length * 12) - 13;
-    doc.font(FONT_BOLD).fontSize(9).fillColor(ACCENT)
+    let payY = curY - bankRows.length * 12 - 13;
+    doc
+      .font(FONT_BOLD)
+      .fontSize(9)
+      .fillColor(ACCENT)
       .text("PAYMENT INSTRUCTIONS", payX, payY);
     payY += 13;
-    doc.font(FONT_BOLD).fontSize(8.5).fillColor(TEXT_DARK)
+    doc
+      .font(FONT_BOLD)
+      .fontSize(8.5)
+      .fillColor(TEXT_DARK)
       .text("PAY BY CHECK", payX, payY);
     payY += 12;
-    doc.font(FONT_REGULAR).fontSize(8.5).fillColor(TEXT_DARK)
-      .text("Check mailing address: 14 Hughes Ste B200, Irvine CA 92618", payX, payY,
-        { width: halfW });
+    doc
+      .font(FONT_REGULAR)
+      .fontSize(8.5)
+      .fillColor(TEXT_DARK)
+      .text(
+        "Check mailing address: 14 Hughes Ste B200, Irvine CA 92618",
+        payX,
+        payY,
+        { width: halfW },
+      );
     payY += 20;
-    doc.font(FONT_BOLD).fontSize(8.5).fillColor(TEXT_DARK)
+    doc
+      .font(FONT_BOLD)
+      .fontSize(8.5)
+      .fillColor(TEXT_DARK)
       .text("FOR WIRE TRANSFERS:", payX, payY);
     payY += 12;
-    doc.font(FONT_REGULAR).fontSize(8.5).fillColor(TEXT_DARK)
-      .text("Please use routing number 021000021", payX, payY, { width: halfW });
+    doc
+      .font(FONT_REGULAR)
+      .fontSize(8.5)
+      .fillColor(TEXT_DARK)
+      .text("Please use routing number 021000021", payX, payY, {
+        width: halfW,
+      });
 
     curY += 16;
 
     // ─────────────────────────────────────────────────────────────────────────
     // SECTION 6 — Notes
     // ─────────────────────────────────────────────────────────────────────────
-    doc.moveTo(margin, curY).lineTo(pageWidth - margin, curY)
-      .strokeColor(DIVIDER).lineWidth(0.5).stroke();
+    doc
+      .moveTo(margin, curY)
+      .lineTo(pageWidth - margin, curY)
+      .strokeColor(DIVIDER)
+      .lineWidth(0.5)
+      .stroke();
     curY += 8;
 
     const notes = [
@@ -549,12 +729,20 @@ export async function GET(req: Request) {
 
     // ── FOOTER ───────────────────────────────────────────────────────────────
     const footerY = doc.page.height - 30;
-    doc.moveTo(margin, footerY).lineTo(pageWidth - margin, footerY)
-      .strokeColor(DIVIDER).lineWidth(0.5).stroke();
-    doc.font(FONT_REGULAR).fontSize(7.5).fillColor(TEXT_MUTED)
+    doc
+      .moveTo(margin, footerY)
+      .lineTo(pageWidth - margin, footerY)
+      .strokeColor(DIVIDER)
+      .lineWidth(0.5)
+      .stroke();
+    doc
+      .font(FONT_REGULAR)
+      .fontSize(7.5)
+      .fillColor(TEXT_MUTED)
       .text(
         "ROTA North America, LLC  |  10 N Martingale Rd #400, Schaumburg, IL 60173, USA  |  Thank you for your business.",
-        margin, footerY + 6,
+        margin,
+        footerY + 6,
         { width: contentWidth, align: "center" },
       );
 
