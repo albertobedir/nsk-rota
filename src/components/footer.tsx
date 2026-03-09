@@ -35,7 +35,7 @@ const categories = [
   },
   {
     name: "Products",
-    path: "en/products",
+    path: "en/products/catalogue-brochure",
     items: [
       { name: "Product Ranges" },
       { name: "Product Search" },
@@ -44,7 +44,7 @@ const categories = [
   },
   {
     name: "Production",
-    path: "en/production",
+    path: "en/production/oem-oes-references",
     items: [
       { name: "Steering, Suspension and Hydraulic Parts Factory" },
       { name: "Hot Metal Forging Factory" },
@@ -128,7 +128,7 @@ export default function Footer() {
         {/* BOTTOM COPYRIGHT */}
         <div className="pb-6 text-center md:text-left flex flex-col md:flex-row items-center  gap-3 text-muted-foreground">
           <span className="flex-1 text-center">
-            © 2022 NSK Group, all rights reserved.
+            © 2026 NSK Group, all rights reserved.
           </span>
           <span>
             make by <b>BABEL</b>

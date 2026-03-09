@@ -90,7 +90,7 @@ export default async function Page() {
 
             <div className="sm:pl-6">
               {/* stats grid (icons above, number, label, underline) */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
                 {[
                   {
                     id: 1,
@@ -151,9 +151,9 @@ export default async function Page() {
                 ].map((s, idx) => (
                   <div
                     key={s.id}
-                    className="flex flex-col items-start text-start"
+                    className="flex flex-col items-start text-start min-w-0 pb-2"
                   >
-                    <div className="mb-3">
+                    <div className="mb-3 h-11 flex items-center">
                       <Image
                         src={`/${s.icon}`}
                         alt={s.label}
@@ -163,9 +163,9 @@ export default async function Page() {
                       />
                     </div>
 
-                    <div className="text-2xl md:text-3xl font-bold">
+                    <div className="text-2xl md:text-3xl font-bold break-words">
                       {s.unit ? (
-                        <span className="whitespace-nowrap">
+                        <span>
                           <CountUp
                             end={s.end}
                             duration={800 + idx * 60}
@@ -191,7 +191,7 @@ export default async function Page() {
 
                     <div className="text-sm text-gray-500 mt-2">{s.label}</div>
 
-                    <div className="w-40 h-1 bg-secondary mt-4"></div>
+                    <div className="w-28 h-[3px] rounded-full bg-secondary mt-auto pt-0 translate-y-4"></div>
                   </div>
                 ))}
               </div>
