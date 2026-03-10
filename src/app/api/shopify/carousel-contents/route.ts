@@ -79,7 +79,8 @@ export async function GET(_req: NextRequest) {
         content_img: urlMap[fm.content_img] ?? null,
         bg_img: urlMap[fm.bg_img] ?? null,
         mobile_img: urlMap[fm.mobile_img] ?? null,
-        type: fm.type ?? "none",
+        name: fm.name ?? null,
+        type: fm.type ?? null,
         link: linkData,
       };
     });

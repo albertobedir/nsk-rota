@@ -53,16 +53,21 @@ export default async function Page() {
           <div className="w-full my-12 max-w-screen-2xl">
             {collections &&
               collections.length > 0 &&
-              collections.map((c: any) => (
-                <MiniPaginationGroup
-                  key={String(c.shopifyId ?? c._id ?? c.raw?.handle)}
-                  title={c?.raw?.title ?? c?.raw?.name ?? "Collection"}
-                  collectionHandle={c?.raw?.handle ?? c?.handle}
-                  collectionId={String(
-                    c?.shopifyId ?? c?._id ?? c?.raw?.handle,
-                  )}
-                />
-              ))}
+              collections
+                .filter((c: any) => {
+                  const name = c?.raw?.title ?? c?.raw?.name ?? "";
+                  return !name.includes("!");
+                })
+                .map((c: any) => (
+                  <MiniPaginationGroup
+                    key={String(c.shopifyId ?? c._id ?? c.raw?.handle)}
+                    title={c?.raw?.title ?? c?.raw?.name ?? "Collection"}
+                    collectionHandle={c?.raw?.handle ?? c?.handle}
+                    collectionId={String(
+                      c?.shopifyId ?? c?._id ?? c?.raw?.handle,
+                    )}
+                  />
+                ))}
           </div>
         </div>
         {/* logos tabs component (client) */}
