@@ -198,12 +198,15 @@ export default async function Page({ params }: { params: any }) {
       };
     });
 
+    const rawTitle = coll?.raw?.title ?? coll?.raw?.name ?? coll?.title ?? id;
+    const cleanTitle = String(rawTitle).replace(/!/g, "");
+
     return (
       <>
         <div className="bg-[#f3f3f3] py-10">
           <div className="w-full max-w-[1540px]  px-6 md:px-27 mx-auto">
             <h1 className="font-bold text-center sm:text-start text-4xl md:text-5xl text-[#1f1f1f]">
-              {coll?.raw?.title ?? coll?.raw?.name ?? coll?.title ?? id}
+              {cleanTitle}
             </h1>
 
             {/* breadcrumb + badge inside header */}
@@ -215,9 +218,7 @@ export default async function Page({ params }: { params: any }) {
                   Collections
                 </span>
                 <span className="opacity-60">/</span>
-                <span className="text-[#1f1f1f]">
-                  {coll?.raw?.title ?? coll?.raw?.name ?? coll?.title ?? id}
-                </span>
+                <span className="text-[#1f1f1f]">{cleanTitle}</span>
               </div>
               <Image
                 className="sm:-mt-[5rem] mt-5"
