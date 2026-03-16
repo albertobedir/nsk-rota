@@ -15,8 +15,9 @@ export function proxy(req: NextRequest) {
   }
 
   // Public routes that should be accessible with or without session
-  const public_routes = ["/add-member"];
-  if (public_routes.includes(pathname)) {
+  const is_add_member_route =
+    pathname === "/add-member" || pathname.startsWith("/add-member/");
+  if (is_add_member_route) {
     return NextResponse.next();
   }
 
