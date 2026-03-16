@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { auth } from "@/lib/axios/auth";
 import useSessionStore from "@/store/session-store";
 import { invalidatePricingTiersCache } from "@/components/single-prod-cart";
 
 export default function SessionRefresher() {
+  const pathname = usePathname();
+
   const refresh = useCallback(async () => {
     // The DB is the authoritative source for tier/tags (kept in sync by webhook).
     // getSession reads from DB and sets customerTags + tierTag in the store.
@@ -63,6 +66,10 @@ export default function SessionRefresher() {
   }, []);
 
   useEffect(() => {
+    const isAddMemberRoute =
+      pathname === "/add-member" || pathname.startsWith("/add-member/");
+    if (isAddMemberRoute) return;
+
     // Run immediately on mount
     refresh();
 
@@ -81,7 +88,7 @@ export default function SessionRefresher() {
       document.removeEventListener("visibilitychange", onVisibility);
       clearInterval(interval);
     };
-  }, [refresh]);
+  }, [pathname, refresh]);
 
   return null;
 }

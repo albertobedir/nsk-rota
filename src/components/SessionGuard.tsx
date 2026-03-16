@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Api } from "@/lib/axios/instance";
 import useSessionStore from "@/store/session-store";
 
@@ -18,9 +18,14 @@ import useSessionStore from "@/store/session-store";
  */
 export default function SessionGuard() {
   const router = useRouter();
+  const pathname = usePathname();
   const clearSession = useSessionStore((s) => s.clearSession);
 
   useEffect(() => {
+    const isAddMemberRoute =
+      pathname === "/add-member" || pathname.startsWith("/add-member/");
+    if (isAddMemberRoute) return;
+
     const verify = async () => {
       try {
         const res = await Api.get("/auth/get-session", { _retry: true }); // _retry: true → skip interceptor's auto-refresh so we control the flow here
@@ -34,7 +39,7 @@ export default function SessionGuard() {
     };
 
     verify();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
 }
