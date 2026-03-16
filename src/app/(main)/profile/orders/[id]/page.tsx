@@ -42,6 +42,7 @@ export default function OrderDetailPage() {
         if (!d?.ok) {
           setError(d?.error || "Failed to load order");
           setOrder(null);
+
           return;
         }
 
@@ -149,6 +150,11 @@ export default function OrderDetailPage() {
       .catch((e) => setError(e?.message || String(e)))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!order) return;
+    console.log("[order-detail] fetched order:", order);
+  }, [order]);
 
   // Fetch product metadata (rotaNo, refNo, shopifyId) for each line item
   useEffect(() => {

@@ -986,9 +986,9 @@ export default function ProductDetailPage() {
                   oemGrouped[brand].push(no);
                 }
 
-                // 2) Collect competitors with Type === "View" as individual rows
+                // 2) Group competitor references (Type === "View") by brand name
                 // First try direct raw.Competiters, then fall back to competitor_info metafield
-                const competitorRows: { name: string; ref: string }[] = [];
+                const competitorGrouped: Record<string, string[]> = {};
                 let rawCompetitors: any[] = [];
                 if (
                   Array.isArray(rawAny?.Competiters) &&
@@ -1020,16 +1020,21 @@ export default function ProductDetailPage() {
                     .toUpperCase();
                   const ref = String(c.ReferansView || "").trim();
                   if (!name || !ref) continue;
-                  competitorRows.push({ name, ref });
+                  if (!competitorGrouped[name]) competitorGrouped[name] = [];
+                  if (!competitorGrouped[name].includes(ref)) {
+                    competitorGrouped[name].push(ref);
+                  }
                 }
 
                 const oemEntries = Object.entries(oemGrouped).sort(([a], [b]) =>
                   a.localeCompare(b),
                 );
 
-                competitorRows.sort((a, b) => a.name.localeCompare(b.name));
+                const competitorEntries = Object.entries(competitorGrouped)
+                  .map(([name, refs]) => [name, refs.sort()] as const)
+                  .sort(([a], [b]) => a.localeCompare(b));
 
-                if (oemEntries.length === 0 && competitorRows.length === 0) {
+                if (oemEntries.length === 0 && competitorEntries.length === 0) {
                   return (
                     <div className="mt-4 text-sm text-muted-foreground">
                       No references available
@@ -1054,12 +1059,12 @@ export default function ProductDetailPage() {
                         </span>
                       </React.Fragment>
                     ))}
-                    {competitorRows.map((c, i) => (
-                      <React.Fragment key={i}>
+                    {competitorEntries.map(([name, refs]) => (
+                      <React.Fragment key={name}>
                         <span className="font-semibold whitespace-nowrap">
-                          {c.name}
+                          {name}
                         </span>
-                        <span className="font-medium">{c.ref}</span>
+                        <span className="font-medium">{refs.join(" - ")}</span>
                       </React.Fragment>
                     ))}
                   </div>

@@ -50,7 +50,7 @@ async function fetchProductMetafields(productId: string) {
         "X-Shopify-Access-Token": accessToken!,
       },
       body: JSON.stringify({ query, variables: { id: productId } }),
-    }
+    },
   );
 
   const data = await response.json();
@@ -67,7 +67,7 @@ async function fetchProductMetafields(productId: string) {
   }
 
   return data.data.product.metafields.edges.map(
-    (edge: { node: Record<string, unknown> }) => edge.node
+    (edge: { node: Record<string, unknown> }) => edge.node,
   );
 }
 
@@ -117,7 +117,7 @@ async function fetchInventoryLocations(productId: string) {
         "X-Shopify-Access-Token": accessToken!,
       },
       body: JSON.stringify({ query, variables: { id: productId } }),
-    }
+    },
   );
 
   const data = await response.json();
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     try {
       console.log(
         "Webhook headers:",
-        Object.fromEntries(req.headers.entries())
+        Object.fromEntries(req.headers.entries()),
       );
     } catch (hdrErr) {
       console.warn("Could not stringify headers:", hdrErr);
@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
       console.log("Metafields fetched:", metafields.length);
       console.log(
         "Inventory locations fetched for variants:",
-        Object.keys(inventoryMap).length
+        Object.keys(inventoryMap).length,
       );
     } catch (metaErr) {
       console.error("Fetch error:", metaErr);
@@ -245,18 +245,18 @@ export async function POST(req: NextRequest) {
     await Product.updateOne(
       { shopifyId: productData.id },
       { $set: { raw: fullProduct } },
-      { upsert: true }
+      { upsert: true },
     );
 
     return NextResponse.json(
       { status: "ok", productId: productData.id },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
     console.error("Webhook error:", err); // Bu satırı ekle
     return NextResponse.json(
       { error: (err as Error).message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
