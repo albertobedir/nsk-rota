@@ -25,15 +25,63 @@ export async function POST(request: NextRequest) {
 
     const lines = lineItems as IncomingLine[];
 
-    // ✅ GID'den numeric ID çıkar
     const normalizeShopifyId = (id: string) =>
       id.includes("/") ? id.split("/").pop()! : id;
 
-    // ✅ customerId her zaman numeric olarak normalize et
     const normalizedCustomerId = customerId
       ? normalizeShopifyId(String(customerId))
       : undefined;
 
+    // ✅ Müşterinin tier indirimini DB'den çek
+    let tierDiscountPercent = 0;
+    let tierDescription = "";
+
+    if (normalizedCustomerId) {
+      try {
+        // Customer tablosundan tier tag'ini çek
+        // Önce Customer modelinde tier alanı yok, shopifyTags User modelinde
+        // O yüzden Shopify Admin REST API'den tag'leri çekiyoruz
+        const shopifyRes = await fetch(
+          `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/customers/${normalizedCustomerId}.json`,
+          {
+            headers: {
+              "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN!,
+            },
+          },
+        );
+        const shopifyData = await shopifyRes.json();
+        const customerTags: string[] = (shopifyData.customer?.tags || "")
+          .split(",")
+          .map((t: string) => t.trim())
+          .filter(Boolean);
+
+        console.log("[CUSTOMER TAGS]", customerTags);
+
+        // tier-X tag'ini bul
+        const tierTag = customerTags.find((t) => t.startsWith("tier-"));
+        console.log("[TIER TAG]", tierTag);
+
+        if (tierTag) {
+          // ✅ PricingTier tablosundan indirim yüzdesini çek
+          const tierData = await prisma.pricingTier.findFirst({
+            where: { tierTag: tierTag },
+            select: { discountPercentage: true, tierName: true },
+          });
+
+          if (tierData) {
+            tierDiscountPercent = tierData.discountPercentage;
+            tierDescription = `${tierData.tierName} - %${tierDiscountPercent} indirim`;
+            console.log(`[TIER] ${tierTag} → %${tierDiscountPercent} indirim`);
+          } else {
+            console.warn(`[TIER] ${tierTag} için DB'de kayıt bulunamadı`);
+          }
+        }
+      } catch (e) {
+        console.warn("[TIER] Tier indirim çekme hatası:", e);
+      }
+    }
+
+    // Credit check (indirimli fiyat üzerinden)
     if (normalizedCustomerId) {
       try {
         const customer = await prisma.customer.findFirst({
@@ -45,11 +93,11 @@ export async function POST(request: NextRequest) {
           const qty = Number(li.quantity || 1);
           const price =
             Number(li.customPrice ?? li.originalUnitPrice ?? 0) || 0;
-          return sum + price * qty;
+          const discounted = price * (1 - tierDiscountPercent / 100);
+          return sum + discounted * qty;
         }, 0);
         console.log("Customer Credit:", remaining);
-        console.log("Cart Total:", computedTotal);
-        console.log("Line Items:", lines);
+        console.log("Cart Total (discounted):", computedTotal);
 
         if (computedTotal > remaining) {
           return NextResponse.json(
@@ -60,17 +108,6 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.warn("Credit check failed", e);
       }
-    }
-
-    let customerPrices: Record<string, number> = {};
-    if (normalizedCustomerId) {
-      const rows = await prisma.customerPricing.findMany({
-        where: { customerId: String(normalizedCustomerId) },
-        select: { metaobjectId: true, price: true },
-      });
-      customerPrices = Object.fromEntries(
-        rows.map((r) => [r.metaobjectId, Number(r.price)]),
-      );
     }
 
     const items = lines.map((li) => {
@@ -86,34 +123,19 @@ export async function POST(request: NextRequest) {
       if (li.merchandiseId) baseItem.variantId = li.merchandiseId;
       else if (li.productId) baseItem.productId = li.productId;
 
-      const explicit = li.customPrice ?? li.originalUnitPrice;
-      if (explicit != null) {
-        baseItem.originalUnitPrice = String(explicit);
-        console.log(
-          `[ITEM] variantId=${baseItem.variantId} explicit price=${baseItem.originalUnitPrice}`,
-        );
-        return baseItem;
-      }
-
-      const merchKey = li.merchandiseId ?? li.productId ?? undefined;
-      const custPrice = merchKey ? customerPrices[merchKey] : undefined;
-
-      if (custPrice != null) {
-        baseItem.originalUnitPrice = String(custPrice);
-        console.log(
-          `[ITEM] variantId=${baseItem.variantId} customerPrice=${baseItem.originalUnitPrice}`,
-        );
-      } else {
-        console.log(
-          `[ITEM] variantId=${baseItem.variantId} NO price override — Shopify default will be used`,
-        );
+      // ✅ Tier indirimi varsa appliedDiscount olarak uygula
+      if (tierDiscountPercent > 0) {
+        baseItem.appliedDiscount = {
+          value: tierDiscountPercent,
+          valueType: "PERCENTAGE",
+          description: tierDescription,
+        };
       }
 
       return baseItem;
     });
 
     const input = {
-      // ✅ Numeric ID gönderiliyor, GID değil
       customerId: normalizedCustomerId
         ? `gid://shopify/Customer/${normalizedCustomerId}`
         : undefined,
@@ -123,7 +145,7 @@ export async function POST(request: NextRequest) {
       shippingAddress: shippingAddress ?? undefined,
       tags: ["b2b", "custom-pricing"],
       note: normalizedCustomerId
-        ? `B2B Order - Custom pricing for ${normalizedCustomerId}`
+        ? `B2B Order - ${tierDescription || "Custom pricing"}`
         : undefined,
     };
 
