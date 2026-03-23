@@ -91,12 +91,15 @@ export async function POST(req: Request) {
     });
 
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST!,
-      port: Number(process.env.SMTP_PORT!),
-      secure: false,
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT),
+      secure: false, // port 25 için false
       auth: {
-        user: process.env.SMTP_USER!,
+        user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS || "",
+      },
+      tls: {
+        rejectUnauthorized: false, // self-signed sertifika için
       },
     });
 

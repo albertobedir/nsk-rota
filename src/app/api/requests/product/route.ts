@@ -47,11 +47,14 @@ export async function POST(request: NextRequest) {
 
         const transporter = nodemailer.createTransport({
           host: process.env.SMTP_HOST,
-          port: Number(process.env.SMTP_PORT || 587),
-          secure: String(process.env.SMTP_SECURE || "false") === "true",
+          port: Number(process.env.SMTP_PORT),
+          secure: false, // port 25 için false
           auth: {
             user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
+            pass: process.env.SMTP_PASS || "",
+          },
+          tls: {
+            rejectUnauthorized: false, // self-signed sertifika için
           },
         });
 

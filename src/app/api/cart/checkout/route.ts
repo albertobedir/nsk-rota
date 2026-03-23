@@ -8,13 +8,9 @@ type IncomingLine = {
   quantity?: number;
   originalUnitPrice?: number | string;
   title?: string;
-  customPrice?: number | string; // explicit override from client
+  customPrice?: number | string;
 };
 
-/**
- * POST /api/cart/checkout
- * Body: { lineItems: [{ merchandiseId: string, quantity: number, price?: number, title?: string }], email?: string, phone?: string }
- */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -27,16 +23,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Normalize
     const lines = lineItems as IncomingLine[];
 
-    // Normalize customerId: strip GID prefix if present
-    // Webhook stores plain numeric id (e.g. "8356960632903") but client may
-    // send the full Shopify GID ("gid://shopify/Customer/8356960632903")
     const normalizeShopifyId = (id: string) =>
       id.includes("/") ? id.split("/").pop()! : id;
 
-    // Server-side credit check: if customerId provided, ensure customer's creditRemaining covers cart total
     if (customerId) {
       try {
         const customer = await prisma.customer.findFirst({
@@ -44,7 +35,6 @@ export async function POST(request: NextRequest) {
           select: { creditRemaining: true },
         });
         const remaining = Number(customer?.creditRemaining ?? 0);
-        // compute total from provided line items (prefer explicit prices)
         const computedTotal = lines.reduce((sum, li) => {
           const qty = Number(li.quantity || 1);
           const price =
@@ -66,15 +56,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fetch customer-specific prices from DB (if customerId provided)
     let customerPrices: Record<string, number> = {};
     if (customerId) {
       const rows = await prisma.customerPricing.findMany({
         where: { customerId: String(customerId) },
         select: { metaobjectId: true, price: true },
       });
-
-      // metaobjectId is stored in DB; we expose it keyed by metaobjectId
       customerPrices = Object.fromEntries(
         rows.map((r) => [r.metaobjectId, Number(r.price)]),
       );
@@ -90,23 +77,31 @@ export async function POST(request: NextRequest) {
         requiresShipping: true,
       };
 
-      // ALWAYS include product reference so Shopify links the line item
       if (li.merchandiseId) baseItem.variantId = li.merchandiseId;
       else if (li.productId) baseItem.productId = li.productId;
 
-      // client-side explicit override takes precedence
       const explicit = li.customPrice ?? li.originalUnitPrice;
       if (explicit != null) {
         baseItem.originalUnitPrice = String(explicit);
+        // ✅ LOG 1: explicit fiyat set edildi mi?
+        console.log(
+          `[ITEM] variantId=${baseItem.variantId} explicit price=${baseItem.originalUnitPrice}`,
+        );
         return baseItem;
       }
 
-      // attempt to find a customer-specific price
       const merchKey = li.merchandiseId ?? li.productId ?? undefined;
       const custPrice = merchKey ? customerPrices[merchKey] : undefined;
 
       if (custPrice != null) {
         baseItem.originalUnitPrice = String(custPrice);
+        console.log(
+          `[ITEM] variantId=${baseItem.variantId} customerPrice=${baseItem.originalUnitPrice}`,
+        );
+      } else {
+        console.log(
+          `[ITEM] variantId=${baseItem.variantId} NO price override — Shopify default will be used`,
+        );
       }
 
       return baseItem;
@@ -124,7 +119,13 @@ export async function POST(request: NextRequest) {
         : undefined,
     };
 
+    // ✅ LOG 2: Shopify'a gönderilen tam input
+    console.log("[DRAFT ORDER INPUT]", JSON.stringify(input, null, 2));
+
     const created = await createDraftOrder(input);
+
+    // ✅ LOG 3: Shopify'dan dönen response
+    console.log("[DRAFT ORDER RESPONSE]", JSON.stringify(created, null, 2));
 
     return NextResponse.json({ created });
   } catch (err) {

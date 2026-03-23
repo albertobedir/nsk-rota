@@ -50,7 +50,6 @@ export default function Navbar({
 
   // hide on scroll: when user scrolls down hide navbar, show when scrolling up
   useEffect(() => {
-    if (logoOnly) return;
     let lastY = typeof window !== "undefined" ? window.scrollY : 0;
     const onScroll = () => {
       const current = window.scrollY;
@@ -68,7 +67,10 @@ export default function Navbar({
 
   if (logoOnly) {
     return (
-      <nav
+      <motion.nav
+        initial={false}
+        animate={{ y: hidden ? "-100%" : 0 }}
+        transition={{ duration: 0.42, ease: [0.2, 0.85, 0.25, 1] }}
         className={cn(
           sticky ? "sticky top-0" : "relative",
           "z-50",
@@ -117,7 +119,7 @@ export default function Navbar({
             </Link>
           </div>
         </div>
-      </nav>
+      </motion.nav>
     );
   }
 

@@ -9,7 +9,7 @@ interface Props {
 export default function layout({ children }: Props) {
   return (
     <main className="relative min-h-screen flex  flex-col gap-30">
-      <Navbar logoOnly sticky={false} />
+      <Navbar logoOnly sticky={true} />
 
       <div className="absolute inset-0 -z-10">
         <Image
