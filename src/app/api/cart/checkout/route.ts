@@ -25,13 +25,19 @@ export async function POST(request: NextRequest) {
 
     const lines = lineItems as IncomingLine[];
 
+    // ✅ GID'den numeric ID çıkar
     const normalizeShopifyId = (id: string) =>
       id.includes("/") ? id.split("/").pop()! : id;
 
-    if (customerId) {
+    // ✅ customerId her zaman numeric olarak normalize et
+    const normalizedCustomerId = customerId
+      ? normalizeShopifyId(String(customerId))
+      : undefined;
+
+    if (normalizedCustomerId) {
       try {
         const customer = await prisma.customer.findFirst({
-          where: { shopifyId: normalizeShopifyId(String(customerId)) },
+          where: { shopifyId: normalizedCustomerId },
           select: { creditRemaining: true },
         });
         const remaining = Number(customer?.creditRemaining ?? 0);
@@ -57,9 +63,9 @@ export async function POST(request: NextRequest) {
     }
 
     let customerPrices: Record<string, number> = {};
-    if (customerId) {
+    if (normalizedCustomerId) {
       const rows = await prisma.customerPricing.findMany({
-        where: { customerId: String(customerId) },
+        where: { customerId: String(normalizedCustomerId) },
         select: { metaobjectId: true, price: true },
       });
       customerPrices = Object.fromEntries(
@@ -83,7 +89,6 @@ export async function POST(request: NextRequest) {
       const explicit = li.customPrice ?? li.originalUnitPrice;
       if (explicit != null) {
         baseItem.originalUnitPrice = String(explicit);
-        // ✅ LOG 1: explicit fiyat set edildi mi?
         console.log(
           `[ITEM] variantId=${baseItem.variantId} explicit price=${baseItem.originalUnitPrice}`,
         );
@@ -108,23 +113,24 @@ export async function POST(request: NextRequest) {
     });
 
     const input = {
-      customerId: customerId ? String(customerId) : undefined,
+      // ✅ Numeric ID gönderiliyor, GID değil
+      customerId: normalizedCustomerId
+        ? `gid://shopify/Customer/${normalizedCustomerId}`
+        : undefined,
       email: email ?? undefined,
       phone: phone ?? undefined,
       lineItems: items,
       shippingAddress: shippingAddress ?? undefined,
       tags: ["b2b", "custom-pricing"],
-      note: customerId
-        ? `B2B Order - Custom pricing for ${customerId}`
+      note: normalizedCustomerId
+        ? `B2B Order - Custom pricing for ${normalizedCustomerId}`
         : undefined,
     };
 
-    // ✅ LOG 2: Shopify'a gönderilen tam input
     console.log("[DRAFT ORDER INPUT]", JSON.stringify(input, null, 2));
 
     const created = await createDraftOrder(input);
 
-    // ✅ LOG 3: Shopify'dan dönen response
     console.log("[DRAFT ORDER RESPONSE]", JSON.stringify(created, null, 2));
 
     return NextResponse.json({ created });
