@@ -1,4 +1,5 @@
 import Footer from "@/components/footer";
+import Navbar from "@/components/navbar";
 import Image from "next/image";
 
 interface Props {
@@ -8,6 +9,8 @@ interface Props {
 export default function layout({ children }: Props) {
   return (
     <main className="relative min-h-screen flex  flex-col gap-30">
+      <Navbar logoOnly sticky={false} />
+
       <div className="absolute inset-0 -z-10">
         <Image
           src="/auth-bg.webp"

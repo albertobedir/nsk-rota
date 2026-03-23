@@ -13,7 +13,12 @@ import Search from "./search";
 import useSessionStore from "@/store/session-store";
 import { auth } from "@/lib/axios/auth";
 
-export default function Navbar() {
+interface NavbarProps {
+  logoOnly?: boolean;
+  sticky?: boolean;
+}
+
+export default function Navbar({ logoOnly = false, sticky = true }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -30,7 +35,7 @@ export default function Navbar() {
 
   // Refresh session on mount so credit values reflect latest server state
   useEffect(() => {
-    let mounted = true;
+    if (logoOnly) return;
     (async () => {
       try {
         await auth.getSession();
@@ -38,13 +43,11 @@ export default function Navbar() {
         // ignore
       }
     })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  }, [logoOnly]);
 
   // hide on scroll: when user scrolls down hide navbar, show when scrolling up
   useEffect(() => {
+    if (logoOnly) return;
     let lastY = typeof window !== "undefined" ? window.scrollY : 0;
     const onScroll = () => {
       const current = window.scrollY;
@@ -58,7 +61,62 @@ export default function Navbar() {
 
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [logoOnly]);
+
+  if (logoOnly) {
+    return (
+      <nav
+        className={cn(
+          sticky ? "sticky top-0" : "relative",
+          "z-50",
+          "flex flex-col gap-4 bg-white shadow shadow-accent",
+        )}
+      >
+        <div className="w-full">
+          <div className="h-1.5 bg-primary w-full"></div>
+          <div className="container relative flex items-center justify-end">
+            <Link
+              href="https://nskgroup.com.tr/en"
+              className="
+      relative flex items-center justify-center
+      rounded-b-md text-white px-30 text-xs font-medium
+      max-w-[9.5rem] h-9
+      right-1/2 translate-x-1/2 sm:translate-x-0 sm:right-[8%]
+    "
+            >
+              <div className="absolute inset-0">
+                <Image
+                  src="/header-upper-bg-primary.svg"
+                  alt="logo"
+                  fill
+                  className="object-cover"
+                  priority
+                />
+              </div>
+
+              <div className="relative z-10 flex items-center gap-1 px-3">
+                <span className="text-sm leading-4 whitespace-nowrap">
+                  Corporate Website
+                </span>
+                <Icons width={18} height={18} name="external-link" />
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        <div className="pb-11 md:px-20 bg-white z-20">
+          <div className="container px-4 relative flex items-center justify-start">
+            <Link
+              className="cursor-pointer w-[110px] sm:w-[140px] md:w-[180px]"
+              href="/"
+            >
+              <Logo className="w-full h-auto md:-mt-4 text-primary" />
+            </Link>
+          </div>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <motion.nav
@@ -66,7 +124,8 @@ export default function Navbar() {
       animate={{ y: hidden ? "-100%" : 0 }}
       transition={{ duration: 0.42, ease: [0.2, 0.85, 0.25, 1] }}
       className={cn(
-        "sticky top-0 z-50",
+        sticky ? "sticky top-0" : "relative",
+        "z-50",
         "flex flex-col gap-4 bg-white shadow shadow-accent",
       )}
     >
