@@ -18,7 +18,10 @@ interface NavbarProps {
   sticky?: boolean;
 }
 
-export default function Navbar({ logoOnly = false, sticky = true }: NavbarProps) {
+export default function Navbar({
+  logoOnly = false,
+  sticky = true,
+}: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
