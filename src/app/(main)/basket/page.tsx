@@ -54,7 +54,8 @@ export default function BasketPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             customerEmail: sessionUser?.email,
-            customerId: sessionUser?.id, // 👈 Eğer varsa ekleyin
+            customerId: sessionUser?.id,
+            tierTag: sessionUser?.tier, // ✅ Session store'dan tier gönder
             lineItems: cart.map((i) => ({
               merchandiseId: i.variantId,
               quantity: i.quantity,

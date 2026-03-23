@@ -28,6 +28,9 @@ export interface SessionUser {
   creditLimit?: number | null;
   creditUsed?: number | null;
   creditRemaining?: number | null;
+  // Shopify tags and tier for B2B pricing
+  tags?: string[] | null;
+  tier?: string | null;
 }
 
 export interface CartItem {
@@ -90,7 +93,7 @@ const useSessionStore = create<SessionState>()(
         if (exists) {
           set({
             cart: cart.map((p) =>
-              p.id === item.id ? { ...p, quantity: p.quantity + qtyToAdd } : p
+              p.id === item.id ? { ...p, quantity: p.quantity + qtyToAdd } : p,
             ),
           });
         } else {
@@ -108,7 +111,7 @@ const useSessionStore = create<SessionState>()(
       increase: (id) =>
         set({
           cart: get().cart.map((p) =>
-            p.id === id ? { ...p, quantity: p.quantity + 1 } : p
+            p.id === id ? { ...p, quantity: p.quantity + 1 } : p,
           ),
         }),
 
@@ -116,7 +119,7 @@ const useSessionStore = create<SessionState>()(
         set({
           cart: get()
             .cart.map((p) =>
-              p.id === id ? { ...p, quantity: Math.max(1, p.quantity - 1) } : p
+              p.id === id ? { ...p, quantity: Math.max(1, p.quantity - 1) } : p,
             )
             .filter((p) => p.quantity > 0),
         }),
@@ -173,8 +176,8 @@ const useSessionStore = create<SessionState>()(
     }),
     {
       name: "rota-session-storage", // both user + cart stored here
-    }
-  )
+    },
+  ),
 );
 
 export default useSessionStore;

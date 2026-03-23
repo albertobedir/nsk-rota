@@ -37,10 +37,12 @@ export async function POST(request: NextRequest) {
     let tierDiscountPercent = 0;
     let tierDescription = "";
 
+    console.log("[REQUEST BODY] tierTag:", tierTag);
+
     if (tierTag) {
       try {
         // Session store'dan gelen tierTag'i kullanarak PricingTier'ı bul
-        console.log("[TIER TAG]", tierTag);
+        console.log("[TIER TAG from request]", tierTag);
 
         const tierData = await prisma.pricingTier.findFirst({
           where: { tierTag: tierTag },
@@ -59,6 +61,8 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.warn("[TIER] Tier indirim çekme hatası:", e);
       }
+    } else {
+      console.warn("[TIER] tierTag request'te gelmedi!");
     }
 
     // Credit check (indirimli fiyat üzerinden)
@@ -92,6 +96,8 @@ export async function POST(request: NextRequest) {
 
     const items = lines.map((li) => {
       const qty = Number(li.quantity || 1);
+      const originalPrice =
+        Number(li.customPrice ?? li.originalUnitPrice ?? 0) || 0;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const baseItem: any = {
@@ -103,13 +109,16 @@ export async function POST(request: NextRequest) {
       if (li.merchandiseId) baseItem.variantId = li.merchandiseId;
       else if (li.productId) baseItem.productId = li.productId;
 
-      // ✅ Tier indirimi varsa appliedDiscount olarak uygula
+      // ✅ Tier indirimi varsa indirimli fiyatı customPrice olarak set et
       if (tierDiscountPercent > 0) {
-        baseItem.appliedDiscount = {
-          value: tierDiscountPercent,
-          valueType: "PERCENTAGE",
-          description: tierDescription,
-        };
+        const discountedPrice = (
+          originalPrice *
+          (1 - tierDiscountPercent / 100)
+        ).toFixed(2);
+        baseItem.customPrice = discountedPrice;
+        console.log(
+          `[LINE ITEM] Original: ${originalPrice}, Discounted: ${discountedPrice}`,
+        );
       }
 
       return baseItem;
