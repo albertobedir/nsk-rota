@@ -14,7 +14,8 @@ type IncomingLine = {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { lineItems, email, phone, shippingAddress, customerId } = body;
+    const { lineItems, email, phone, shippingAddress, customerId, tierTag } =
+      body;
 
     if (!Array.isArray(lineItems) || lineItems.length === 0) {
       return NextResponse.json(
@@ -36,45 +37,24 @@ export async function POST(request: NextRequest) {
     let tierDiscountPercent = 0;
     let tierDescription = "";
 
-    if (normalizedCustomerId) {
+    if (tierTag) {
       try {
-        // Customer tablosundan tier tag'ini çek
-        // Önce Customer modelinde tier alanı yok, shopifyTags User modelinde
-        // O yüzden Shopify Admin REST API'den tag'leri çekiyoruz
-        const shopifyRes = await fetch(
-          `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/customers/${normalizedCustomerId}.json`,
-          {
-            headers: {
-              "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN!,
-            },
-          },
-        );
-        const shopifyData = await shopifyRes.json();
-        const customerTags: string[] = (shopifyData.customer?.tags || "")
-          .split(",")
-          .map((t: string) => t.trim())
-          .filter(Boolean);
-
-        console.log("[CUSTOMER TAGS]", customerTags);
-
-        // tier-X tag'ini bul
-        const tierTag = customerTags.find((t) => t.startsWith("tier-"));
+        // Session store'dan gelen tierTag'i kullanarak PricingTier'ı bul
         console.log("[TIER TAG]", tierTag);
 
-        if (tierTag) {
-          // ✅ PricingTier tablosundan indirim yüzdesini çek
-          const tierData = await prisma.pricingTier.findFirst({
-            where: { tierTag: tierTag },
-            select: { discountPercentage: true, tierName: true },
-          });
+        const tierData = await prisma.pricingTier.findFirst({
+          where: { tierTag: tierTag },
+          select: { discountPercentage: true, tierName: true },
+        });
 
-          if (tierData) {
-            tierDiscountPercent = tierData.discountPercentage;
-            tierDescription = `${tierData.tierName} - %${tierDiscountPercent} indirim`;
-            console.log(`[TIER] ${tierTag} → %${tierDiscountPercent} indirim`);
-          } else {
-            console.warn(`[TIER] ${tierTag} için DB'de kayıt bulunamadı`);
-          }
+        if (tierData) {
+          tierDiscountPercent = tierData.discountPercentage;
+          tierDescription = `${tierData.tierName} - %${tierDiscountPercent} indirim`;
+          console.log(
+            `[TIER] ${tierTag} → %${tierDiscountPercent} indirim (Prisma)`,
+          );
+        } else {
+          console.warn(`[TIER] ${tierTag} için DB'de kayıt bulunamadı`);
         }
       } catch (e) {
         console.warn("[TIER] Tier indirim çekme hatası:", e);
