@@ -1187,7 +1187,12 @@ export default function ProductDetailPage() {
                           </span>
                         )}
                       </div>
-                      <div className="font-medium">{cp.raw.title}</div>
+                      <div className="font-medium">
+                        {(cp.raw.title ?? "")
+                          .replace(/\s*-\s*[\w\d]+$/, "")
+                          .trim() ||
+                          (cp.raw.title ?? "")}
+                      </div>
                     </div>
 
                     {compTech.length > 0 && (

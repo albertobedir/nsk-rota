@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import useSessionStore from "@/store/session-store";
 import { useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,13 +31,41 @@ const categories = [
 
 export default function NavbarModal({ open, setOpen }: Props) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   const user = useSessionStore((s) => s.user);
+  const clearSession = useSessionStore((s) => s.clearSession);
 
   const fmt = (v: number) =>
     new Intl.NumberFormat("tr-TR", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(v) + " $";
+
+  const handleLogout = async () => {
+    try {
+      // Clear all cookies
+      document.cookie.split(";").forEach((c) => {
+        const eqPos = c.indexOf("=");
+        const name = eqPos > -1 ? c.substr(0, eqPos).trim() : c.trim();
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+      });
+
+      // Clear localStorage
+      localStorage.clear();
+
+      // Clear session store
+      clearSession();
+
+      // Close modal
+      setOpen(false);
+
+      // Redirect to login
+      router.push("/auth/login");
+    } catch (e) {
+      console.error("Logout failed:", e);
+      router.push("/auth/login");
+    }
+  };
 
   // No document-level outside-click listener: we only close the menu
   // when a menu item is clicked (per requested behavior).
@@ -73,6 +102,18 @@ export default function NavbarModal({ open, setOpen }: Props) {
                 </ul>
               </div>
             ))}
+
+            {/* Logout */}
+            {user && (
+              <div className="w-full border-t pt-4">
+                <button
+                  onClick={handleLogout}
+                  className="text-base py-2 text-red-600 font-semibold hover:text-red-700 transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
 
           {/* top-right X provided by SheetContent */}
@@ -117,6 +158,18 @@ export default function NavbarModal({ open, setOpen }: Props) {
                           </Link>
                         </li>
                       ))}
+
+                      {/* Logout under Profile */}
+                      {category.name === "Profile" && user && (
+                        <li className="text-base py-1">
+                          <button
+                            onClick={handleLogout}
+                            className="text-red-600 font-bold hover:text-red-700 transition-colors text-left"
+                          >
+                            Logout
+                          </button>
+                        </li>
+                      )}
                     </ul>
                   </div>
                 ))}

@@ -82,6 +82,8 @@ export default function Navbar({
           <div className="container relative flex items-center justify-end">
             <Link
               href="https://nskgroup.com.tr/en"
+              target="_blank"
+              rel="noopener noreferrer"
               className="
       relative flex items-center justify-center
       rounded-b-md text-white px-30 text-xs font-medium
@@ -139,6 +141,8 @@ export default function Navbar({
         <div className="container relative flex items-center justify-end">
           <Link
             href="https://nskgroup.com.tr/en"
+            target="_blank"
+            rel="noopener noreferrer"
             className="
       relative flex items-center justify-center
       rounded-b-md text-white px-30 text-xs font-medium

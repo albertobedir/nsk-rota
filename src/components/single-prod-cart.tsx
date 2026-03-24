@@ -628,16 +628,30 @@ export default function SingleProdCard({
 
           {/* Price under title (hidden when price is 0) */}
           {Number(price) > 0 && (
-            <div className="mt-1 flex items-center gap-3">
-              <div>
-                <span className="text-base md:text-lg font-bold text-secondary">
-                  {(tierPrice ?? Number(price)).toLocaleString("en-US", {
+            <div className="mt-1 flex items-baseline gap-2 flex-wrap">
+              <span className="text-lg md:text-xl font-extrabold text-secondary">
+                $
+                {effectiveDiscount
+                  ? tierPrice?.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  : Number(price).toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                USD
+              </span>
+              {effectiveDiscount && (
+                <span className="text-sm font-medium text-gray-400 line-through select-none">
+                  $
+                  {Number(price).toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{" "}
                   USD
                 </span>
-              </div>
+              )}
             </div>
           )}
 
