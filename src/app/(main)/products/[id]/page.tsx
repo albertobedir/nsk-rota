@@ -1132,7 +1132,7 @@ export default function ProductDetailPage() {
               <Spinner label="Loading components..." size={30} />
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            <div className="flex flex-col sm:flex-row sm:justify-start items-start gap-4 mt-6">
               {componentsProducts.map(({ prod, qty }) => {
                 const cp = prod as IProduct;
                 const img = (() => {
@@ -1148,15 +1148,15 @@ export default function ProductDetailPage() {
                   }
                   return "";
                 })();
+                const cpRota = extractRotaNo(cp.raw.metafields);
 
                 const href = `/products/${cp.shopifyId ?? cp._id}`;
                 const compTech = getTechnicalRows(cp.raw.metafields || []);
 
                 return (
-                  <a
-                    href={href}
+                  <div
                     key={cp._id}
-                    className="block bg-white rounded-lg p-4 hover:shadow-lg transition-shadow"
+                    className="block bg-white rounded-lg p-4 max-w-xs"
                   >
                     <div className="w-full h-44 relative mb-4 overflow-hidden rounded-lg">
                       {!img ? (
@@ -1176,29 +1176,31 @@ export default function ProductDetailPage() {
                       )}
                     </div>
 
-                    <div className="mb-4">
-                      <div className="font-semibold text-lg border-b-2 border-secondary pb-2">
-                        {cp.raw.title}
+                    <div className="mb-2">
+                      <div className="text-xl font-bold">
+                        <a href={href} className="hover:underline">
+                          {cpRota}
+                        </a>{" "}
                         {qty > 1 && (
                           <span className="text-base font-normal">
-                            {" "}
                             (X {qty})
                           </span>
                         )}
                       </div>
+                      <div className="font-medium">{cp.raw.title}</div>
                     </div>
 
                     {compTech.length > 0 && (
                       <div className="mt-3">
-                        <div className="font-semibold inline-block text-sm border-b-2 border-secondary">
+                        <div className="font-semibold inline-block text-xl border-b-2 border-secondary">
                           Technical Information
                         </div>
 
-                        <div className="mt-3 text-xs grid grid-cols-2 gap-y-2">
+                        <div className="mt-3 text-sm grid grid-cols-2 gap-y-2">
                           {compTech.slice(0, 8).map((row: TechInfoRow) => (
                             <div
                               key={row.key}
-                              className="flex justify-between col-span-2 border-b border-muted/20 py-1"
+                              className="flex justify-between col-span-2 border-b border-muted/20 py-2"
                             >
                               <span className="font-medium">{row.label}</span>
                               <span className="text-right">
@@ -1209,7 +1211,7 @@ export default function ProductDetailPage() {
                         </div>
                       </div>
                     )}
-                  </a>
+                  </div>
                 );
               })}
             </div>
