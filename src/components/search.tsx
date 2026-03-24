@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { v1 as uuid } from "uuid";
 import Icons from "./icons";
 import { useProductsStore } from "@/store/products-store";
@@ -17,9 +17,14 @@ export default function Search() {
   const [type, setType] = useState<"single" | "multiple">("single");
   const [value, setValue] = useState("");
   const [tags, setTags] = useState<Tag[]>([]);
-  const router = useRouter(); // ← ADDED
+  const [isSearching, setIsSearching] = useState(false);
+  const router = useRouter();
 
   const { searchProducts } = useProductsStore();
+
+  // Debounce timer ve last search query'i track et
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const lastSearchRef = useRef<string>("");
 
   const handleSetType = (t: "single" | "multiple") => {
     setType(t);
@@ -29,45 +34,90 @@ export default function Search() {
   };
 
   // --- SEARCH BUTTON ---
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
+    // Prevent duplicate searches while one is in progress
+    if (isSearching) return;
+
+    // Clear any pending debounce
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
+    }
+
     if (type === "single") {
       const val = value.trim();
       if (val.length < 4) return; // require min 4 chars
 
-      await searchProducts(val);
-      setValue("");
-      router.push(`/products`);
+      // Prevent duplicate searches for same query
+      if (lastSearchRef.current === val) return;
+
+      lastSearchRef.current = val;
+      setIsSearching(true);
+
+      try {
+        await searchProducts(val);
+        setValue("");
+        router.push(`/products`);
+      } finally {
+        setIsSearching(false);
+      }
     } else {
       if (tags.length === 0) return;
 
       const query = tags.map((t) => t.value).join(",");
 
-      router.push(`/products`);
-      await searchProducts(query);
+      // Prevent duplicate searches for same query
+      if (lastSearchRef.current === query) return;
+
+      lastSearchRef.current = query;
+      setIsSearching(true);
+
+      try {
+        router.push(`/products`);
+        await searchProducts(query);
+      } finally {
+        setIsSearching(false);
+      }
     }
-  };
+  }, [type, value, tags, isSearching, searchProducts, router]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (type === "single") {
-      handleSearch();
-    } else {
-      if (value.trim() !== "") {
-        const parts = value
-          .split(/[\s,]+/)
-          .map((v) => v.trim())
-          .filter(Boolean);
-        const newTags = parts.map((v) => ({
-          id: uuid(),
-          value: v,
-          editable: false,
-        }));
-        setTags([...tags, ...newTags]);
-        setValue("");
-      }
+    // Debounce search submissions
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
     }
+
+    debounceTimer.current = setTimeout(() => {
+      if (type === "single") {
+        handleSearch();
+      } else {
+        if (value.trim() !== "") {
+          const parts = value
+            .split(/[\s,]+/)
+            .map((v) => v.trim())
+            .filter(Boolean);
+          const newTags = parts.map((v) => ({
+            id: uuid(),
+            value: v,
+            editable: false,
+          }));
+          setTags([...tags, ...newTags]);
+          setValue("");
+        }
+      }
+    }, 300); // Debounce 300ms
   };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
 
   const removeTag = (tag: Tag) => {
     setTags(tags.filter((t) => t.id !== tag.id));
@@ -171,20 +221,37 @@ export default function Search() {
 
             <button
               onClick={handleSearch}
+              disabled={
+                isSearching || (type === "single" && value.trim().length < 4)
+              }
               className={cn(
-                "p-2 bg-secondary rounded-full",
-                type === "single" && value.trim().length < 4
-                  ? "opacity-50 pointer-events-none"
-                  : "cursor-pointer",
+                "p-2 bg-secondary rounded-full transition-opacity",
+                isSearching || (type === "single" && value.trim().length < 4)
+                  ? "opacity-50 cursor-not-allowed"
+                  : "cursor-pointer hover:opacity-90",
               )}
-              aria-disabled={type === "single" && value.trim().length < 4}
+              aria-disabled={
+                isSearching || (type === "single" && value.trim().length < 4)
+              }
+              title={isSearching ? "Aranıyor..." : "Ara"}
             >
-              <Icons
-                className="text-white"
-                width={20}
-                height={20}
-                name="search"
-              />
+              {isSearching ? (
+                <div className="animate-spin">
+                  <Icons
+                    className="text-white"
+                    width={20}
+                    height={20}
+                    name="search"
+                  />
+                </div>
+              ) : (
+                <Icons
+                  className="text-white"
+                  width={20}
+                  height={20}
+                  name="search"
+                />
+              )}
             </button>
           </div>
         </div>

@@ -577,6 +577,32 @@ export default function ProductsPage() {
           <p className="text-lg font-medium">
             search term: &quot;{searchTerm}&quot;
           </p>
+        ) : Object.values(filters).some((f) => f) ? (
+          (() => {
+            const activeFilters = [
+              { label: "Brand", value: filters.brand },
+              { label: "Model", value: filters.model },
+              { label: "Type", value: filters.type },
+              { label: "Description", value: filters.desc },
+              { label: "In Stock Only", value: filters.stock },
+            ].filter((f) => f.value);
+
+            return (
+              <p className="text-lg font-medium">
+                {activeFilters.map((filter, idx) => (
+                  <span key={filter.label}>
+                    <span className="opacity-60">{filter.label}:</span>{" "}
+                    <span className="text-secondary font-semibold">
+                      {filter.value}
+                    </span>
+                    {idx < activeFilters.length - 1 && (
+                      <span className="opacity-60"> • </span>
+                    )}
+                  </span>
+                ))}
+              </p>
+            );
+          })()
         ) : (
           <p className="text-lg font-medium text-muted-foreground">
             All products
@@ -590,22 +616,38 @@ export default function ProductsPage() {
           <div className="w-full py-24 flex flex-col items-center justify-center">
             <div className="w-10 h-10 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : searchTerm && products.length === 0 ? (
+        ) : (searchTerm || Object.values(filters).some((f) => f)) &&
+          products.length === 0 ? (
           <div className="w-full">
             {/* Section header */}
             <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-[#1f1f1f]">
-                Not found in stock
-              </h2>
-              <p className="text-sm text-muted-foreground mt-2">
-                The following item(s) are not currently available. Request them
-                below.
-              </p>
+              {searchTerm ? (
+                <>
+                  <h2 className="text-3xl font-bold text-[#1f1f1f]">
+                    Not found in stock
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    The following item(s) are not currently available. Request
+                    them below.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-4xl font-bold text-[#1f1f1f]">
+                    No products found
+                  </h2>
+                  <p className="text-base text-muted-foreground mt-4">
+                    No products match your selected filters. Try adjusting your
+                    search criteria.
+                  </p>
+                </>
+              )}
             </div>
 
             {/* One card per search term — same grid as product listing */}
-            <div
-              className="
+            {searchTerm && (
+              <div
+                className="
           grid 
           grid-cols-1 
           sm:grid-cols-2 
@@ -614,183 +656,189 @@ export default function ProductsPage() {
           gap-6 
           place-items-center
         "
-            >
-              {String(searchTerm)
-                .split(",")
-                .map((t) => t.trim())
-                .filter(Boolean)
-                .map((term) => (
-                  <Card
-                    key={term}
-                    className="shadow-none bg-white flex flex-col gap-0 rounded-md w-full p-0 border-2 h-full"
-                  >
-                    {/* Placeholder image area */}
-                    <div className="relative w-full rounded-t-[inherit] h-36 md:h-56 lg:h-64 bg-muted/30 flex items-center justify-center">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <ImageIcon size={48} strokeWidth={1.2} />
-                      </div>
-                    </div>
-
-                    {/* Card body */}
-                    <div className="flex flex-col bg-white gap-3 p-4 flex-1">
-                      {/* Code / term */}
-                      <p className="font-extrabold text-2xl md:text-3xl leading-none text-[#1f1f1f] break-all">
-                        {term}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Not available in current stock
-                      </p>
-
-                      {/* Get Request button — desktop opens modal, mobile opens sheet */}
-                      <div className="mt-auto pt-3">
-                        {/* Desktop */}
-                        <div className="hidden md:block">
-                          <Button
-                            disabled={requestedTerms.has(term.toLowerCase())}
-                            className={`w-full font-semibold ${
-                              requestedTerms.has(term.toLowerCase())
-                                ? "bg-gray-400 text-white cursor-not-allowed"
-                                : "bg-secondary text-white"
-                            }`}
-                            onClick={() => {
-                              if (requestedTerms.has(term.toLowerCase()))
-                                return;
-                              setRequestTerm(term);
-                              setShowRequestModal(true);
-                            }}
-                          >
-                            {requestedTerms.has(term.toLowerCase())
-                              ? "Already Requested"
-                              : "Get Request"}
-                          </Button>
+              >
+                {String(searchTerm)
+                  .split(",")
+                  .map((t) => t.trim())
+                  .filter(Boolean)
+                  .map((term) => (
+                    <Card
+                      key={term}
+                      className="shadow-none bg-white flex flex-col gap-0 rounded-md w-full p-0 border-2 h-full"
+                    >
+                      {/* Placeholder image area */}
+                      <div className="relative w-full rounded-t-[inherit] h-36 md:h-56 lg:h-64 bg-muted/30 flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <ImageIcon size={48} strokeWidth={1.2} />
                         </div>
+                      </div>
 
-                        {/* Mobile */}
-                        <div className="md:hidden">
-                          <Sheet>
-                            <SheetTrigger asChild>
-                              <Button
-                                disabled={requestedTerms.has(
-                                  term.toLowerCase(),
-                                )}
-                                className={`w-full font-semibold ${
-                                  requestedTerms.has(term.toLowerCase())
-                                    ? "bg-gray-400 text-white cursor-not-allowed"
-                                    : "bg-secondary text-white"
-                                }`}
-                                onClick={() =>
-                                  !requestedTerms.has(term.toLowerCase()) &&
-                                  setRequestTerm(term)
-                                }
-                              >
-                                {requestedTerms.has(term.toLowerCase())
-                                  ? "Already Requested"
-                                  : "Get Request"}
-                              </Button>
-                            </SheetTrigger>
-                            <SheetContent side="right" className="max-w-lg">
-                              <SheetHeader>
-                                <SheetTitle>Request product: {term}</SheetTitle>
-                              </SheetHeader>
-                              <div className="p-4">
-                                <label className="block font-medium mb-2">
-                                  Details
-                                </label>
-                                <Textarea
-                                  id={`product-request-message-${term}`}
-                                  defaultValue={`I'm looking for: ${term}`}
-                                />
-                              </div>
-                              <SheetFooter>
-                                <div className="flex gap-2">
-                                  <Button
-                                    onClick={async () => {
-                                      try {
-                                        const ta = document.getElementById(
-                                          `product-request-message-${term}`,
-                                        ) as HTMLTextAreaElement | null;
-                                        const message = ta
-                                          ? ta.value
-                                          : `I'm looking for ${term}`;
-                                        const resp = await fetch(
-                                          `/api/requests/product`,
-                                          {
-                                            method: "POST",
-                                            headers: {
-                                              "Content-Type":
-                                                "application/json",
+                      {/* Card body */}
+                      <div className="flex flex-col bg-white gap-3 p-4 flex-1">
+                        {/* Code / term */}
+                        <p className="font-extrabold text-2xl md:text-3xl leading-none text-[#1f1f1f] break-all">
+                          {term}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Not available in current stock
+                        </p>
+
+                        {/* Get Request button — desktop opens modal, mobile opens sheet */}
+                        <div className="mt-auto pt-3">
+                          {/* Desktop */}
+                          <div className="hidden md:block">
+                            <Button
+                              disabled={requestedTerms.has(term.toLowerCase())}
+                              className={`w-full font-semibold ${
+                                requestedTerms.has(term.toLowerCase())
+                                  ? "bg-gray-400 text-white cursor-not-allowed"
+                                  : "bg-secondary text-white"
+                              }`}
+                              onClick={() => {
+                                if (requestedTerms.has(term.toLowerCase()))
+                                  return;
+                                setRequestTerm(term);
+                                setShowRequestModal(true);
+                              }}
+                            >
+                              {requestedTerms.has(term.toLowerCase())
+                                ? "Already Requested"
+                                : "Get Request"}
+                            </Button>
+                          </div>
+
+                          {/* Mobile */}
+                          <div className="md:hidden">
+                            <Sheet>
+                              <SheetTrigger asChild>
+                                <Button
+                                  disabled={requestedTerms.has(
+                                    term.toLowerCase(),
+                                  )}
+                                  className={`w-full font-semibold ${
+                                    requestedTerms.has(term.toLowerCase())
+                                      ? "bg-gray-400 text-white cursor-not-allowed"
+                                      : "bg-secondary text-white"
+                                  }`}
+                                  onClick={() =>
+                                    !requestedTerms.has(term.toLowerCase()) &&
+                                    setRequestTerm(term)
+                                  }
+                                >
+                                  {requestedTerms.has(term.toLowerCase())
+                                    ? "Already Requested"
+                                    : "Get Request"}
+                                </Button>
+                              </SheetTrigger>
+                              <SheetContent side="right" className="max-w-lg">
+                                <SheetHeader>
+                                  <SheetTitle>
+                                    Request product: {term}
+                                  </SheetTitle>
+                                </SheetHeader>
+                                <div className="p-4">
+                                  <label className="block font-medium mb-2">
+                                    Details
+                                  </label>
+                                  <Textarea
+                                    id={`product-request-message-${term}`}
+                                    defaultValue={`I'm looking for: ${term}`}
+                                  />
+                                </div>
+                                <SheetFooter>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      onClick={async () => {
+                                        try {
+                                          const ta = document.getElementById(
+                                            `product-request-message-${term}`,
+                                          ) as HTMLTextAreaElement | null;
+                                          const message = ta
+                                            ? ta.value
+                                            : `I'm looking for ${term}`;
+                                          const resp = await fetch(
+                                            `/api/requests/product`,
+                                            {
+                                              method: "POST",
+                                              headers: {
+                                                "Content-Type":
+                                                  "application/json",
+                                              },
+                                              body: JSON.stringify({
+                                                query: term,
+                                                message,
+                                              }),
                                             },
-                                            body: JSON.stringify({
-                                              query: term,
-                                              message,
-                                            }),
-                                          },
-                                        );
-                                        if (resp.ok) {
-                                          try {
-                                            const list: string[] = JSON.parse(
-                                              localStorage.getItem(
-                                                REQUESTED_PRODUCTS_KEY,
-                                              ) ?? "[]",
-                                            );
-                                            if (
-                                              !list
-                                                .map((s) => s.toLowerCase())
-                                                .includes(term.toLowerCase())
-                                            ) {
-                                              list.push(term);
-                                              localStorage.setItem(
-                                                REQUESTED_PRODUCTS_KEY,
-                                                JSON.stringify(list),
+                                          );
+                                          if (resp.ok) {
+                                            try {
+                                              const list: string[] = JSON.parse(
+                                                localStorage.getItem(
+                                                  REQUESTED_PRODUCTS_KEY,
+                                                ) ?? "[]",
                                               );
-                                            }
-                                            setRequestedTerms(
-                                              (prev) =>
-                                                new Set([
-                                                  ...prev,
-                                                  term.toLowerCase(),
-                                                ]),
+                                              if (
+                                                !list
+                                                  .map((s) => s.toLowerCase())
+                                                  .includes(term.toLowerCase())
+                                              ) {
+                                                list.push(term);
+                                                localStorage.setItem(
+                                                  REQUESTED_PRODUCTS_KEY,
+                                                  JSON.stringify(list),
+                                                );
+                                              }
+                                              setRequestedTerms(
+                                                (prev) =>
+                                                  new Set([
+                                                    ...prev,
+                                                    term.toLowerCase(),
+                                                  ]),
+                                              );
+                                            } catch {}
+                                            toast.success("Request submitted");
+                                            const close =
+                                              document.querySelector(
+                                                '[data-slot="sheet-close"]',
+                                              ) as HTMLElement | null;
+                                            if (close) close.click();
+                                          } else {
+                                            toast.error(
+                                              "Failed to submit request",
                                             );
-                                          } catch {}
-                                          toast.success("Request submitted");
-                                          const close = document.querySelector(
-                                            '[data-slot="sheet-close"]',
-                                          ) as HTMLElement | null;
-                                          if (close) close.click();
-                                        } else {
+                                          }
+                                        } catch (e) {
+                                          console.error(e);
                                           toast.error(
                                             "Failed to submit request",
                                           );
                                         }
-                                      } catch (e) {
-                                        console.error(e);
-                                        toast.error("Failed to submit request");
-                                      }
-                                    }}
-                                  >
-                                    Send request
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    onClick={() => {
-                                      const close = document.querySelector(
-                                        '[data-slot="sheet-close"]',
-                                      ) as HTMLElement | null;
-                                      if (close) close.click();
-                                    }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </SheetFooter>
-                            </SheetContent>
-                          </Sheet>
+                                      }}
+                                    >
+                                      Send request
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      onClick={() => {
+                                        const close = document.querySelector(
+                                          '[data-slot="sheet-close"]',
+                                        ) as HTMLElement | null;
+                                        if (close) close.click();
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </SheetFooter>
+                              </SheetContent>
+                            </Sheet>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </Card>
-                ))}
-            </div>
+                    </Card>
+                  ))}
+              </div>
+            )}
 
             {/* Desktop modal overlay */}
             {showRequestModal && (

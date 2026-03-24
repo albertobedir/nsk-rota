@@ -127,6 +127,11 @@ export async function createDraftOrder(input: DraftOrderInput) {
                 quantity
                 originalUnitPrice
                 discountedUnitPrice
+                appliedDiscount {
+                  value
+                  valueType
+                  description
+                }
                 variant {
                   id
                   title
@@ -167,7 +172,7 @@ export async function createDraftOrder(input: DraftOrderInput) {
 // 2. Draft Order Güncelle
 export async function updateDraftOrder(
   id: string,
-  input: Partial<DraftOrderInput>
+  input: Partial<DraftOrderInput>,
 ) {
   const mutation = `
     mutation draftOrderUpdate($id: ID!, $input: DraftOrderInput!) {
@@ -185,6 +190,11 @@ export async function updateDraftOrder(
                 quantity
                 originalUnitPrice
                 discountedUnitPrice
+                appliedDiscount {
+                  value
+                  valueType
+                  description
+                }
               }
             }
           }
@@ -267,7 +277,7 @@ export async function sendDraftOrderInvoice(
     subject?: string;
     customMessage?: string;
     bcc?: string[];
-  }
+  },
 ) {
   const mutation = `
     mutation draftOrderInvoiceSend($id: ID!, $email: EmailInput) {

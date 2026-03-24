@@ -43,21 +43,27 @@ Api.interceptors.response.use(
     const config = response.config;
 
     // validateStatus: () => true means 401s land here instead of the error handler.
-    // Skip retry for auth endpoints (refresh, login…) to avoid infinite loops.
+    // Skip retry for:
+    // 1. Auth endpoints (refresh, login…) to avoid infinite loops
+    // 2. Internal meta sync requests (_internal_meta_sync: true)
+    // 3. Request already retried (_retry: true)
     if (
       response.status === 401 &&
       !config._retry &&
+      !config._internal_meta_sync &&
       !config.url?.includes("/auth/")
     ) {
       config._retry = true;
       try {
-        await Api.post("/auth/refresh-token", undefined, { _retry: true });
+        await Api.post("/auth/refresh", undefined, { _retry: true });
         return Api(config);
-      } catch {
+      } catch (refreshError) {
+        // Refresh failed: clear session and redirect to login
         useSessionStore.getState().clearSession();
         if (typeof window !== "undefined") {
           window.location.href = "/auth/login";
         }
+        return Promise.reject(refreshError);
       }
     }
 
@@ -66,16 +72,24 @@ Api.interceptors.response.use(
   async (error) => {
     // Handles network errors / timeouts (validateStatus bypasses this for HTTP errors)
     const { config, response } = error;
-    if (response?.status === 401 && !config?._retry) {
+
+    if (
+      response?.status === 401 &&
+      !config?._retry &&
+      !config?._internal_meta_sync &&
+      !config?.url?.includes("/auth/")
+    ) {
       config._retry = true;
       try {
-        await Api.post("/auth/refresh-token", undefined, { _retry: true });
+        await Api.post("/auth/refresh", undefined, { _retry: true });
         return Api(config);
-      } catch {
+      } catch (refreshError) {
+        // Refresh failed: clear session and redirect to login
         useSessionStore.getState().clearSession();
         if (typeof window !== "undefined") {
           window.location.href = "/auth/login";
         }
+        return Promise.reject(refreshError);
       }
     }
 

@@ -21,6 +21,7 @@ export default function BasketPage() {
 
   const clearCartStore = useSessionStore((s) => s.clearCart);
   const sessionUser = useSessionStore((s) => s.user);
+  const pricingTiers = useSessionStore((s) => s.pricingTiers);
   const router = useRouter();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
@@ -49,13 +50,27 @@ export default function BasketPage() {
   const handleGetOffer = () => {
     (async () => {
       try {
+        // Calculate discount percentage from pricing tiers
+        let discountPercentage = 0;
+        if (sessionUser?.tier && pricingTiers && pricingTiers.length > 0) {
+          const matchingTier = pricingTiers.find(
+            (t) => (t as any).fieldsMap?.tier_tag === sessionUser.tier,
+          );
+          if (matchingTier) {
+            const discountStr = (matchingTier as any).fieldsMap
+              ?.discount_percentage;
+            discountPercentage = parseFloat(discountStr) || 0;
+          }
+        }
+
         const resp = await fetch("/api/cart/checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             customerEmail: sessionUser?.email,
             customerId: sessionUser?.id,
-            tierTag: sessionUser?.tier, // ✅ Session store'dan tier gönder
+            userTier: sessionUser?.tier,
+            discountPercentage,
             lineItems: cart.map((i) => ({
               merchandiseId: i.variantId,
               quantity: i.quantity,

@@ -9,12 +9,12 @@ const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET!;
 
 export async function POST(request: NextRequest) {
   try {
-    const refreshToken = request.cookies.get("refreshToken")?.value;
+    const refreshToken = request.cookies.get("refresh_token")?.value;
 
     if (!refreshToken) {
       return NextResponse.json(
         { message: "Refresh token bulunamadı" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json(
         { message: "Geçersiz refresh token" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -39,17 +39,19 @@ export async function POST(request: NextRequest) {
     const newAccessToken = jwt.sign(
       { id: user.id, email: user.email },
       ACCESS_TOKEN_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "1h" },
     );
 
     const newRefreshToken = jwt.sign(
       { id: user.id, email: user.email },
       REFRESH_TOKEN_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     const res = NextResponse.json({
       message: "Token yenilendi",
+      access_token: newAccessToken,
+      refresh_token: newRefreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -82,7 +84,7 @@ export async function POST(request: NextRequest) {
     console.error("Refresh Token Error:", err);
     return NextResponse.json(
       { message: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

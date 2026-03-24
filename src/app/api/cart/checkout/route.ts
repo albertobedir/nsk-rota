@@ -14,8 +14,15 @@ type IncomingLine = {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { lineItems, email, phone, shippingAddress, customerId, tierTag } =
-      body;
+    const {
+      lineItems,
+      email,
+      phone,
+      shippingAddress,
+      customerId,
+      userTier,
+      discountPercentage,
+    } = body;
 
     if (!Array.isArray(lineItems) || lineItems.length === 0) {
       return NextResponse.json(
@@ -25,63 +32,48 @@ export async function POST(request: NextRequest) {
     }
 
     const lines = lineItems as IncomingLine[];
+    const discount = Number(discountPercentage ?? 0);
 
     const normalizeShopifyId = (id: string) =>
       id.includes("/") ? id.split("/").pop()! : id;
 
-    const normalizedCustomerId = customerId
-      ? normalizeShopifyId(String(customerId))
-      : undefined;
+    // ✅ DEBUG: Log incoming values
+    console.log("[CHECKOUT REQUEST]", {
+      customerId,
+      userTier,
+      discountPercentage,
+      lineItemsCount: lineItems.length,
+      firstItem: lineItems[0],
+    });
 
-    // ✅ Müşterinin tier indirimini DB'den çek
-    let tierDiscountPercent = 0;
-    let tierDescription = "";
-
-    console.log("[REQUEST BODY] tierTag:", tierTag);
-
-    if (tierTag) {
-      try {
-        // Session store'dan gelen tierTag'i kullanarak PricingTier'ı bul
-        console.log("[TIER TAG from request]", tierTag);
-
-        const tierData = await prisma.pricingTier.findFirst({
-          where: { tierTag: tierTag },
-          select: { discountPercentage: true, tierName: true },
-        });
-
-        if (tierData) {
-          tierDiscountPercent = tierData.discountPercentage;
-          tierDescription = `${tierData.tierName} - %${tierDiscountPercent} indirim`;
-          console.log(
-            `[TIER] ${tierTag} → %${tierDiscountPercent} indirim (Prisma)`,
-          );
-        } else {
-          console.warn(`[TIER] ${tierTag} için DB'de kayıt bulunamadı`);
-        }
-      } catch (e) {
-        console.warn("[TIER] Tier indirim çekme hatası:", e);
-      }
-    } else {
-      console.warn("[TIER] tierTag request'te gelmedi!");
-    }
-
-    // Credit check (indirimli fiyat üzerinden)
-    if (normalizedCustomerId) {
+    if (customerId) {
       try {
         const customer = await prisma.customer.findFirst({
-          where: { shopifyId: normalizedCustomerId },
+          where: { shopifyId: normalizeShopifyId(String(customerId)) },
           select: { creditRemaining: true },
         });
         const remaining = Number(customer?.creditRemaining ?? 0);
+
+        // Calculate total using tier discount
         const computedTotal = lines.reduce((sum, li) => {
           const qty = Number(li.quantity || 1);
-          const price =
-            Number(li.customPrice ?? li.originalUnitPrice ?? 0) || 0;
-          const discounted = price * (1 - tierDiscountPercent / 100);
-          return sum + discounted * qty;
+          let price = Number(li.customPrice ?? li.originalUnitPrice ?? 0) || 0;
+
+          // Apply tier discount if no explicit price
+          if (!li.customPrice && discount > 0 && price > 0) {
+            const discountedPrice = price * (1 - discount / 100);
+            console.log(
+              `[CREDIT CHECK] item: price=${price} × (1-${discount}/100) = ${discountedPrice.toFixed(2)}, qty=${qty}`,
+            );
+            price = discountedPrice;
+          }
+
+          return sum + price * qty;
         }, 0);
-        console.log("Customer Credit:", remaining);
-        console.log("Cart Total (discounted):", computedTotal);
+
+        console.log(
+          `[CREDIT CHECK TOTAL] computedTotal=${computedTotal.toFixed(2)}, creditRemaining=${remaining}`,
+        );
 
         if (computedTotal > remaining) {
           return NextResponse.json(
@@ -94,10 +86,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Get user's tier and discount percentage from request
+    console.log(
+      `[TIER] customerId=${customerId} userTier=${userTier} discount=${discount}%`,
+    );
+
     const items = lines.map((li) => {
       const qty = Number(li.quantity || 1);
-      const originalPrice =
-        Number(li.customPrice ?? li.originalUnitPrice ?? 0) || 0;
+      const originalPrice = Number(li.originalUnitPrice ?? 0);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const baseItem: any = {
@@ -109,39 +105,76 @@ export async function POST(request: NextRequest) {
       if (li.merchandiseId) baseItem.variantId = li.merchandiseId;
       else if (li.productId) baseItem.productId = li.productId;
 
-      // ✅ Tier indirimi varsa indirimli fiyatı customPrice olarak set et
-      if (tierDiscountPercent > 0) {
-        const discountedPrice = (
-          originalPrice *
-          (1 - tierDiscountPercent / 100)
-        ).toFixed(2);
-        baseItem.customPrice = discountedPrice;
+      console.log(
+        `\n[ITEM PROCESSING START] id=${baseItem.variantId} qty=${qty} originalPrice=${originalPrice}`,
+      );
+
+      // Determine which price to use
+      let customPrice: number | undefined;
+      const explicit = li.customPrice;
+
+      if (explicit != null) {
+        customPrice = Number(explicit);
+        console.log(`[ITEM] EXPLICIT price found: customPrice=${customPrice}`);
+      } else if (discount > 0 && originalPrice > 0) {
+        // Apply tier-based discount
+        customPrice = originalPrice * (1 - discount / 100);
         console.log(
-          `[LINE ITEM] Original: ${originalPrice}, Discounted: ${discountedPrice}`,
+          `[ITEM] TIER DISCOUNT applied: originalPrice=${originalPrice} × (1 - ${discount}/100) = ${customPrice.toFixed(2)}`,
+        );
+      } else {
+        console.log(
+          `[ITEM] NO discount applied (discount=${discount}, originalPrice=${originalPrice})`,
         );
       }
 
+      // Apply discount if custom price differs from original
+      if (
+        customPrice != null &&
+        originalPrice > 0 &&
+        customPrice < originalPrice
+      ) {
+        // Use PERCENTAGE so Shopify applies discount on its own recorded price
+        // (not on frontend's potentially discounted originalUnitPrice)
+        baseItem.appliedDiscount = {
+          value: discount,
+          valueType: "PERCENTAGE",
+          description: `B2B Tier Pricing - ${discount}% off`,
+        };
+        console.log(
+          `[DISCOUNT APPLIED] PERCENTAGE approach: ${discount}% off (Shopify will apply to its recorded price)`,
+        );
+      } else {
+        console.log(
+          `[NO DISCOUNT] This item won't have discount (customPrice=${customPrice}, originalPrice=${originalPrice})`,
+        );
+      }
+
+      console.log(
+        `[ITEM PROCESSING END] final baseItem:`,
+        JSON.stringify(baseItem, null, 2),
+      );
       return baseItem;
     });
 
     const input = {
-      customerId: normalizedCustomerId
-        ? `gid://shopify/Customer/${normalizedCustomerId}`
-        : undefined,
+      customerId: customerId ? String(customerId) : undefined,
       email: email ?? undefined,
       phone: phone ?? undefined,
       lineItems: items,
       shippingAddress: shippingAddress ?? undefined,
       tags: ["b2b", "custom-pricing"],
-      note: normalizedCustomerId
-        ? `B2B Order - ${tierDescription || "Custom pricing"}`
+      note: customerId
+        ? `B2B Order - Custom pricing for ${customerId}`
         : undefined,
     };
 
+    // ✅ LOG 2: Shopify'a gönderilen tam input
     console.log("[DRAFT ORDER INPUT]", JSON.stringify(input, null, 2));
 
     const created = await createDraftOrder(input);
 
+    // ✅ LOG 3: Shopify'dan dönen response
     console.log("[DRAFT ORDER RESPONSE]", JSON.stringify(created, null, 2));
 
     return NextResponse.json({ created });

@@ -20,11 +20,11 @@ function verifyShopifyWebhook(req: NextRequest, rawBody: string) {
   return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(hmacHeader));
 }
 
-async function fetchCollectionProducts(collectionGid: string) {
+async function fetchCollectionProducts(collectionGid: string): Promise<any[]> {
   const query = `
-    query getCollectionProducts($id: ID!) {
+    query getCollectionProducts($id: ID!, $cursor: String) {
       collection(id: $id) {
-        products(first: 250) {
+        products(first: 250, after: $cursor) {
           edges {
             node {
               id
@@ -35,37 +35,65 @@ async function fetchCollectionProducts(collectionGid: string) {
           }
           pageInfo {
             hasNextPage
+            endCursor
           }
         }
       }
     }
   `;
 
-  const response = await fetch(
-    `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/graphql.json`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!,
+  const allProducts: any[] = [];
+  let cursor: string | null = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const response: Response = await fetch(
+      `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/graphql.json`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!,
+        },
+        body: JSON.stringify({
+          query,
+          variables: { id: collectionGid, cursor },
+        }),
       },
-      body: JSON.stringify({
-        query,
-        variables: { id: collectionGid },
-      }),
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Shopify API error: ${response.status} ${response.statusText}`,
+      );
     }
-  );
 
-  const { data } = await response.json();
+    const { data, errors }: any = await response.json();
 
-  return (
-    data?.collection?.products?.edges?.map((edge: any) => ({
+    if (errors?.length) {
+      throw new Error(`GraphQL errors: ${JSON.stringify(errors)}`);
+    }
+
+    const productsPage: any = data?.collection?.products;
+    if (!productsPage) break;
+
+    const batch = productsPage.edges.map((edge: any) => ({
       id: parseInt(edge.node.legacyResourceId),
       title: edge.node.title,
       handle: edge.node.handle,
       gid: edge.node.id,
-    })) || []
-  );
+    }));
+
+    allProducts.push(...batch);
+    hasNextPage = productsPage.pageInfo.hasNextPage;
+    cursor = productsPage.pageInfo.endCursor ?? null;
+
+    console.log(
+      `[Collection Sync] Fetched ${allProducts.length} products so far...`,
+    );
+  }
+
+  return allProducts;
 }
 
 export async function POST(req: NextRequest) {
@@ -78,11 +106,11 @@ export async function POST(req: NextRequest) {
     }
 
     const collectionData = JSON.parse(rawBody);
-    console.log("Collection created - ID:", collectionData.id);
+    console.log("[Collection Webhook] Received - ID:", collectionData.id);
 
     await connectDB();
 
-    // 1. Collection'ı kaydet
+    // 1. Collection meta verisini kaydet
     const full = {
       ...collectionData,
       receivedAt: new Date(),
@@ -91,12 +119,12 @@ export async function POST(req: NextRequest) {
     await Collection.updateOne(
       { shopifyId: collectionData.id },
       { $set: { raw: full, updatedAt: new Date() } },
-      { upsert: true }
+      { upsert: true },
     );
 
-    // 2. Ürünleri Shopify'dan çek
+    // 2. Tüm ürünleri sayfalama ile Shopify'dan çek
     const products = await fetchCollectionProducts(
-      collectionData.admin_graphql_api_id
+      collectionData.admin_graphql_api_id,
     );
 
     // 3. Ürünleri MongoDB'ye kaydet
@@ -108,11 +136,11 @@ export async function POST(req: NextRequest) {
           productCount: products.length,
           updatedAt: new Date(),
         },
-      }
+      },
     );
 
     console.log(
-      `Collection ${collectionData.id} saved with ${products} products`
+      `[Collection Webhook] Collection ${collectionData.id} saved with ${products.length} products`,
     );
 
     return NextResponse.json(
@@ -121,13 +149,13 @@ export async function POST(req: NextRequest) {
         collectionId: collectionData.id,
         productCount: products.length,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
-    console.error("Collection webhook error:", err);
+    console.error("[Collection Webhook] Error:", err);
     return NextResponse.json(
       { error: (err as Error).message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
