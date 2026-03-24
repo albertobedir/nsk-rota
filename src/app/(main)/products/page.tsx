@@ -533,6 +533,7 @@ export default function ProductsPage() {
               onCheckedChange={(checked) =>
                 setFilters((prev) => ({ ...prev, stock: checked ? "IN" : "" }))
               }
+              className="data-[state=checked]:bg-green-600"
             />
           </div>
         </div>
@@ -572,12 +573,8 @@ export default function ProductsPage() {
           </Button>
         </div>
       </div>
-      <div className="flex justify-center items-center w-full">
-        {searchTerm ? (
-          <p className="text-lg font-medium">
-            search term: &quot;{searchTerm}&quot;
-          </p>
-        ) : Object.values(filters).some((f) => f) ? (
+      <div className="flex justify-center items-start w-full">
+        {searchTerm ? null : Object.values(filters).some((f) => f) ? (
           (() => {
             const activeFilters = [
               { label: "Brand", value: filters.brand },

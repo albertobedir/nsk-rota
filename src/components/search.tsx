@@ -18,6 +18,7 @@ export default function Search() {
   const [value, setValue] = useState("");
   const [tags, setTags] = useState<Tag[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [shakingTagId, setShakingTagId] = useState<string | null>(null);
   const router = useRouter();
 
   const { searchProducts } = useProductsStore();
@@ -94,17 +95,55 @@ export default function Search() {
         handleSearch();
       } else {
         if (value.trim() !== "") {
+          // Max 20 tags - don't add more
+          if (tags.length >= 20) {
+            return;
+          }
+
           const parts = value
             .split(/[\s,]+/)
             .map((v) => v.trim())
             .filter(Boolean);
-          const newTags = parts.map((v) => ({
-            id: uuid(),
-            value: v,
-            editable: false,
-          }));
-          setTags([...tags, ...newTags]);
-          setValue("");
+
+          // Get existing tag values for duplicate check
+          const existingValues = new Set(
+            tags.map((t) => t.value.toLowerCase()),
+          );
+
+          // Filter out duplicates and limit total to 20
+          const newTags = parts
+            .filter((v) => !existingValues.has(v.toLowerCase()))
+            .slice(0, Math.max(0, 20 - tags.length))
+            .map((v) => ({
+              id: uuid(),
+              value: v,
+              editable: false,
+            }));
+
+          // Check if there are duplicates to shake
+          const hasDuplicates = parts.some((v) =>
+            existingValues.has(v.toLowerCase()),
+          );
+
+          if (hasDuplicates) {
+            // Find first duplicate and shake it
+            const firstDuplicateValue = parts.find((v) =>
+              existingValues.has(v.toLowerCase()),
+            );
+            const duplicateTag = tags.find(
+              (t) =>
+                t.value.toLowerCase() === firstDuplicateValue?.toLowerCase(),
+            );
+            if (duplicateTag) {
+              setShakingTagId(duplicateTag.id);
+              setTimeout(() => setShakingTagId(null), 600);
+            }
+          }
+
+          if (newTags.length > 0) {
+            setTags([...tags, ...newTags]);
+            setValue("");
+          }
         }
       }
     }, 300); // Debounce 300ms
@@ -132,6 +171,15 @@ export default function Search() {
   };
 
   const handleChangeTagValue = (tag: Tag, value: string) => {
+    // Check if new value already exists in other tags
+    const isDuplicate = tags.some(
+      (t) => t.id !== tag.id && t.value.toLowerCase() === value.toLowerCase(),
+    );
+
+    if (isDuplicate) {
+      return; // Don't allow editing to duplicate value
+    }
+
     setTags(
       tags.map((t) => ({ ...t, value: t.id === tag.id ? value : t.value })),
     );
@@ -145,6 +193,16 @@ export default function Search() {
 
   return (
     <div className="w-full flex flex-col gap-3">
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-4px); }
+          75% { transform: translateX(4px); }
+        }
+        .shake-animation {
+          animation: shake 0.6s ease-in-out;
+        }
+      `}</style>
       {/* SEARCH BAR */}
       <div className="shadow-[0px_0px_20px_0px_#000] shadow-muted-foreground/30 rounded-xl w-full sm:flex-row flex flex-col sm:items-start">
         {/* LEFT BUTTONS */}
@@ -200,20 +258,60 @@ export default function Search() {
                 onChange={(e) => setValue(e.target.value)}
                 onPaste={(e) => {
                   if (type !== "multiple") return;
+                  // Max 20 tags check
+                  if (tags.length >= 20) {
+                    e.preventDefault();
+                    return;
+                  }
+
                   const pasted = e.clipboardData.getData("text");
                   const parts = pasted
                     .split(/[\s,]+/)
                     .map((v) => v.trim())
                     .filter(Boolean);
                   if (parts.length === 0) return;
-                  e.preventDefault();
-                  const newTags = parts.map((v) => ({
-                    id: uuid(),
-                    value: v,
-                    editable: false,
-                  }));
-                  setTags((prev) => [...prev, ...newTags]);
-                  setValue("");
+
+                  // Get existing tag values for duplicate check
+                  const existingValues = new Set(
+                    tags.map((t) => t.value.toLowerCase()),
+                  );
+
+                  // Filter out duplicates and limit total to 20
+                  const newTags = parts
+                    .filter((v) => !existingValues.has(v.toLowerCase()))
+                    .slice(0, Math.max(0, 20 - tags.length))
+                    .map((v) => ({
+                      id: uuid(),
+                      value: v,
+                      editable: false,
+                    }));
+
+                  // Check if there are duplicates to shake
+                  const hasDuplicates = parts.some((v) =>
+                    existingValues.has(v.toLowerCase()),
+                  );
+
+                  if (hasDuplicates) {
+                    // Find first duplicate and shake it
+                    const firstDuplicateValue = parts.find((v) =>
+                      existingValues.has(v.toLowerCase()),
+                    );
+                    const duplicateTag = tags.find(
+                      (t) =>
+                        t.value.toLowerCase() ===
+                        firstDuplicateValue?.toLowerCase(),
+                    );
+                    if (duplicateTag) {
+                      setShakingTagId(duplicateTag.id);
+                      setTimeout(() => setShakingTagId(null), 600);
+                    }
+                  }
+
+                  if (newTags.length > 0) {
+                    e.preventDefault();
+                    setTags((prev) => [...prev, ...newTags]);
+                    setValue("");
+                  }
                 }}
                 className="w-full px-5 text-lg outline-none placeholder:text-lg h-12"
               />
@@ -259,33 +357,50 @@ export default function Search() {
 
       {/* TAGS — rendered below the search bar */}
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-2 sm:pl-[13rem] bg-white sm:bg-transparent">
-          {tags.map((tag) => (
-            <div
-              key={tag.id}
-              className="bg-[#ddd] text-black rounded-lg pl-2 pr-1 py-0.5"
-            >
-              <input
-                type="text"
-                disabled={!tag.editable}
-                value={tag.value}
-                onChange={(e) => handleChangeTagValue(tag, e.target.value)}
-                onDoubleClick={() => handleDoubleClick(tag)}
-                className="outline-none bg-transparent px-0 py-0"
-                style={{
-                  width: `${tag.value.length || 1}ch`,
-                  minWidth: "2ch",
-                  maxWidth: "100%",
-                }}
-              />
-              <button
-                className="cursor-pointer hover:bg-red-500/20 rounded-full p-1"
-                onClick={() => removeTag(tag)}
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-between items-center px-2 sm:pl-[13rem]">
+            <span className="text-xs text-slate-500">
+              {tags.length}/20 tags
+            </span>
+            {tags.length >= 20 && (
+              <span className="text-xs text-red-500 font-medium">
+                Maximum tags reached
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2 px-2 sm:pl-[13rem] bg-white sm:bg-transparent max-h-32 overflow-y-auto">
+            {tags.map((tag) => (
+              <div
+                key={tag.id}
+                className={cn(
+                  "rounded-lg pl-2 pr-1 py-0.5 flex-shrink-0 transition-colors",
+                  shakingTagId === tag.id
+                    ? "shake-animation bg-red-100"
+                    : "bg-[#ddd] text-black",
+                )}
               >
-                <Icons name="x" width={10} height={10} />
-              </button>
-            </div>
-          ))}
+                <input
+                  type="text"
+                  disabled={!tag.editable}
+                  value={tag.value}
+                  onChange={(e) => handleChangeTagValue(tag, e.target.value)}
+                  onDoubleClick={() => handleDoubleClick(tag)}
+                  className="outline-none bg-transparent px-0 py-0"
+                  style={{
+                    width: `${tag.value.length || 1}ch`,
+                    minWidth: "2ch",
+                    maxWidth: "100%",
+                  }}
+                />
+                <button
+                  className="cursor-pointer hover:bg-red-500/20 rounded-full p-1"
+                  onClick={() => removeTag(tag)}
+                >
+                  <Icons name="x" width={10} height={10} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

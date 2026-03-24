@@ -138,13 +138,13 @@ export default function Navbar({
     >
       <div className="w-full">
         <div className="h-1.5 bg-primary w-full"></div>
-        <div className="container relative flex items-center justify-end">
+        <div className="container relative flex items-start justify-end">
           <Link
             href="https://nskgroup.com.tr/en"
             target="_blank"
             rel="noopener noreferrer"
             className="
-      relative flex items-center justify-center
+      relative flex items-start justify-center
       rounded-b-md text-white px-30 text-xs font-medium
       max-w-[9.5rem] h-9
       right-1/2 translate-x-1/2 sm:translate-x-0 sm:right-[8%]
@@ -173,7 +173,7 @@ export default function Navbar({
       </div>
 
       <div className="pb-11 md:px-20 bg-white z-20">
-        <div className="container px-4 relative flex items-center justify-between gap-8 xl:gap-10">
+        <div className="container px-4 relative flex items-start justify-between gap-8 xl:gap-10">
           {/* LOGO */}
           <Link
             className="cursor-pointer w-[110px] sm:w-[140px] md:w-[180px]"
@@ -185,7 +185,7 @@ export default function Navbar({
           {/* RESPONSIVE SEARCH + CREDIT BAR */}
           <div
             className={cn(
-              "lg:relative lg:px-0 px-4 absolute grid grid-cols-1 xl:grid-cols-[1fr_auto] flex-1 gap-4 items-center justify-center w-full left-0 bottom-0 translate-y-[calc(100%+1.5rem)] lg:left-auto lg:bottom-auto lg:translate-y-0",
+              "lg:relative lg:px-0 px-4 absolute grid grid-cols-1 xl:grid-cols-[1fr_auto] flex-1 gap-4 items-start justify-center w-full left-0 bottom-0 translate-y-[calc(100%+1.5rem)] lg:left-auto lg:bottom-auto lg:translate-y-0",
               isSearchOpen ? "lg:grid grid" : "lg:grid hidden",
             )}
           >
@@ -242,7 +242,7 @@ export default function Navbar({
           </div>
 
           {/* RIGHT SIDE ICONS */}
-          <div className="flex items-center justify-between h-18 gap-5">
+          <div className="flex items-start justify-between h-18 gap-5">
             {/* 🛒 CART + BADGE */}
             {user ? (
               <Link href="/basket" className="cursor-pointer relative">

@@ -37,8 +37,8 @@ const categories = [
     name: "Products",
     path: "en/products/catalogue-brochure",
     items: [
-      { name: "Product Ranges" },
-      { name: "Product Search" },
+      { name: "Product Ranges", href: "https://nskgroup.com.tr/en/products/product-ranges" },
+      { name: "Product Search", href: "https://www.nskgroup.com.tr/en/products/product-search" },
       { name: "Catalogue &Brochure" },
     ],
   },
@@ -46,10 +46,10 @@ const categories = [
     name: "Production",
     path: "en/production/oem-oes-references",
     items: [
-      { name: "Steering, Suspension and Hydraulic Parts Factory" },
-      { name: "Hot Metal Forging Factory" },
-      { name: "Test Skills" },
-      { name: "OEM/OES References" },
+      { name: "Steering, Suspension and Hydraulic Parts Factory", href: "https://www.nskgroup.com.tr/en/production/steering-suspension-and-hydraulic-parts-factory" },
+      { name: "Hot Metal Forging Factory", href: "https://www.nskgroup.com.tr/en/production/hot-metal-forging-factory" },
+      { name: "Test Skills", href: "https://nskgroup.com.tr/en/production/test-skills" },
+      { name: "OEM/OES References", href: "https://nskgroup.com.tr/en/production/oem-oes-references" },
     ],
   },
   {

@@ -956,6 +956,8 @@ export default function SingleProdCard({
 
               // No stock info OR explicitly out of stock
               if (!hasStockInfo || !isActuallyInStock) {
+                const buttonText = hasPrice ? "Get Stock" : "Get Stock/Offer";
+
                 return (
                   <button
                     disabled={alreadyRequested}
@@ -966,7 +968,7 @@ export default function SingleProdCard({
                         : "bg-secondary text-white hover:brightness-110"
                     }`}
                   >
-                    {alreadyRequested ? "Already Requested" : "Get Offer"}
+                    {alreadyRequested ? "Already Requested" : buttonText}
                   </button>
                 );
               }

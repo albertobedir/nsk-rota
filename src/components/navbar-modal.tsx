@@ -43,12 +43,8 @@ export default function NavbarModal({ open, setOpen }: Props) {
 
   const handleLogout = async () => {
     try {
-      // Clear all cookies
-      document.cookie.split(";").forEach((c) => {
-        const eqPos = c.indexOf("=");
-        const name = eqPos > -1 ? c.substr(0, eqPos).trim() : c.trim();
-        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
-      });
+      // Call logout API to clear cookies server-side
+      await fetch("/api/auth/logout", { method: "POST" });
 
       // Clear localStorage
       localStorage.clear();
