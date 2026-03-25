@@ -23,19 +23,23 @@ export default function CollectionProducts({
     <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {pageItems.map((product: any) => {
-          // Extract OEM info from metafields (matches products page logic)
-          const oemsArr = (() => {
-            const oemMeta = product.raw?.metafields?.find(
-              (m: any) => m.namespace === "custom" && m.key === "oem_info",
-            );
-            if (!oemMeta?.value) return [];
-            try {
-              const parsed = JSON.parse(oemMeta.value);
-              return Array.isArray(parsed) ? parsed : [parsed];
-            } catch {
-              return [oemMeta.value];
-            }
-          })();
+          // Use oems directly if available (from collection page), otherwise extract from metafields
+          const oemsArr =
+            product.oems && product.oems.length > 0
+              ? product.oems
+              : (() => {
+                  const oemMeta = product.raw?.metafields?.find(
+                    (m: any) =>
+                      m.namespace === "custom" && m.key === "oem_info",
+                  );
+                  if (!oemMeta?.value) return [];
+                  try {
+                    const parsed = JSON.parse(oemMeta.value);
+                    return Array.isArray(parsed) ? parsed : [parsed];
+                  } catch {
+                    return [oemMeta.value];
+                  }
+                })();
 
           // Extract code/rota from metafields
           const extractRotaNoFromMetafields = (metafields: any[] = []) => {
@@ -79,7 +83,9 @@ export default function CollectionProducts({
             return "Unknown";
           };
 
-          const code = extractRotaNoFromMetafields(product.raw?.metafields);
+          const code =
+            product.code ??
+            extractRotaNoFromMetafields(product.raw?.metafields);
 
           // Determine match type based on searchTerm
           const matchType = (() => {
