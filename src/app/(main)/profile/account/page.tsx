@@ -1,9 +1,33 @@
 "use client";
 import { Card } from "@/components/ui/card";
 import useSessionStore from "@/store/session-store";
+import { useRouter } from "next/navigation";
 
 export default function ProfilePage() {
   const user = useSessionStore((s) => s.user);
+  const router = useRouter();
+  const clearSession = useSessionStore((s) => s.clearSession);
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Logout failed: ${response.status}`);
+      }
+
+      localStorage.clear();
+      clearSession();
+      router.push("/auth/login");
+    } catch (e) {
+      console.error("Logout failed:", e);
+      clearSession();
+      router.push("/auth/login");
+    }
+  };
 
   return (
     <div className="space-y-4 px-2 sm:px-0">
@@ -65,6 +89,16 @@ export default function ProfilePage() {
               <div className="text-xs text-slate-500">Payment Terms</div>
               <div className="font-medium">{user?.paymentTerms ?? "-"}</div>
             </div>
+          </div>
+
+          {/* Logout Button */}
+          <div className="mt-6 pt-4 border-t border-slate-200">
+            <button
+              onClick={handleLogout}
+              className="text-sm font-medium text-red-600 hover:text-red-700 hover:underline transition-colors"
+            >
+              Logout
+            </button>
           </div>
         </Card>
 

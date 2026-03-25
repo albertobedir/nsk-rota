@@ -373,7 +373,7 @@ export default function Search() {
               <div
                 key={tag.id}
                 className={cn(
-                  "rounded-lg pl-2 pr-1 py-0.5 flex-shrink-0 transition-colors",
+                  "rounded-lg pl-2 pr-1 py-0.5 shrink-0 transition-colors",
                   shakingTagId === tag.id
                     ? "shake-animation bg-red-100"
                     : "bg-[#ddd] text-black",

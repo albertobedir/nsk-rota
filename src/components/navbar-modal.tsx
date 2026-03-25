@@ -99,15 +99,59 @@ export default function NavbarModal({ open, setOpen }: Props) {
               </div>
             ))}
 
-            {/* Logout */}
+            {/* USER CREDIT INFO - Mobile */}
+            {user ? (
+              <div className="w-full border-t border-slate-100 pt-4 mt-2">
+                <h4 className="text-lg font-semibold pb-3">Credit Info</h4>
+                <div className="bg-slate-50 px-3 py-3 rounded-lg border border-slate-100">
+                  {(() => {
+                    const creditLimit = Number(user?.creditLimit ?? 0);
+                    const creditUsed = Number(user?.creditUsed ?? 0);
+                    const creditRemaining = Number(
+                      user?.creditRemaining ??
+                        Math.max(0, creditLimit - creditUsed),
+                    );
+
+                    return (
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <span className="text-slate-500 font-medium">
+                          Credit Limit
+                        </span>
+                        <span className="text-slate-700 font-semibold text-right tabular-nums">
+                          {fmt(creditLimit)}
+                        </span>
+
+                        <span className="text-amber-600 font-medium">Used</span>
+                        <span className="text-amber-600 font-semibold text-right tabular-nums">
+                          {fmt(creditUsed)}
+                        </span>
+
+                        <span className="text-slate-500 font-medium">
+                          Remaining
+                        </span>
+                        <span className="text-slate-700 font-semibold text-right tabular-nums">
+                          {fmt(creditRemaining)}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Logout - Mobile only */}
             {user && (
               <div className="w-full border-t pt-4">
-                <button
-                  onClick={handleLogout}
-                  className="text-base py-2 text-red-600 font-semibold hover:text-red-700 transition-colors"
+                <Link
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleLogout();
+                  }}
+                  className="text-base py-2 text-red-600 font-semibold hover:text-red-700 transition-colors block"
                 >
                   Logout
-                </button>
+                </Link>
               </div>
             )}
           </div>
@@ -154,18 +198,6 @@ export default function NavbarModal({ open, setOpen }: Props) {
                           </Link>
                         </li>
                       ))}
-
-                      {/* Logout under Profile */}
-                      {category.name === "Profile" && user && (
-                        <li className="text-base py-1">
-                          <button
-                            onClick={handleLogout}
-                            className="text-red-600 font-bold hover:text-red-700 transition-colors text-left"
-                          >
-                            Logout
-                          </button>
-                        </li>
-                      )}
                     </ul>
                   </div>
                 ))}

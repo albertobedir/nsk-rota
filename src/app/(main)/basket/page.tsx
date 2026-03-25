@@ -107,7 +107,7 @@ export default function BasketPage() {
           router.push("/profile/order-history");
         }
       } catch (e) {
-        console.error("Get offer failed:", e);
+        console.error("Request offer failed:", e);
         toast.error("Failed to create order");
       }
     })();
@@ -348,18 +348,18 @@ export default function BasketPage() {
               {/* Desktop header row (table head) */}
               <div className="hidden lg:block">
                 <div className="bg-white border rounded-xl px-8 py-6 overflow-hidden">
-                  <div className="grid grid-cols-[140px_140px_1fr_230px_120px_1px] items-center">
+                  <div className="grid grid-cols-[140px_1fr_230px_120px_80px] items-center gap-4">
                     <div className="font-bold text-lg text-[#2b2b2b]">
                       Matching Type
                     </div>
-                    <div className="font-bold text-lg text-[#2b2b2b]">
-                      Searched Value
-                    </div>
-                    <div className="font-bold text-center text-lg text-[#2b2b2b]">
+                    <div className="font-bold text-lg text-[#2b2b2b] pl-3">
                       Product Name
                     </div>
                     <div className="font-bold text-lg text-[#2b2b2b]">
                       ROTA No.
+                    </div>
+                    <div className="font-bold text-center text-lg text-[#2b2b2b]">
+                      Qty
                     </div>
 
                     <button
@@ -393,7 +393,7 @@ export default function BasketPage() {
                     {/* Desktop row */}
                     <div className="hidden lg:block w-[1200px]">
                       <div className="bg-white  border rounded-xl px-8 py-6 overflow-hidden">
-                        <div className="grid grid-cols-[140px_260px_1fr_120px_120px_80px] items-center gap-4">
+                        <div className="grid grid-cols-[140px_1fr_230px_120px_80px] items-center gap-4">
                           {/* Matching Type */}
                           <div className="flex items-center gap-2 text-gray-600">
                             <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-white text-xs">
@@ -402,15 +402,10 @@ export default function BasketPage() {
                             <span className="font-semibold">Exact Match</span>
                           </div>
 
-                          {/* Searched Value */}
-                          <div className="text-gray-500">
-                            {item.subtitle ?? '""'}
-                          </div>
-
                           {/* Product (clickable) */}
                           <Link
                             href={`/products/${item.id}`}
-                            className="flex items-center gap-4 cursor-pointer"
+                            className="flex items-center gap-4 cursor-pointer pl-3"
                           >
                             <div className="relative h-16 w-16 rounded-lg border bg-white overflow-hidden">
                               <Image
@@ -422,7 +417,9 @@ export default function BasketPage() {
                             </div>
                             <div className="min-w-0">
                               <p className="font-extrabold text-lg text-[#2b2b2b] truncate">
-                                {item.title}
+                                {(item.title ?? "")
+                                  .replace(/\s*-\s*[\w\d]+$/, "")
+                                  .trim() || item.title}
                               </p>
                               <p className="text-gray-500 text-sm truncate">
                                 {item.subtitle ?? ""}
@@ -438,7 +435,13 @@ export default function BasketPage() {
                                   })}{" "}
                                   (
                                   <span className="font-normal">
-                                    {item.quantity ?? 0}
+                                    {Number(item.price ?? 0).toLocaleString(
+                                      "en-US",
+                                      {
+                                        style: "currency",
+                                        currency: "USD",
+                                      },
+                                    )}
                                   </span>
                                   )
                                 </span>
@@ -517,26 +520,15 @@ export default function BasketPage() {
 
                     {/* Mobile card */}
                     <div className="lg:hidden w-[20.4rem] bg-white border rounded-xl p-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm font-bold text-[#1f3b7b]">
-                            Eşleşme Türü:
-                          </p>
-                          <div className="mt-1 flex items-center gap-2 text-gray-600">
-                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-white text-xs">
-                              ✓
-                            </span>
-                            <span className="font-semibold">Exact Match</span>
-                          </div>
-                        </div>
-
-                        <div>
-                          <p className="text-sm font-bold text-[#1f3b7b]">
-                            Aranan Değer:
-                          </p>
-                          <p className="mt-1 text-gray-500">
-                            {item.subtitle ?? '""'}
-                          </p>
+                      <div>
+                        <p className="text-sm font-bold text-[#1f3b7b]">
+                          Eşleşme Türü:
+                        </p>
+                        <div className="mt-1 flex items-center gap-2 text-gray-600">
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-white text-xs">
+                            ✓
+                          </span>
+                          <span className="font-semibold">Exact Match</span>
                         </div>
                       </div>
 
@@ -559,7 +551,9 @@ export default function BasketPage() {
                         </div>
                         <div className="min-w-0">
                           <p className="font-extrabold text-base text-[#2b2b2b] truncate">
-                            {item.title}
+                            {(item.title ?? "")
+                              .replace(/\s*-\s*[\w\d]+$/, "")
+                              .trim() || item.title}
                           </p>
                           <p className="text-gray-500 text-sm truncate">
                             {item.subtitle ?? ""}
@@ -575,7 +569,13 @@ export default function BasketPage() {
                               })}{" "}
                               (
                               <span className="font-normal">
-                                {item.quantity ?? 0}
+                                {Number(item.price ?? 0).toLocaleString(
+                                  "en-US",
+                                  {
+                                    style: "currency",
+                                    currency: "USD",
+                                  },
+                                )}
                               </span>
                               )
                             </span>
@@ -673,13 +673,6 @@ export default function BasketPage() {
                       style: "currency",
                       currency: "USD",
                     })}
-                  </span>
-                </div>
-
-                <div className="mt-2 text-sm text-gray-600 translate-y-5 flex items-center justify-between">
-                  <span>Shipping</span>
-                  <span className="text-sm text-green-600 font-semibold">
-                    Free
                   </span>
                 </div>
 

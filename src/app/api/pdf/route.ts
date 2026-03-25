@@ -13,6 +13,8 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
+    const discountParam = url.searchParams.get("discount");
+    const userDiscount = discountParam ? Number(discountParam) : null;
     const origin = url.origin;
 
     // Fetch and normalise order data
@@ -466,11 +468,18 @@ export async function GET(req: Request) {
       });
     }
 
-    const grandTotal = Number(order?.totalPrice?.amount) || subtotal;
+    let grandTotal = Number(order?.totalPrice?.amount) || subtotal;
     const totalQty = itemsList.reduce(
       (s, e) => s + Number((e?.node || e)?.quantity ?? 1),
       0,
     );
+
+    // Calculate discount amount if tier discount is provided
+    let discountAmount = 0;
+    if (userDiscount && userDiscount > 0) {
+      discountAmount = subtotal * (userDiscount / 100);
+      grandTotal = subtotal - discountAmount;
+    }
 
     // Helper: draw a footer row with pre-computed X offsets for each column
     const footerLabelOffset = COL.no + COL.orderNo + COL.custNo + COL.rotaNo;
@@ -607,6 +616,9 @@ export async function GET(req: Request) {
     const shipping = Number(order?.shipping || 0) || 0;
     const taxes = Number(order?.taxes || 0) || 0;
     totRow("Subtotal", formatMoney(subtotal, currency));
+    if (userDiscount && userDiscount > 0) {
+      totRow("B2B Tier Discount", `-${formatMoney(discountAmount, currency)}`);
+    }
     totRow("Sales Tax", formatMoney(taxes, currency));
     totRow("Shipping", formatMoney(shipping, currency));
     // Divider

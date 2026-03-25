@@ -20,22 +20,40 @@ export default function CollectionProducts({
   return (
     <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {pageItems.map((product: any) => (
-          <SingleProdCard
-            key={product._id ?? product.code}
-            id={product.code}
-            code={product.code}
-            title={product.title}
-            shopifyId={product.shopifyId}
-            productRaw={product.raw}
-            price={product.price}
-            image={product.image}
-            oems={product.oems}
-            variantId={`gid://shopify/ProductVariant/${product.raw?.variants?.[0]?.id}`}
-            location={product.raw?.location ?? ""}
-            inStock={true}
-          />
-        ))}
+        {pageItems.map((product: any) => {
+          // Extract OEM info from metafields (matches products page logic)
+          const oemsArr = (() => {
+            const oemMeta = product.raw?.metafields?.find(
+              (m: any) => m.namespace === "custom" && m.key === "oem_info",
+            );
+            if (!oemMeta?.value) return [];
+            try {
+              const parsed = JSON.parse(oemMeta.value);
+              return Array.isArray(parsed) ? parsed : [parsed];
+            } catch {
+              return [oemMeta.value];
+            }
+          })();
+
+          const price = Number(product.raw?.variants?.[0]?.price ?? "0");
+          const image = product.raw?.images?.[0]?.src ?? "";
+          const shopifyId = product.shopifyId ?? (product.raw as any)?.id;
+
+          return (
+            <SingleProdCard
+              key={product._id}
+              id={product.code}
+              code={product.code}
+              title={product.raw?.title}
+              shopifyId={shopifyId}
+              productRaw={product.raw}
+              price={price}
+              image={image}
+              oems={oemsArr}
+              variantId={`gid://shopify/ProductVariant/${product.raw?.variants?.[0]?.id}`}
+            />
+          );
+        })}
       </div>
 
       {total > 0 && totalPages > 1 && (

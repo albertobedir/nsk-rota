@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
+import useSessionStore from "@/store/session-store";
 
 type LineItem = {
   title: string;
@@ -31,6 +32,12 @@ export default function OrderDetailPage() {
   const [productMetas, setProductMetas] = useState<Record<string, ProductMeta>>(
     {},
   );
+  const [pricingTiers, setPricingTiers] = useState<any[]>([]);
+  const [userDiscount, setUserDiscount] = useState<number | null>(null);
+
+  // Get user tier from session store
+  const tierTag = useSessionStore((s) => s.tierTag);
+  const getDiscountForTier = useSessionStore((s) => s.getDiscountForTier);
 
   useEffect(() => {
     if (!id) return;
@@ -156,6 +163,33 @@ export default function OrderDetailPage() {
     console.log("[order-detail] fetched order:", order);
   }, [order]);
 
+  // Fetch pricing tiers and calculate user discount
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await fetch(`/api/pricing-tiers/db`);
+        const json = await resp.json().catch(() => null);
+        const tiers: any[] = json?.results || [];
+        setPricingTiers(tiers);
+
+        // Calculate discount for current tier
+        if (tierTag) {
+          const normalized = String(tierTag).toLowerCase().trim();
+          const found = tiers.find(
+            (t) =>
+              String(t.tierTag ?? "")
+                .toLowerCase()
+                .trim() === normalized,
+          );
+          const discount = found ? Number(found.discountPercentage) : null;
+          setUserDiscount(discount);
+        }
+      } catch (e) {
+        console.warn("[order-detail] pricing tiers fetch failed", e);
+      }
+    })();
+  }, [tierTag]);
+
   // Fetch product metadata (rotaNo, refNo, shopifyId) for each line item
   useEffect(() => {
     if (!order) return;
@@ -259,9 +293,14 @@ export default function OrderDetailPage() {
           <h2 className="text-xl font-semibold">Order Detail</h2>
           <button
             type="button"
-            onClick={() =>
-              window.open(`/api/pdf?id=${encodeURIComponent(id as string)}`)
-            }
+            onClick={() => {
+              const params = new URLSearchParams();
+              params.append("id", id as string);
+              if (userDiscount) {
+                params.append("discount", String(userDiscount));
+              }
+              window.open(`/api/pdf?${params.toString()}`);
+            }}
             className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded"
           >
             Download as PDF
@@ -414,9 +453,28 @@ export default function OrderDetailPage() {
                         Qty: {node.quantity}
                       </div>
                       {node.variant?.price?.amount && (
-                        <div className="text-sm">
-                          {node.variant.price.amount}{" "}
-                          {node.variant.price.currencyCode}
+                        <div className="flex items-center gap-2">
+                          {userDiscount && userDiscount > 0 ? (
+                            <>
+                              <span className="text-sm font-medium text-gray-400 line-through">
+                                ${Number(node.variant.price.amount).toFixed(2)}{" "}
+                                {node.variant.price.currencyCode}
+                              </span>
+                              <span className="text-sm font-semibold text-secondary">
+                                $
+                                {(
+                                  Number(node.variant.price.amount) *
+                                  (1 - userDiscount / 100)
+                                ).toFixed(2)}{" "}
+                                {node.variant.price.currencyCode}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-sm">
+                              ${Number(node.variant.price.amount).toFixed(2)}{" "}
+                              {node.variant.price.currencyCode}
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>

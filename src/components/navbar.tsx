@@ -195,7 +195,7 @@ export default function Navbar({
 
             {user ? (
               <div className="col-span-1 w-full justify-end hidden xl:flex">
-                <div className="bg-white px-3.5 py-2.5 rounded-xl border border-slate-100 shadow-sm w-[190px] shrink-0">
+                <div className="bg-white px-3.5 py-2.5 rounded-xl border border-slate-100 shadow-sm w-full xl:w-[190px] shrink-0">
                   {(() => {
                     const creditLimit = Number(user?.creditLimit ?? 0);
                     const creditUsed = Number(user?.creditUsed ?? 0);
@@ -242,7 +242,7 @@ export default function Navbar({
           </div>
 
           {/* RIGHT SIDE ICONS */}
-          <div className="flex items-start justify-between h-18 gap-5">
+          <div className="flex items-center justify-end h-18 gap-5">
             {/* 🛒 CART + BADGE */}
             {user ? (
               <Link href="/basket" className="cursor-pointer relative">

@@ -944,7 +944,7 @@ export default function SingleProdCard({
             })()}
           </div>
 
-          {/* Quantity + Add to cart / Get Offer / Out of Stock */}
+          {/* Quantity + Add to cart / Request Offer / Out of Stock */}
           <div className="mt-auto pt-2">
             {(() => {
               const hasPrice = Number(price) > 0;
@@ -956,7 +956,9 @@ export default function SingleProdCard({
 
               // No stock info OR explicitly out of stock
               if (!hasStockInfo || !isActuallyInStock) {
-                const buttonText = hasPrice ? "Get Stock" : "Get Stock/Offer";
+                const buttonText = hasPrice
+                  ? "Request Stock"
+                  : "Request Stock/Offer";
 
                 return (
                   <button
@@ -973,7 +975,7 @@ export default function SingleProdCard({
                 );
               }
 
-              // Has stock but no price → Get Offer
+              // Has stock but no price → Request Offer
               if (hasStockInfo && isActuallyInStock && !hasPrice) {
                 return (
                   <button
@@ -985,7 +987,7 @@ export default function SingleProdCard({
                         : "bg-secondary text-white hover:brightness-110"
                     }`}
                   >
-                    {alreadyRequested ? "Already Requested" : "Get Offer"}
+                    {alreadyRequested ? "Already Requested" : "Request Offer"}
                   </button>
                 );
               }
@@ -1083,7 +1085,7 @@ export default function SingleProdCard({
         </div>
       </Card>
 
-      {/* Get Offer Dialog */}
+      {/* Request Offer Dialog */}
       <Dialog open={offerOpen} onOpenChange={setOfferOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>

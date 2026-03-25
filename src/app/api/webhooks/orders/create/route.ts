@@ -297,9 +297,8 @@ export async function POST(req: NextRequest) {
 
     // Manuel ödeme kontrolü
     const order = orderData;
-    const isManualPayment = order.payment_gateway_names?.includes(
-      "Send Invoice to My Email",
-    );
+    const isManualPayment =
+      order.payment_gateway_names?.includes("Use My Credits");
     const isManualPaymentResolved =
       isManualPayment || orderDetails?.paymentGatewayNames?.includes("manual");
 

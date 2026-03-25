@@ -845,7 +845,7 @@ export default function ProductDetailPage() {
                         : "bg-secondary text-white hover:brightness-110"
                     }`}
                   >
-                    {alreadyRequested ? "Already Requested" : "Get Stock"}
+                    {alreadyRequested ? "Already Requested" : "Request Stock"}
                   </button>
                 );
               }
@@ -1353,7 +1353,7 @@ export default function ProductDetailPage() {
         </p>
       </div>
 
-      {/* GET STOCK DIALOG */}
+      {/* REQUEST STOCK DIALOG */}
       <Dialog open={stockModalOpen} onOpenChange={setStockModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
