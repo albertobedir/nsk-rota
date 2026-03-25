@@ -7,9 +7,11 @@ import SingleProdCard from "@/components/single-prod-cart";
 export default function CollectionProducts({
   products,
   perPage = 12,
+  searchTerm,
 }: {
   products: any[];
   perPage?: number;
+  searchTerm?: string;
 }) {
   const [page, setPage] = useState(1);
   const total = products.length;
@@ -35,6 +37,65 @@ export default function CollectionProducts({
             }
           })();
 
+          // Extract code/rota from metafields
+          const extractRotaNoFromMetafields = (metafields: any[] = []) => {
+            const direct = metafields.find((m) => m.key === "rota_no")?.value;
+            if (direct) return direct;
+
+            const candidate = metafields.find(
+              (m) =>
+                m.key === "oem_info" ||
+                m.key === "brand_info" ||
+                (m.namespace === "custom" && /(oem|brand)/i.test(m.key)),
+            );
+
+            if (candidate) {
+              try {
+                const parsed = JSON.parse(candidate.value);
+                if (Array.isArray(parsed) && parsed[0]) {
+                  return (
+                    parsed[0].RotaNo ||
+                    parsed[0].rotaNo ||
+                    parsed[0].Rota ||
+                    parsed[0].rota ||
+                    "Unknown"
+                  );
+                }
+                if (parsed && typeof parsed === "object") {
+                  return (
+                    parsed.RotaNo ||
+                    parsed.rotaNo ||
+                    parsed.Rota ||
+                    parsed.rota ||
+                    "Unknown"
+                  );
+                }
+              } catch (e) {
+                const m = String(candidate.value).match(/\d{3,}/);
+                if (m) return m[0];
+              }
+            }
+
+            return "Unknown";
+          };
+
+          const code = extractRotaNoFromMetafields(product.raw?.metafields);
+
+          // Determine match type based on searchTerm
+          const matchType = (() => {
+            const q = (searchTerm ?? "").toString().trim();
+            if (!q) return undefined;
+            const lowerQ = q.toLowerCase();
+            const codeStr = String(code ?? "").toLowerCase();
+            const titleStr = String(product.raw?.title ?? "").toLowerCase();
+
+            if (codeStr === lowerQ || titleStr === lowerQ)
+              return "exact" as const;
+            if (codeStr.includes(lowerQ) || titleStr.includes(lowerQ))
+              return "partial" as const;
+            return undefined;
+          })();
+
           const price = Number(product.raw?.variants?.[0]?.price ?? "0");
           const image = product.raw?.images?.[0]?.src ?? "";
           const shopifyId = product.shopifyId ?? (product.raw as any)?.id;
@@ -42,8 +103,8 @@ export default function CollectionProducts({
           return (
             <SingleProdCard
               key={product._id}
-              id={product.code}
-              code={product.code}
+              id={code}
+              code={code}
               title={product.raw?.title}
               shopifyId={shopifyId}
               productRaw={product.raw}
@@ -51,6 +112,10 @@ export default function CollectionProducts({
               image={image}
               oems={oemsArr}
               variantId={`gid://shopify/ProductVariant/${product.raw?.variants?.[0]?.id}`}
+              location="CHICAGO"
+              inStock={true}
+              matchType={matchType}
+              searchTerm={searchTerm}
             />
           );
         })}
