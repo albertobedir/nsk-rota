@@ -435,6 +435,7 @@ export default function BasketPage() {
                                   })}{" "}
                                   (
                                   <span className="font-normal">
+                                    {item.quantity ?? 0} x{" "}
                                     {Number(item.price ?? 0).toLocaleString(
                                       "en-US",
                                       {
@@ -561,14 +562,16 @@ export default function BasketPage() {
 
                           <div className="mt-1 text-sm text-gray-700">
                             <span className="font-semibold">
+                              total(
                               {(
                                 (item.price ?? 0) * (item.quantity ?? 0)
                               ).toLocaleString("en-US", {
                                 style: "currency",
                                 currency: "USD",
-                              })}{" "}
-                              (
+                              })}
+                              ) (
                               <span className="font-normal">
+                                {item.quantity ?? 0} x{" "}
                                 {Number(item.price ?? 0).toLocaleString(
                                   "en-US",
                                   {

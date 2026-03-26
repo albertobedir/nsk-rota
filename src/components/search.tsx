@@ -16,7 +16,16 @@ interface Tag {
 export default function Search() {
   const [type, setType] = useState<"single" | "multiple">("single");
   const [value, setValue] = useState("");
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [tags, setTags] = useState<Tag[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem("search-tags");
+      return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+      console.error("Failed to load tags from localStorage", error);
+      return [];
+    }
+  });
   const [isSearching, setIsSearching] = useState(false);
   const [shakingTagId, setShakingTagId] = useState<string | null>(null);
   const router = useRouter();
@@ -27,11 +36,17 @@ export default function Search() {
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const lastSearchRef = useRef<string>("");
 
+  // Save tags to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem("search-tags", JSON.stringify(tags));
+    } catch (error) {
+      console.error("Failed to save tags to localStorage", error);
+    }
+  }, [tags]);
+
   const handleSetType = (t: "single" | "multiple") => {
     setType(t);
-    if (t === "single") {
-      setTags([]);
-    }
   };
 
   // --- SEARCH BUTTON ---
@@ -160,6 +175,15 @@ export default function Search() {
 
   const removeTag = (tag: Tag) => {
     setTags(tags.filter((t) => t.id !== tag.id));
+  };
+
+  const clearAllTags = () => {
+    setTags([]);
+    try {
+      localStorage.removeItem("search-tags");
+    } catch (error) {
+      console.error("Failed to clear tags from localStorage", error);
+    }
   };
 
   const handleDoubleClick = (tag: Tag) => {
@@ -356,17 +380,25 @@ export default function Search() {
       </div>
 
       {/* TAGS — rendered below the search bar */}
-      {tags.length > 0 && (
+      {type === "multiple" && tags.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="flex justify-between items-center px-2 sm:pl-[13rem]">
             <span className="text-xs text-slate-500">
               {tags.length}/20 tags
             </span>
-            {tags.length >= 20 && (
-              <span className="text-xs text-red-500 font-medium">
-                Maximum tags reached
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              {tags.length >= 20 && (
+                <span className="text-xs text-red-500 font-medium">
+                  Maximum tags reached
+                </span>
+              )}
+              <button
+                onClick={clearAllTags}
+                className="text-xs text-secondary hover:text-secondary/80 font-semibold transition-colors cursor-pointer"
+              >
+                Clear All
+              </button>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2 px-2 sm:pl-[13rem] bg-white sm:bg-transparent max-h-32 overflow-y-auto">
             {tags.map((tag) => (

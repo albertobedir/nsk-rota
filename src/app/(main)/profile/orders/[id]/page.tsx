@@ -437,7 +437,9 @@ export default function OrderDetailPage() {
                     )}
                     <div className="flex-1">
                       <div className="font-medium group-hover:underline">
-                        {node.title}
+                        {(node.title ?? "")
+                          .replace(/\s*-\s*[\w\d]+$/, "")
+                          .trim() || node.title}
                       </div>
                       {meta?.rotaNo && (
                         <div className="text-sm font-semibold text-secondary">

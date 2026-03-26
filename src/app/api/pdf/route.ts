@@ -712,6 +712,20 @@ export async function GET(req: Request) {
       .text("Please use routing number 021000021", payX, payY, {
         width: halfW,
       });
+    payY += 20;
+    doc
+      .font(FONT_BOLD)
+      .fontSize(8.5)
+      .fillColor(TEXT_DARK)
+      .text("PAY BY ZELLE", payX, payY);
+    payY += 12;
+    doc
+      .font(FONT_REGULAR)
+      .fontSize(8.5)
+      .fillColor(TEXT_DARK)
+      .text("NAME: b.kilic@nskgroup.com.tr", payX, payY, {
+        width: halfW,
+      });
 
     curY += 16;
 
