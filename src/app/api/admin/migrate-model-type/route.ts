@@ -71,9 +71,9 @@ export async function POST(req: NextRequest) {
 
             if (brandDescription) {
               const tree = responseJson.tree as any;
-              const brandTree = tree[brandDescription];
+              const brandTree = (tree as any)[brandDescription as string];
 
-              if (brandTree && brandTree[modelDescription]) {
+              if (brandTree && (brandTree as any)[modelDescription]) {
                 const types = Object.keys(brandTree[modelDescription]);
                 metafieldsFiltered.push({
                   namespace: "custom",

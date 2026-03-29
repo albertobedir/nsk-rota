@@ -286,9 +286,9 @@ export async function POST(req: NextRequest) {
             if (brandDescription) {
               const responseJson = await import("@/static/response.json");
               const tree = responseJson.default?.tree || {};
-              const brandTree = tree[brandDescription];
+              const brandTree = (tree as any)[brandDescription as string];
 
-              if (brandTree && brandTree[modelDescription]) {
+              if (brandTree && (brandTree as any)[modelDescription]) {
                 const types = Object.keys(brandTree[modelDescription]);
                 if (!metafields.find((m: any) => m.key === "type_info")) {
                   metafields.push({

@@ -24,12 +24,14 @@ interface ValidatedImage {
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
+    
     console.log(
       "[validate-images] Starting validation for product:",
-      params.id,
+      id,
     );
 
     await connectDB();
@@ -38,7 +40,7 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const timeout = parseInt(searchParams.get("timeout") ?? "5000", 10);
 
-    const productId = params.id;
+    const productId = id;
     console.log(
       "[validate-images] Product ID:",
       productId,
