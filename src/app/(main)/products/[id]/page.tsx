@@ -159,7 +159,9 @@ export default function ProductDetailPage() {
   const [stockModalOpen, setStockModalOpen] = useState(false);
   const [visibleModelsCount, setVisibleModelsCount] = useState(5);
   // Track which images are valid (not broken)
-  const [validImgIndices, setValidImgIndices] = useState<Set<number>>(new Set());
+  const [validImgIndices, setValidImgIndices] = useState<Set<number>>(
+    new Set(),
+  );
 
   const REQUESTED_PRODUCTS_KEY = "requested_products";
   const [alreadyRequested, setAlreadyRequested] = useState(false);
