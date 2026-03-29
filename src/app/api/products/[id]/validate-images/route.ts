@@ -28,11 +28,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
-    console.log(
-      "[validate-images] Starting validation for product:",
-      id,
-    );
+
+    console.log("[validate-images] Starting validation for product:", id);
 
     await connectDB();
     console.log("[validate-images] Connected to DB");
