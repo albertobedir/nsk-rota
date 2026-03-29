@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongoose/instance";
 import Product from "@/schemas/mongoose/product";
@@ -46,6 +48,30 @@ export async function GET(_req: NextRequest) {
           const vals = collectValuesFromField(mf.value);
           if (!vals.length) continue;
 
+          // ✅ FIXED: Extract brands, models, types from applications metafield
+          if (key === "applications") {
+            try {
+              const apps = JSON.parse(mf.value);
+              if (Array.isArray(apps)) {
+                for (const app of apps) {
+                  if (app.BrandDescription) brands.add(app.BrandDescription);
+                  if (app.ModelDescription) models.add(app.ModelDescription);
+                  if (app.VehicleType) types.add(app.VehicleType);
+                  if (app.Model2) types.add(app.Model2);
+                }
+              }
+            } catch (e) {
+              // fallback to string parsing if JSON parse fails
+              vals.forEach((v) => {
+                if (v.includes("BrandDescription")) brands.add(v);
+                if (v.includes("ModelDescription")) models.add(v);
+                if (v.includes("VehicleType")) types.add(v);
+                if (v.includes("Model2")) types.add(v);
+              });
+            }
+          }
+
+          // keep other field extraction as before for backward compatibility
           if (key.includes("brand")) vals.forEach((v) => brands.add(v));
           else if (key.includes("model")) vals.forEach((v) => models.add(v));
           else if (key.includes("type")) vals.forEach((v) => types.add(v));
@@ -84,7 +110,7 @@ export async function GET(_req: NextRequest) {
     console.error("Options API error:", err);
     return NextResponse.json(
       { ok: false, error: (err as Error).message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

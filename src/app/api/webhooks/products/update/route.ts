@@ -50,7 +50,7 @@ async function fetchProductMetafields(productId: string) {
         "X-Shopify-Access-Token": accessToken!,
       },
       body: JSON.stringify({ query, variables: { id: productId } }),
-    }
+    },
   );
 
   const data = await response.json();
@@ -66,7 +66,7 @@ async function fetchProductMetafields(productId: string) {
   }
 
   return data.data.product.metafields.edges.map(
-    (edge: { node: Record<string, unknown> }) => edge.node
+    (edge: { node: Record<string, unknown> }) => edge.node,
   );
 }
 
@@ -116,7 +116,7 @@ async function fetchInventoryLocations(productId: string) {
         "X-Shopify-Access-Token": accessToken!,
       },
       body: JSON.stringify({ query, variables: { id: productId } }),
-    }
+    },
   );
 
   const data = await response.json();
@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
       console.log("Metafields fetched:", metafields.length);
       console.log(
         "Inventory locations fetched for variants:",
-        Object.keys(inventoryMap).length
+        Object.keys(inventoryMap).length,
       );
       try {
         console.log("InventoryMap:", JSON.stringify(inventoryMap, null, 2));
@@ -229,25 +229,98 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date(),
     };
 
+    // Extract model_info and type_info from applications (real product model)
+    try {
+      const applicationsMeta = metafields.find(
+        (m: any) => m.key === "applications" && m.namespace === "custom",
+      );
+
+      let modelDescription: string | null = null;
+      if (applicationsMeta?.value) {
+        try {
+          const applications = JSON.parse(applicationsMeta.value);
+          if (
+            Array.isArray(applications) &&
+            applications[0]?.ModelDescription
+          ) {
+            modelDescription = applications[0].ModelDescription;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // If we have a model, add it as model_info
+      if (modelDescription) {
+        if (!metafields.find((m: any) => m.key === "model_info")) {
+          metafields.push({
+            namespace: "custom",
+            key: "model_info",
+            value: JSON.stringify([modelDescription]),
+            type: "json",
+          });
+        }
+
+        // Now find types for this specific model under this brand
+        try {
+          const brandInfoMeta = metafields.find(
+            (m: any) => m.key === "brand_info" && m.namespace === "custom",
+          );
+          if (brandInfoMeta?.value) {
+            const brandInfo = JSON.parse(brandInfoMeta.value);
+            const brandDescription = Array.isArray(brandInfo)
+              ? brandInfo[0]?.BrandDescription
+              : brandInfo?.BrandDescription;
+
+            if (brandDescription) {
+              const responseJson = await import("@/static/response.json");
+              const tree = responseJson.default?.tree || {};
+              const brandTree = tree[brandDescription];
+
+              if (brandTree && brandTree[modelDescription]) {
+                const types = Object.keys(brandTree[modelDescription]);
+                if (!metafields.find((m: any) => m.key === "type_info")) {
+                  metafields.push({
+                    namespace: "custom",
+                    key: "type_info",
+                    value: JSON.stringify(types),
+                    type: "json",
+                  });
+                }
+                console.log(
+                  `✅ Added correct model (${modelDescription}) and types for`,
+                  brandDescription,
+                );
+              }
+            }
+          }
+        } catch (brandErr) {
+          console.warn("Error processing brand tree:", brandErr);
+        }
+      }
+    } catch (extractErr) {
+      console.warn("Error extracting model/type info:", extractErr);
+    }
+
     await connectDB();
 
     await Product.updateOne(
       { shopifyId: productData.id },
       { $set: { raw: fullProduct } },
-      { upsert: true }
+      { upsert: true },
     );
 
     console.log("Product saved with inventory locations");
 
     return NextResponse.json(
       { status: "ok", action: "updated", productId: productData.id },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
     console.error("Webhook update error:", err);
     return NextResponse.json(
       { error: (err as Error).message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

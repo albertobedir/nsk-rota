@@ -97,9 +97,61 @@ export default function SingleProdCard({
   const addToCart = useSessionStore((s) => s.addToCart);
   const cart = useSessionStore((s) => s.cart);
 
+  // Prefer an image from productRaw.images that contains `/files/<digits>` (4+ digits)
+  // when there are multiple images. Fall back to the `image` prop.
+  const displayImage = (() => {
+    try {
+      const imgs = productRaw?.images;
+      if (Array.isArray(imgs) && imgs.length > 0) {
+        if (imgs.length > 1) {
+          // find image whose src contains `/files/` followed by 4 or more digits
+          const matched = imgs.find((it: any) => {
+            const src = String(it?.src || it?.url || "");
+            return /\/files\/(\d{4,})/.test(src);
+          });
+          if (matched) return String(matched?.src || matched?.url || image);
+        }
+        // fallback to first image entry
+        const first = imgs[0];
+        return String(first?.src || first?.url || image);
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
+    return image;
+  })();
+
   // use string so user can clear the field while typing (e.g. replace "1" with "300")
   const [qty, setQty] = useState<string>("1");
   const [offerOpen, setOfferOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [imgSrc, setImgSrc] = useState<string>(
+    displayImage || "/image_not_found.png",
+  );
+
+  // Test if image URL actually loads (handles cases where URL returns 200 but broken content)
+  const testImageLoads = (url: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (!url || url.trim() === "") {
+        resolve(false);
+        return;
+      }
+      const img = new window.Image();
+      const timeout = setTimeout(() => {
+        resolve(false); // Timeout after 3s → treat as broken
+      }, 3000);
+
+      img.onload = () => {
+        clearTimeout(timeout);
+        resolve(true);
+      };
+      img.onerror = () => {
+        clearTimeout(timeout);
+        resolve(false);
+      };
+      img.src = url;
+    });
+  };
 
   const REQUESTED_PRODUCTS_KEY = "requested_products";
   const [alreadyRequested, setAlreadyRequested] = useState(false);
@@ -113,6 +165,46 @@ export default function SingleProdCard({
       );
     } catch {}
   }, [code]);
+
+  // Test if displayImage loads successfully; fallback to placeholder if broken
+  React.useEffect(() => {
+    let isMounted = true;
+
+    if (!displayImage || displayImage.trim() === "") {
+      if (isMounted) {
+        setImgSrc("/image_not_found.png");
+        setImageError(false);
+      }
+      return;
+    }
+
+    (async () => {
+      const canLoad = await testImageLoads(displayImage);
+      if (isMounted) {
+        if (canLoad) {
+          setImgSrc(displayImage);
+          setImageError(false);
+        } else {
+          setImgSrc("/image_not_found.png");
+          setImageError(true);
+        }
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [displayImage]);
+
+  // Update imgSrc when displayImage changes (and validate it's a valid URL)
+  React.useEffect(() => {
+    if (displayImage && displayImage.trim() !== "") {
+      setImgSrc(displayImage);
+      setImageError(false);
+    } else {
+      setImgSrc("/image_not_found.png");
+    }
+  }, [displayImage]);
 
   // determine exact match also when OEM number equals searchTerm
   const extractOemNo = (entry: any) => {
@@ -286,30 +378,6 @@ export default function SingleProdCard({
       /* ignore */
     }
     return String(id ?? "unknown");
-  })();
-
-  // Prefer an image from productRaw.images that contains `/files/<digits>` (4+ digits)
-  // when there are multiple images. Fall back to the `image` prop.
-  const displayImage = (() => {
-    try {
-      const imgs = productRaw?.images;
-      if (Array.isArray(imgs) && imgs.length > 0) {
-        if (imgs.length > 1) {
-          // find image whose src contains `/files/` followed by 4 or more digits
-          const matched = imgs.find((it: any) => {
-            const src = String(it?.src || it?.url || "");
-            return /\/files\/(\d{4,})/.test(src);
-          });
-          if (matched) return String(matched?.src || matched?.url || image);
-        }
-        // fallback to first image entry
-        const first = imgs[0];
-        return String(first?.src || first?.url || image);
-      }
-    } catch (e) {
-      // ignore and fallback
-    }
-    return image;
   })();
 
   // Fetch pricing tiers via shared module-level cache — only ONE request fires
@@ -561,16 +629,27 @@ export default function SingleProdCard({
               </span>
             </div>
           ) : null}
-          {!displayImage ? (
-            <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5 rounded-[inherit]">
-              <ImageIcon size={48} className="text-muted-foreground" />
+          {!displayImage || imageError ? (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-muted-foreground/5 rounded-[inherit]">
+              <ImageIcon size={48} className="text-muted-foreground mb-2" />
+              <span className="text-xs text-muted-foreground text-center px-2">
+                No image available
+              </span>
             </div>
           ) : (
             <Image
               alt={title}
               fill
               className="rounded-[inherit] object-contain"
-              src={displayImage}
+              src={imgSrc}
+              onError={() => {
+                // Fallback to placeholder if image fails to load
+                if (imgSrc !== "/image_not_found.png") {
+                  setImgSrc("/image_not_found.png");
+                } else {
+                  setImageError(true);
+                }
+              }}
             />
           )}
         </div>
@@ -663,12 +742,31 @@ export default function SingleProdCard({
               const comps = Array.isArray(rawAny?.Competiters)
                 ? rawAny.Competiters
                 : [];
-              return comps.some(
-                (c: any) =>
-                  String(c?.Type ?? "")
-                    .trim()
-                    .toLowerCase() === "view",
+              if (
+                comps.some(
+                  (c: any) =>
+                    String(c?.Type ?? "")
+                      .trim()
+                      .toLowerCase() === "view",
+                )
+              )
+                return true;
+
+              // Also check metafields for competitor_info
+              const metafields: any[] =
+                rawAny?.metafields ?? rawAny?.raw?.metafields ?? [];
+              const compField = metafields.find((m: any) =>
+                /competitor_info/i.test(m?.key ?? ""),
               );
+              if (compField?.value) {
+                const parsed =
+                  typeof compField.value === "string"
+                    ? JSON.parse(compField.value)
+                    : compField.value;
+                if (Array.isArray(parsed) && parsed.length > 0) return true;
+              }
+
+              return false;
             } catch {
               return false;
             }

@@ -1,3 +1,4 @@
+/* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { connectDB } from "@/lib/mongoose/instance";
@@ -41,10 +42,12 @@ export async function GET(req: NextRequest) {
       stockStatus = "",
       instock = "",
       location = "",
-      description = "",
+      description: descParam = "",
       model = "",
       type = "",
     } = Object.fromEntries(req.nextUrl.searchParams) as Record<string, string>;
+
+    let description = descParam;
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
@@ -91,6 +94,7 @@ export async function GET(req: NextRequest) {
       const combinedPattern = searchValues.map((v) => `(${v})`).join("|");
 
       // Match rota_no, oem_info JSON (RotaNo/OemNo) OR competitor_info JSON (ReferansView)
+      // ALSO match by SKU, title, and handle (fallback for products without metafields)
       metafieldConditions.push({
         $or: [
           {
@@ -126,6 +130,21 @@ export async function GET(req: NextRequest) {
               },
             },
           },
+          // 🔥 KRITIK: SKU arama (variants.sku = RotaNo sistemde)
+          {
+            "raw.variants": {
+              $elemMatch: {
+                sku: { $regex: combinedPattern, $options: "i" },
+              },
+            },
+          },
+          // Title ve handle fallback
+          {
+            "raw.title": { $regex: combinedPattern, $options: "i" },
+          },
+          {
+            "raw.handle": { $regex: combinedPattern, $options: "i" },
+          },
         ],
       });
     }
@@ -151,20 +170,23 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Brand search - JSON array içinde arama (brand_info metafield)
+    // Brand search - Match via applications metafield (BrandDescription)
     if (brand) {
       const brandValues = brand
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
+      const brandPattern = brandValues
+        .map((v) => `\\b${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`)
+        .join("|");
 
       metafieldConditions.push({
         "raw.metafields": {
           $elemMatch: {
             namespace: "custom",
-            key: "brand_info",
+            key: "applications",
             value: {
-              $regex: brandValues.join("|"),
+              $regex: `"BrandDescription"\\s*:\\s*"([^"]*(?:${brandPattern})[^"]*)`,
               $options: "i",
             },
           },
@@ -234,16 +256,17 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Description filter — exact title match (anchored, case-insensitive)
-    // Uses word-boundary anchors so "Tie Rod End" won't match "V-Rod"
+    // Description filter — partial title match with word boundaries (case-insensitive)
+    // Allows matching "torque rod" against "BINKLEY TORQUE ROD END"
     if (description) {
       const escaped = description.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       metafieldConditions.push({
-        "raw.title": { $regex: `^${escaped}$`, $options: "i" },
+        "raw.title": { $regex: `\\b${escaped}`, $options: "i" },
       } as any);
     }
 
-    // Model filter — matched against brand_info metafield
+    // Model filter — search in applications metafield (ModelDescription)
+    // ✅ FIXED: Now uses applications array instead of deprecated model_info
     if (model) {
       const modelValues = model
         .split(",")
@@ -252,18 +275,25 @@ export async function GET(req: NextRequest) {
       const modelPattern = modelValues
         .map((v) => `\\b${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`)
         .join("|");
-      metafieldConditions.push({
-        "raw.metafields": {
-          $elemMatch: {
-            namespace: "custom",
-            key: "brand_info",
-            value: { $regex: modelPattern, $options: "i" },
+
+      if (modelPattern) {
+        metafieldConditions.push({
+          "raw.metafields": {
+            $elemMatch: {
+              namespace: "custom",
+              key: "applications",
+              value: {
+                $regex: `"ModelDescription"\\s*:\\s*"([^"]*(?:${modelPattern})[^"]*)`,
+                $options: "i",
+              },
+            },
           },
-        },
-      });
+        });
+      }
     }
 
-    // Type filter — matched against brand_info metafield
+    // Type filter — search in applications metafield (VehicleType OR Model2)
+    // ✅ FIXED: Now searches both VehicleType and Model2 fields
     if (type) {
       const typeValues = type
         .split(",")
@@ -272,15 +302,37 @@ export async function GET(req: NextRequest) {
       const typePattern = typeValues
         .map((v) => `\\b${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`)
         .join("|");
-      metafieldConditions.push({
-        "raw.metafields": {
-          $elemMatch: {
-            namespace: "custom",
-            key: "brand_info",
-            value: { $regex: typePattern, $options: "i" },
-          },
-        },
-      });
+
+      if (typePattern) {
+        metafieldConditions.push({
+          $or: [
+            {
+              "raw.metafields": {
+                $elemMatch: {
+                  namespace: "custom",
+                  key: "applications",
+                  value: {
+                    $regex: `"VehicleType"\\s*:\\s*"(${typePattern})"`,
+                    $options: "i",
+                  },
+                },
+              },
+            },
+            {
+              "raw.metafields": {
+                $elemMatch: {
+                  namespace: "custom",
+                  key: "applications",
+                  value: {
+                    $regex: `"Model2"\\s*:\\s*"(${typePattern})"`,
+                    $options: "i",
+                  },
+                },
+              },
+            },
+          ],
+        });
+      }
     }
 
     // Merge metafield conditions with any explicit id-based query above

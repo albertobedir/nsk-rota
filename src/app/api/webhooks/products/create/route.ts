@@ -240,6 +240,79 @@ export async function POST(req: NextRequest) {
       receivedAt: new Date(),
     };
 
+    // Extract model_info and type_info from applications (real product model)
+    try {
+      const applicationsMeta = metafields.find(
+        (m: any) => m.key === "applications" && m.namespace === "custom",
+      );
+
+      let modelDescription: string | null = null;
+      if (applicationsMeta?.value) {
+        try {
+          const applications = JSON.parse(applicationsMeta.value);
+          if (
+            Array.isArray(applications) &&
+            applications[0]?.ModelDescription
+          ) {
+            modelDescription = applications[0].ModelDescription;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // If we have a model, add it as model_info
+      if (modelDescription) {
+        if (!metafields.find((m: any) => m.key === "model_info")) {
+          metafields.push({
+            namespace: "custom",
+            key: "model_info",
+            value: JSON.stringify([modelDescription]),
+            type: "json",
+          });
+        }
+
+        // Now find types for this specific model under this brand
+        try {
+          const brandInfoMeta = metafields.find(
+            (m: any) => m.key === "brand_info" && m.namespace === "custom",
+          );
+          if (brandInfoMeta?.value) {
+            const brandInfo = JSON.parse(brandInfoMeta.value);
+            const brandDescription = Array.isArray(brandInfo)
+              ? brandInfo[0]?.BrandDescription
+              : brandInfo?.BrandDescription;
+
+            if (brandDescription) {
+              const responseJson = await import("@/static/response.json");
+              const tree = responseJson.default?.tree || {};
+              const brandTree = tree[brandDescription];
+
+              if (brandTree && brandTree[modelDescription]) {
+                const types = Object.keys(brandTree[modelDescription]);
+                if (!metafields.find((m: any) => m.key === "type_info")) {
+                  metafields.push({
+                    namespace: "custom",
+                    key: "type_info",
+                    value: JSON.stringify(types),
+                    type: "json",
+                  });
+                }
+                console.log(
+                  `✅ Added correct model (${modelDescription}) and types for`,
+                  brandDescription,
+                );
+              }
+            }
+          }
+        } catch (brandErr) {
+          console.warn("Error processing brand tree:", brandErr);
+        }
+      }
+    } catch (extractErr) {
+      console.warn("Error extracting model/type info:", extractErr);
+    }
+
     await connectDB();
 
     await Product.updateOne(

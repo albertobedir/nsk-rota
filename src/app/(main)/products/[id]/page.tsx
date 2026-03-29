@@ -158,6 +158,8 @@ export default function ProductDetailPage() {
   const [qty, setQty] = useState<string>("1");
   const [stockModalOpen, setStockModalOpen] = useState(false);
   const [visibleModelsCount, setVisibleModelsCount] = useState(5);
+  // Track which images are valid (not broken)
+  const [validImgIndices, setValidImgIndices] = useState<Set<number>>(new Set());
 
   const REQUESTED_PRODUCTS_KEY = "requested_products";
   const [alreadyRequested, setAlreadyRequested] = useState(false);
@@ -177,6 +179,51 @@ export default function ProductDetailPage() {
         list.map((s) => s.toLowerCase()).includes(rotaKey.toLowerCase()),
       );
     } catch {}
+  }, [product]);
+
+  // Test each image for validity (handles URLs that return 200 with broken content)
+  useEffect(() => {
+    if (!product?.raw?.images) {
+      setValidImgIndices(new Set());
+      return;
+    }
+
+    let isMounted = true;
+    const imgs = product.raw.images;
+
+    (async () => {
+      const validIndices = new Set<number>();
+
+      for (let i = 0; i < imgs.length; i++) {
+        const src = String(imgs[i]?.src || "");
+        if (!src.trim()) continue;
+
+        // Test if image loads (with 3s timeout)
+        const canLoad = await new Promise<boolean>((resolve) => {
+          const timeout = setTimeout(() => resolve(false), 3000);
+          const img = new window.Image();
+          img.onload = () => {
+            clearTimeout(timeout);
+            resolve(true);
+          };
+          img.onerror = () => {
+            clearTimeout(timeout);
+            resolve(false);
+          };
+          img.src = src;
+        });
+
+        if (canLoad) validIndices.add(i);
+      }
+
+      if (isMounted) {
+        setValidImgIndices(validIndices);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
   }, [product]);
 
   /* Components state (moved up to avoid conditional hook calls) */
@@ -348,6 +395,10 @@ export default function ProductDetailPage() {
         `/api/products/gets?shopifyId=${id}`,
       );
       const shopifyJson = await attemptByShopify.json().catch(() => null);
+      console.log("[product-page] fetchProduct - shopifyId attempt:", {
+        id,
+        shopifyJson,
+      });
       let found = shopifyJson?.results?.[0] ?? null;
 
       // Fallback: if not found, treat param as variant id and try that
@@ -356,16 +407,28 @@ export default function ProductDetailPage() {
           `/api/products/gets?variantId=${id}`,
         );
         const variantJson = await attemptByVariant.json().catch(() => null);
+        console.log("[product-page] fetchProduct - variantId attempt:", {
+          id,
+          variantJson,
+        });
         found = variantJson?.results?.[0] ?? null;
       }
 
-      // Final fallback: keep old behavior and search rota_no
+      // Final fallback: keep old behavior and search rota_no (now includes SKU, title, handle)
       if (!found) {
         const attemptByRota = await fetch(`/api/products/gets?search=${id}`);
         const rotaJson = await attemptByRota.json().catch(() => null);
+        console.log(
+          "[product-page] fetchProduct - search (rota_no/SKU) attempt:",
+          {
+            id,
+            rotaJson,
+          },
+        );
         found = rotaJson?.results?.[0] ?? null;
       }
 
+      console.log("[product-page] fetchProduct - final result:", { id, found });
       setProduct(found);
       setLoading(false);
     }
@@ -467,23 +530,28 @@ export default function ProductDetailPage() {
   // Build display images from raw.images, moving the "rota no" image to index 0.
   // The rota-no image is identified by its src containing /files/ followed by 4+ digits
   // (e.g. "…/files/29016005.jpg").
+  // Filter out broken images (test performed in useEffect above).
   const displayImages: ShopifyImage[] = (() => {
     try {
       const imgs = raw.images;
       if (Array.isArray(imgs) && imgs.length > 0) {
-        if (imgs.length > 1) {
-          const matchedIdx = imgs.findIndex((it) => {
+        // Filter to only include images that passed validation test
+        let filtered = imgs.filter((_, idx) => validImgIndices.has(idx));
+        if (filtered.length === 0) filtered = imgs; // Fallback if no tests passed yet
+
+        if (filtered.length > 1) {
+          const matchedIdx = filtered.findIndex((it) => {
             const src = String((it as any)?.src || "");
             return /\/files\/\d{4,}/.test(src);
           });
           if (matchedIdx > 0) {
-            const ordered = [...imgs];
+            const ordered = [...filtered];
             const [found] = ordered.splice(matchedIdx, 1);
             ordered.unshift(found);
             return ordered;
           }
         }
-        return imgs;
+        return filtered;
       }
     } catch {
       // ignore – fall through
@@ -652,18 +720,12 @@ export default function ProductDetailPage() {
           {displayImages.map((img, i) => (
             <CarouselItem key={i} className="min-h-[300px] md:min-h-[450px]">
               <div className="relative w-full h-[300px] md:h-[450px]">
-                {!img.src ? (
-                  <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5">
-                    <ImageIcon size={64} className="text-muted-foreground" />
-                  </div>
-                ) : (
-                  <Image
-                    src={img.src}
-                    alt={title}
-                    fill
-                    className="object-contain"
-                  />
-                )}
+                <Image
+                  src={img.src}
+                  alt={title}
+                  fill
+                  className="object-contain"
+                />
               </div>
             </CarouselItem>
           ))}
@@ -1092,21 +1154,12 @@ export default function ProductDetailPage() {
               {displayImages.map((img, i) => (
                 <CarouselItem key={i} className="min-h-[450px]">
                   <div className="relative w-full h-[450px]">
-                    {!img.src ? (
-                      <div className="w-full h-full flex items-center justify-center bg-muted-foreground/5">
-                        <ImageIcon
-                          size={80}
-                          className="text-muted-foreground"
-                        />
-                      </div>
-                    ) : (
-                      <Image
-                        src={img.src}
-                        alt={title}
-                        fill
-                        className="object-contain"
-                      />
-                    )}
+                    <Image
+                      src={img.src}
+                      alt={title}
+                      fill
+                      className="object-contain"
+                    />
                   </div>
                 </CarouselItem>
               ))}
