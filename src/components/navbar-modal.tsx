@@ -77,16 +77,16 @@ export default function NavbarModal({ open, setOpen }: Props) {
                   {category.items
                     .filter((item) => !item.desktop)
                     .map((item) => (
-                    <li key={item.name} className="text-base py-2">
-                      <Link
-                        className="hover:text-secondary transition-colors"
-                        href={item.href}
-                        onClick={() => setOpen(false)}
-                      >
-                        {item.name}
-                      </Link>
-                    </li>
-                  ))}
+                      <li key={item.name} className="text-base py-2">
+                        <Link
+                          className="hover:text-secondary transition-colors"
+                          href={item.href}
+                          onClick={() => setOpen(false)}
+                        >
+                          {item.name}
+                        </Link>
+                      </li>
+                    ))}
                 </ul>
               </div>
             ))}
