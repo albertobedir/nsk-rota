@@ -270,6 +270,26 @@ export async function POST(req: NextRequest) {
     console.log("Order Number:", orderData.order_number);
     console.log("Financial Status:", orderData.financial_status);
     console.log("Customer ID:", orderData.customer?.id);
+    console.log("Tags:", orderData.tags);
+
+    // Check if this is a credit-card-payment order (from Pay Order flow)
+    // These orders should NOT have automatic credit deduction
+    const orderTags: string[] = (orderData.tags ?? "")
+      .split(",")
+      .map((t: string) => t.trim());
+
+    if (orderTags.includes("credit-card-payment")) {
+      console.log(
+        "✅ credit-card-payment order detected — skipping automatic credit deduction",
+      );
+      return NextResponse.json({
+        status: "ok",
+        orderId: orderData.id,
+        orderNumber: orderData.order_number,
+        skipped: "credit-card-payment",
+        note: "Credit card payment - manual credit management by admin",
+      });
+    }
 
     // Payment gateway bilgisini GraphQL ile çek
     let orderDetails = null;

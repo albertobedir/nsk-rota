@@ -196,8 +196,8 @@ export default function OrderDetailPage() {
         return;
       }
 
-      // Redirect to Shopify native checkout page
-      window.location.href = data.invoiceUrl;
+      // Redirect to Shopify native checkout page in new tab
+      window.open(data.invoiceUrl, "_blank");
     } catch {
       toast.error("An error occurred, please try again.");
     } finally {

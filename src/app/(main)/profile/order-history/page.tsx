@@ -55,51 +55,64 @@ export default function OrderHistoryPage() {
         return;
       }
 
-      const mapped: Order[] = (data.orders || []).map((o: any) => {
-        const orderNo = o.name || o.order_number || o.id || "";
-        const id = o.id || "";
-        const orderDate = o.createdAt || o.created_at || "";
-        const total = o.totalPriceSet?.shopMoney
-          ? `${o.totalPriceSet.shopMoney.amount} ${o.totalPriceSet.shopMoney.currencyCode}`
-          : o.total_price || "";
-        const shipping = o.shippingAddress || o.shipping_address;
-        const deliveryAddress = shipping
-          ? `${shipping.address1 || ""}${
-              shipping.city ? ", " + shipping.city : ""
-            }${shipping.zip ? " " + shipping.zip : ""}${
-              shipping.country ? ", " + shipping.country : ""
-            }`.trim()
-          : "";
+      const mapped: Order[] = (data.orders || [])
+        .filter((o: any) => {
+          // Hide cancelled draft orders (credit-card-payment tag)
+          // These are duplicates from the checkout flow and should not be shown
+          const tags: string[] = o.tags ?? [];
+          const isCancelled =
+            o.financialStatus === "voided" || o.cancelledAt != null;
 
-        const fulfillments: any[] = Array.isArray(o.fulfillments)
-          ? o.fulfillments
-          : [];
-        const trackingNumbers = fulfillments
-          .flatMap((f: any) =>
-            f.tracking_numbers?.length
-              ? f.tracking_numbers
-              : f.tracking_number
-                ? [f.tracking_number]
-                : [],
-          )
-          .join(", ");
-        const trackingUrl: string =
-          fulfillments.find((f: any) => f.tracking_url)?.tracking_url ||
-          fulfillments.find((f: any) => f.tracking_urls?.length)
-            ?.tracking_urls?.[0] ||
-          "";
+          if (isCancelled && tags.includes("credit-card-payment")) {
+            return false; // Hide this order
+          }
+          return true; // Show this order
+        })
+        .map((o: any) => {
+          const orderNo = o.name || o.order_number || o.id || "";
+          const id = o.id || "";
+          const orderDate = o.createdAt || o.created_at || "";
+          const total = o.totalPriceSet?.shopMoney
+            ? `${o.totalPriceSet.shopMoney.amount} ${o.totalPriceSet.shopMoney.currencyCode}`
+            : o.total_price || "";
+          const shipping = o.shippingAddress || o.shipping_address;
+          const deliveryAddress = shipping
+            ? `${shipping.address1 || ""}${
+                shipping.city ? ", " + shipping.city : ""
+              }${shipping.zip ? " " + shipping.zip : ""}${
+                shipping.country ? ", " + shipping.country : ""
+              }`.trim()
+            : "";
 
-        return {
-          id,
-          orderNo,
-          orderDate: orderDate?.slice?.(0, 10) || orderDate,
-          total,
-          tracking: (o.tracking || trackingNumbers || "") as string,
-          trackingUrl,
-          warehouse: o.warehouse || "",
-          deliveryAddress,
-        } as Order;
-      });
+          const fulfillments: any[] = Array.isArray(o.fulfillments)
+            ? o.fulfillments
+            : [];
+          const trackingNumbers = fulfillments
+            .flatMap((f: any) =>
+              f.tracking_numbers?.length
+                ? f.tracking_numbers
+                : f.tracking_number
+                  ? [f.tracking_number]
+                  : [],
+            )
+            .join(", ");
+          const trackingUrl: string =
+            fulfillments.find((f: any) => f.tracking_url)?.tracking_url ||
+            fulfillments.find((f: any) => f.tracking_urls?.length)
+              ?.tracking_urls?.[0] ||
+            "";
+
+          return {
+            id,
+            orderNo,
+            orderDate: orderDate?.slice?.(0, 10) || orderDate,
+            total,
+            tracking: (o.tracking || trackingNumbers || "") as string,
+            trackingUrl,
+            warehouse: o.warehouse || "",
+            deliveryAddress,
+          } as Order;
+        });
 
       setOrders(mapped);
     } catch (err: any) {
