@@ -7,8 +7,6 @@ import Link from "next/link";
 type Order = {
   orderNo: string;
   id?: string;
-  invoiceNo?: string;
-  b2bNo?: string;
   orderDate: string;
   total: string;
   tracking?: string;
@@ -19,7 +17,6 @@ type Order = {
 
 export default function OrderHistoryPage() {
   const [orderNo, setOrderNo] = useState("");
-  const [invoiceNo, setInvoiceNo] = useState("");
   const [trackingNo, setTrackingNo] = useState("");
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -30,7 +27,6 @@ export default function OrderHistoryPage() {
 
   const clearFilters = () => {
     setOrderNo("");
-    setInvoiceNo("");
     setTrackingNo("");
   };
 
@@ -117,7 +113,6 @@ export default function OrderHistoryPage() {
 
   const rows = orders.filter((o) => {
     if (orderNo && !o.orderNo.includes(orderNo)) return false;
-    if (invoiceNo && !(o.invoiceNo || "").includes(invoiceNo)) return false;
     if (trackingNo && !(o.tracking || "").includes(trackingNo)) return false;
     return true;
   });
@@ -133,15 +128,6 @@ export default function OrderHistoryPage() {
             <input
               value={orderNo}
               onChange={(e) => setOrderNo(e.target.value)}
-              className="mt-1 w-full rounded border px-3 py-2 text-sm"
-            />
-          </div>
-
-          <div className="md:col-span-1 lg:col-span-1">
-            <label className="block text-xs text-slate-600">Invoice No</label>
-            <input
-              value={invoiceNo}
-              onChange={(e) => setInvoiceNo(e.target.value)}
               className="mt-1 w-full rounded border px-3 py-2 text-sm"
             />
           </div>
@@ -187,12 +173,6 @@ export default function OrderHistoryPage() {
                   Order No
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
-                  Invoice No
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
-                  B2B No
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
                   Order Date
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
@@ -223,12 +203,6 @@ export default function OrderHistoryPage() {
                     ) : (
                       r.orderNo
                     )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-700">
-                    {r.invoiceNo || "-"}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-700">
-                    {r.b2bNo || "-"}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">
                     {r.orderDate}
