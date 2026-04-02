@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, skipped: "not completed" });
     }
 
-    const note: string = body.note2 ?? "";
+    const note: string = body.note2 ?? body.note ?? "";
 
     // Shopify numeric ID'yi yakala — GID veya sadece rakam
     // "gid://shopify/Order/6967864688943" → 6967864688943
