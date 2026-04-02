@@ -85,6 +85,7 @@ export default function OrderDetailPage() {
 
         const normalized = {
           id: src._id?.toString?.() || src.id || src.shopifyId || raw.id,
+          shopifyId: src.shopifyId || raw.id, // Shopify numeric ID
           orderNumber:
             src.orderNumber || src.order_number || raw.order_number || src.name,
           processedAt: src.processedAt || raw.processed_at || src.createdAt,
@@ -181,6 +182,7 @@ export default function OrderDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId: order.id,
+          shopifyOrderId: order.shopifyId,
           orderName: order.orderNumber,
           totalAmount: order.totalPrice?.amount,
           customerId: user?.id || undefined,

@@ -5,7 +5,8 @@ import { createDraftOrder } from "@/lib/shopify/draft";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, orderName, totalAmount, customerId } = body;
+    const { orderId, shopifyOrderId, orderName, totalAmount, customerId } =
+      body;
 
     if (!orderId || !totalAmount) {
       return NextResponse.json(
@@ -14,8 +15,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Build Shopify GID from numeric ID
+    const shopifyOrderGid = shopifyOrderId
+      ? `gid://shopify/Order/${String(shopifyOrderId).replace(/\D/g, "")}`
+      : null;
+
     console.log("[/api/order/pay] Started:", {
       orderId,
+      shopifyOrderId,
+      shopifyOrderGid,
       orderName,
       totalAmount,
       customerId,
@@ -37,7 +45,7 @@ export async function POST(request: NextRequest) {
         "credit-card-payment",
         `order-ref-${String(orderName).replace("#", "")}`,
       ],
-      note: `Credit card payment — Original Order: ${orderName} (${orderId})`,
+      note: `Credit card payment — Original Order: ${orderName} (${shopifyOrderGid || orderId})`,
     });
 
     // Check for userErrors
