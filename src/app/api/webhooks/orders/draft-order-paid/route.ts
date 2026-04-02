@@ -2,64 +2,66 @@
 import { NextRequest, NextResponse } from "next/server";
 import { shopifyAdminFetch } from "@/lib/shopify/instance";
 
-/**
- * Webhook handler for draft_orders/update event
- * Triggers when a draft order is marked as completed/paid
- *
- * This webhook:
- * 1. Extracts the original order ID from the draft order note
- * 2. Marks the original order as PAID (financial status)
- * 3. Does NOT modify customer's credit (they paid with credit card)
- */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Webhook payload structure for draft_orders/update
-    const { id: draftOrderId, name, note, status } = body;
-
-    console.log("[webhook/draft-order-paid] Received:", {
-      draftOrderId,
-      draftOrderName: name,
-      status,
+    console.log("[draft-order-paid webhook]", {
+      draftOrderId: body.id,
+      status: body.status,
+      tags: body.tags,
+      note: body.note2,
+      newOrderId: body.order_id,
     });
 
-    // Only process if draft order is completed/paid
-    if (status !== "completed" && status !== "invoiced") {
-      console.log(
-        `[webhook/draft-order-paid] Skipping — status is "${status}", not "completed" or "invoiced"`,
-      );
-      return NextResponse.json({ ok: true, skipped: true });
+    const tags: string[] = body.tags ?? [];
+    const status: string = body.status ?? "";
+
+    if (!tags.includes("credit-card-payment")) {
+      return NextResponse.json({ ok: true, skipped: "no tag" });
     }
 
-    // 1. Parse original order ID from note
-    // Note format: "Credit card payment — Original Order: #1015 (gid://shopify/Order/6967864688943)"
-    const orderGidMatch = note?.match(/gid:\/\/shopify\/Order\/(\d+)/);
+    if (status !== "completed") {
+      return NextResponse.json({ ok: true, skipped: "not completed" });
+    }
 
-    if (!orderGidMatch) {
+    const note: string = body.note2 ?? "";
+
+    // Shopify numeric ID'yi yakala — GID veya sadece rakam
+    // "gid://shopify/Order/6967864688943" → 6967864688943
+    // "Original Order: #1019 (6967864688943)" → 6967864688943 (son parantez içi)
+    const gidMatch = note.match(/gid:\/\/shopify\/Order\/(\d+)/);
+    const parenMatch = note.match(/\((\d+)\)\s*$/); // parantez içindeki numeric ID
+
+    const originalOrderNumericId = gidMatch?.[1] ?? parenMatch?.[1] ?? null;
+
+    if (!originalOrderNumericId) {
       console.warn(
-        "[webhook/draft-order-paid] Could not extract order ID from note:",
+        "[draft-order-paid] original order ID parse edilemedi, note:",
         note,
       );
-      return NextResponse.json({ ok: true, noOrderFound: true });
+      return NextResponse.json({ ok: true, skipped: "no order ref" });
     }
 
-    const originalOrderGid = `gid://shopify/Order/${orderGidMatch[1]}`;
+    const originalOrderGid = `gid://shopify/Order/${originalOrderNumericId}`;
+    const newOrderGid = body.order_id
+      ? `gid://shopify/Order/${body.order_id}`
+      : null;
 
-    console.log("[webhook/draft-order-paid] Marking order as paid:", {
+    console.log("[draft-order-paid] processing:", {
       originalOrderGid,
-      draftOrderId,
+      newOrderGid,
     });
 
-    // 2. Mark original order as PAID using Shopify mutation
-    const markAsPaidResponse = await shopifyAdminFetch({
+    // Orijinal siparişi PAID yap
+    const paidResult = await shopifyAdminFetch({
       query: `
         mutation markAsPaid($input: OrderMarkAsPaidInput!) {
           orderMarkAsPaid(input: $input) {
             order {
               id
               name
-              financialStatus
+              displayFinancialStatus
             }
             userErrors {
               field
@@ -68,51 +70,52 @@ export async function POST(request: NextRequest) {
           }
         }
       `,
-      variables: {
-        input: {
-          id: originalOrderGid,
-        },
-      },
+      variables: { input: { id: originalOrderGid } },
     });
 
-    if (markAsPaidResponse.errors) {
-      console.error(
-        "[webhook/draft-order-paid] Mutation error:",
-        markAsPaidResponse.errors,
-      );
-      return NextResponse.json(
-        { message: "Failed to mark order as paid" },
-        { status: 500 },
+    const markAsPaidErrors =
+      paidResult?.data?.orderMarkAsPaid?.userErrors ?? [];
+    if (markAsPaidErrors.length > 0) {
+      console.error("[draft-order-paid] markAsPaid errors:", markAsPaidErrors);
+    } else {
+      console.log(
+        "[draft-order-paid] ✅ original order PAID:",
+        paidResult?.data?.orderMarkAsPaid?.order,
       );
     }
 
-    const userErrors =
-      markAsPaidResponse.data?.orderMarkAsPaid?.userErrors || [];
-    if (userErrors.length > 0) {
-      console.warn("[webhook/draft-order-paid] User errors:", userErrors);
+    // Draft'tan gelen yeni order'ı iptal et
+    if (newOrderGid) {
+      const cancelResult = await shopifyAdminFetch({
+        query: `
+          mutation cancelOrder($orderId: ID!, $reason: OrderCancelReason!) {
+            orderCancel(orderId: $orderId, reason: $reason, refund: false, restock: false) {
+              job { id }
+              userErrors { field message }
+            }
+          }
+        `,
+        variables: { orderId: newOrderGid, reason: "OTHER" },
+      });
+
+      const cancelErrors = cancelResult?.data?.orderCancel?.userErrors ?? [];
+      if (cancelErrors.length > 0) {
+        console.warn("[draft-order-paid] cancel errors:", cancelErrors);
+      } else {
+        console.log(
+          "[draft-order-paid] ✅ yeni order iptal edildi:",
+          newOrderGid,
+        );
+      }
     }
 
-    const updatedOrder = markAsPaidResponse.data?.orderMarkAsPaid?.order;
-    console.log("[webhook/draft-order-paid] Order updated successfully:", {
-      orderId: updatedOrder?.id,
-      orderName: updatedOrder?.name,
-      financialStatus: updatedOrder?.financialStatus,
-    });
-
-    // 3. Return success
-    // Note: We do NOT modify customer credit here
-    // (They paid with credit card, not using their credit balance)
     return NextResponse.json({
       ok: true,
       originalOrderId: originalOrderGid,
-      draftOrderId,
-      financialStatus: updatedOrder?.financialStatus,
+      newOrderCancelled: !!newOrderGid,
     });
   } catch (err: any) {
-    console.error("[webhook/draft-order-paid] Error:", err);
-    return NextResponse.json(
-      { message: err?.message || "Internal server error" },
-      { status: 500 },
-    );
+    console.error("[draft-order-paid] webhook error:", err);
+    return NextResponse.json({ ok: false }, { status: 500 });
   }
 }

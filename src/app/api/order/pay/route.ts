@@ -15,15 +15,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build Shopify GID from numeric ID
-    const shopifyOrderGid = shopifyOrderId
-      ? `gid://shopify/Order/${String(shopifyOrderId).replace(/\D/g, "")}`
-      : null;
+    if (!shopifyOrderId) {
+      return NextResponse.json(
+        { message: "shopifyOrderId is required" },
+        { status: 400 },
+      );
+    }
 
     console.log("[/api/order/pay] Started:", {
       orderId,
       shopifyOrderId,
-      shopifyOrderGid,
       orderName,
       totalAmount,
       customerId,
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
         "credit-card-payment",
         `order-ref-${String(orderName).replace("#", "")}`,
       ],
-      note: `Credit card payment — Original Order: ${orderName} (${shopifyOrderGid || orderId})`,
+      note: `Credit card payment — Original Order: ${orderName} (gid://shopify/Order/${shopifyOrderId})`,
     });
 
     // Check for userErrors
