@@ -13,7 +13,18 @@ interface Props {
   setOpen: (open: boolean) => void;
 }
 
-const categories = [
+interface MenuItem {
+  name: string;
+  href: string;
+  desktop?: boolean;
+}
+
+interface Category {
+  name: string;
+  items: MenuItem[];
+}
+
+const categories: Category[] = [
   {
     name: "Profile",
     items: [
@@ -21,6 +32,7 @@ const categories = [
 
       { name: "Order History", href: "/profile/order-history" },
       { name: "Invoices", href: "/profile/invoices" },
+      { name: "Logout", href: "/logout", desktop: true },
     ],
   },
   {
@@ -40,28 +52,6 @@ export default function NavbarModal({ open, setOpen }: Props) {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(v) + " $";
-
-  const handleLogout = async () => {
-    try {
-      // Call logout API to clear cookies server-side
-      await fetch("/api/auth/logout", { method: "POST" });
-
-      // Clear localStorage
-      localStorage.clear();
-
-      // Clear session store
-      clearSession();
-
-      // Close modal
-      setOpen(false);
-
-      // Redirect to login
-      router.push("/auth/login");
-    } catch (e) {
-      console.error("Logout failed:", e);
-      router.push("/auth/login");
-    }
-  };
 
   // No document-level outside-click listener: we only close the menu
   // when a menu item is clicked (per requested behavior).
@@ -84,7 +74,9 @@ export default function NavbarModal({ open, setOpen }: Props) {
               <div key={category.name} className="w-full">
                 <h4 className="text-lg font-semibold pb-2">{category.name}</h4>
                 <ul className="flex flex-col">
-                  {category.items.map((item) => (
+                  {category.items
+                    .filter((item) => !item.desktop)
+                    .map((item) => (
                     <li key={item.name} className="text-base py-2">
                       <Link
                         className="hover:text-secondary transition-colors"
@@ -139,15 +131,12 @@ export default function NavbarModal({ open, setOpen }: Props) {
               </div>
             ) : null}
 
-            {/* Logout - Mobile only */}
+            {/* Logout - Mobile only, below Credit Info */}
             {user && (
-              <div className="w-full border-t pt-4">
+              <div className="w-full border-t border-slate-100 pt-4">
                 <Link
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleLogout();
-                  }}
+                  href="/logout"
+                  onClick={() => setOpen(false)}
                   className="text-base py-2 text-red-600 font-semibold hover:text-red-700 transition-colors block"
                 >
                   Logout
@@ -190,7 +179,11 @@ export default function NavbarModal({ open, setOpen }: Props) {
                       {category.items.map((item) => (
                         <li key={item.name} className="text-base py-1">
                           <Link
-                            className="hover:text-secondary transition-colors"
+                            className={cn(
+                              "hover:text-secondary transition-colors",
+                              item.name === "Logout" &&
+                                "text-red-600 font-semibold hover:text-red-700",
+                            )}
                             href={item.href}
                             // burada setOpen(false) YOK
                           >

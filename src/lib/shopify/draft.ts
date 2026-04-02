@@ -6,6 +6,7 @@ import { shopifyAdminFetch } from "./instance";
 export interface DraftOrderLineItem {
   variantId?: string;
   productId?: string;
+  title?: string; // Custom item için
   quantity: number;
   originalUnitPrice?: string; // Custom price için
   appliedDiscount?: {

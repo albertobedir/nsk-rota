@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState } from "react";
@@ -34,10 +33,12 @@ export default function OrderDetailPage() {
   );
   const [pricingTiers, setPricingTiers] = useState<any[]>([]);
   const [userDiscount, setUserDiscount] = useState<number | null>(null);
+  const [payLoading, setPayLoading] = useState(false);
 
   // Get user tier from session store
   const tierTag = useSessionStore((s) => s.tierTag);
   const getDiscountForTier = useSessionStore((s) => s.getDiscountForTier);
+  const user = useSessionStore((s) => s.user);
 
   useEffect(() => {
     if (!id) return;
@@ -162,6 +163,45 @@ export default function OrderDetailPage() {
     if (!order) return;
     console.log("[order-detail] fetched order:", order);
   }, [order]);
+
+  // Handle Pay Order button click
+  const handlePayOrder = async () => {
+    if (!order) return;
+
+    // Only pending orders can be paid
+    if (order.financialStatus?.toLowerCase() !== "pending") {
+      toast.info("This order has already been paid.");
+      return;
+    }
+
+    setPayLoading(true);
+    try {
+      const res = await fetch("/api/order/pay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id,
+          orderName: order.orderNumber,
+          totalAmount: order.totalPrice?.amount,
+          customerId: user?.id || undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.message || "Failed to initiate payment.");
+        return;
+      }
+
+      // Redirect to Shopify native checkout page
+      window.location.href = data.invoiceUrl;
+    } catch {
+      toast.error("An error occurred, please try again.");
+    } finally {
+      setPayLoading(false);
+    }
+  };
 
   // Fetch pricing tiers and calculate user discount
   useEffect(() => {
@@ -307,14 +347,16 @@ export default function OrderDetailPage() {
           </button>
           <button
             type="button"
-            onClick={() =>
-              toast.info(
-                "Online payment is currently being processed through your account manager. Please contact us for assistance.",
-              )
+            onClick={handlePayOrder}
+            disabled={
+              payLoading ||
+              !order ||
+              order.financialStatus?.toLowerCase() !== "pending"
             }
-            className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded"
+            className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 hover:brightness-110 transition"
           >
-            Pay Order
+            {payLoading && <Spinner className="w-3 h-3" />}
+            {payLoading ? "Yönlendiriliyor..." : "Pay Order"}
           </button>
         </div>
       </div>
