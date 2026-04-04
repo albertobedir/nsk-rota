@@ -192,6 +192,39 @@ export async function POST(request: NextRequest) {
     // ✅ LOG 3: Shopify'dan dönen response
     console.log("[DRAFT ORDER RESPONSE]", JSON.stringify(created, null, 2));
 
+    // Enable discount codes in Shopify checkout
+    const draftId = created?.draftOrder?.id;
+    if (draftId) {
+      try {
+        const numericId = String(draftId).split("/").pop();
+        const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN!;
+        const shopifyToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!;
+
+        await fetch(
+          `https://${shopifyDomain}/admin/api/2025-01/draft_orders/${numericId}.json`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Shopify-Access-Token": shopifyToken,
+            },
+            body: JSON.stringify({
+              draft_order: {
+                id: numericId,
+                "allow_discount_codes_in_checkout?": true,
+              },
+            }),
+          },
+        );
+        console.log(
+          "[DRAFT UPDATE] allow_discount_codes_in_checkout enabled for draft",
+          numericId,
+        );
+      } catch (e) {
+        console.warn("[DRAFT UPDATE] failed to enable discount codes:", e);
+      }
+    }
+
     return NextResponse.json({ created });
   } catch (err) {
     console.error("/api/cart/checkout error:", err);

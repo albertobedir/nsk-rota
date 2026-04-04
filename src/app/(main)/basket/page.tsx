@@ -732,7 +732,7 @@ export default function BasketPage() {
                   </span>
                 </div>
 
-                <div className="mt-4">
+                <div className="mt-4 opacity-0 pointer-events-none">
                   {discountApplied ? (
                     <div className="flex items-center justify-between text-sm bg-green-50 rounded-md px-3 py-2">
                       <span className="text-green-700 font-semibold">
