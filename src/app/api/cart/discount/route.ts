@@ -148,7 +148,9 @@ export async function POST(req: NextRequest) {
 
     // 4) calculateDraftOrder ile amount'u hesapla
     const lines = (lineItems as IncomingLine[]).map((li) => ({
-      variantId: li.variantId ?? undefined,
+      variantId: li.variantId
+        ? `gid://shopify/ProductVariant/${li.variantId}`
+        : undefined,
       quantity: Number(li.quantity ?? 1),
       originalUnitPrice: String(li.price ?? "0"),
       title: li.title ?? "Item",

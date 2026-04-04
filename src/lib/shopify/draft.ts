@@ -428,6 +428,12 @@ export async function calculateDraftOrder(input: DraftOrderInput) {
 
   const variables = { input };
   const response = await shopifyAdminFetch({ query: mutation, variables });
+
+  console.log(
+    "[calculateDraftOrder raw response]",
+    JSON.stringify(response, null, 2),
+  );
+
   return response.data?.draftOrderCalculate;
 }
 
