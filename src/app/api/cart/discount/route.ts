@@ -231,10 +231,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5) Amount hesapla — subtotal vs totalPrice
-    const subtotal = parseFloat(calculated.subtotalPrice ?? "0");
-    const totalPrice = parseFloat(calculated.totalPrice ?? "0");
-    const tax = parseFloat(calculated.totalTax ?? "0");
+    // 5) Amount hesapla — subtotal vs totalPrice (MoneyV2 -> .amount)
+    const subtotal = parseFloat(calculated.subtotalPrice?.amount ?? "0");
+    const totalPrice = parseFloat(calculated.totalPrice?.amount ?? "0");
+    const tax = parseFloat(calculated.totalTax?.amount ?? "0");
     const discountAmount = Math.max(0, subtotal - (totalPrice - tax));
 
     console.log("[DISCOUNT AMOUNT CALC]", {
