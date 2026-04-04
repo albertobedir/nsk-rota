@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { calculateDraftOrder, getDiscountByCode } from "@/lib/shopify/draft";
+import {
+  createDraftOrder,
+  deleteDraftOrder,
+  getDiscountByCode,
+} from "@/lib/shopify/draft";
 
 type IncomingLine = {
   variantId?: string;
@@ -26,7 +30,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1) Discount detayını çek
+    // 1) Discount detayını çek — status + minimum requirement
     const discount = await getDiscountByCode(code.trim());
 
     console.log(`[DISCOUNT LOOKUP] code="${code.trim()}"`, {
@@ -55,7 +59,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2) Cart değerlerini hesapla
+    // 2) Cart toplamlarını hesapla
     const cartSubtotal = (lineItems as IncomingLine[]).reduce(
       (sum, li) => sum + Number(li.price ?? 0) * Number(li.quantity ?? 1),
       0,
@@ -65,20 +69,8 @@ export async function POST(req: NextRequest) {
       0,
     );
 
-    console.log("[CART TOTALS]", {
-      subtotal: cartSubtotal,
-      totalQty: cartTotalQty,
-      lineItemsCount: lineItems.length,
-    });
-
-    // 3) Minimum koşul kontrolü — spesifik mesaj üret
+    // 3) Minimum koşul kontrolü
     const minReq = discount.minimumRequirement;
-
-    console.log("[MIN REQUIREMENT CHECK]", {
-      hasMinReq: !!minReq,
-      hasSubtotalReq: !!minReq?.greaterThanOrEqualToSubtotal,
-      hasQtyReq: !!minReq?.greaterThanOrEqualToQuantity,
-    });
 
     if (minReq?.greaterThanOrEqualToSubtotal) {
       const minAmount = parseFloat(
@@ -87,66 +79,39 @@ export async function POST(req: NextRequest) {
       const currency =
         minReq.greaterThanOrEqualToSubtotal.currencyCode ?? "USD";
 
-      console.log("[MIN SUBTOTAL CHECK]", {
-        required: minAmount,
-        current: cartSubtotal,
-        passed: cartSubtotal >= minAmount,
-      });
-
       if (cartSubtotal < minAmount) {
-        const formatted = minAmount.toLocaleString("en-US", {
+        const needed = (minAmount - cartSubtotal).toLocaleString("en-US", {
           style: "currency",
           currency,
         });
-        const currentFormatted = cartSubtotal.toLocaleString("en-US", {
+        const minFmt = minAmount.toLocaleString("en-US", {
           style: "currency",
           currency,
         });
-        console.log(
-          "[MIN SUBTOTAL REJECTED]",
-          formatted,
-          "vs",
-          currentFormatted,
-        );
-        return NextResponse.json(
-          {
-            valid: false,
-            message: `Minimum cart total of ${formatted} required. Your cart is ${currentFormatted}.`,
-            requirementType: "MIN_SUBTOTAL",
-            required: minAmount,
-            current: cartSubtotal,
-          },
-          { status: 200 },
-        );
+        return NextResponse.json({
+          valid: false,
+          message: `Minimum cart total of ${minFmt} required. Add ${needed} more to use this code.`,
+          requirementType: "MIN_SUBTOTAL",
+          required: minAmount,
+          current: cartSubtotal,
+        });
       }
     }
 
     if (minReq?.greaterThanOrEqualToQuantity) {
       const minQty = Number(minReq.greaterThanOrEqualToQuantity);
-
-      console.log("[MIN QUANTITY CHECK]", {
-        required: minQty,
-        current: cartTotalQty,
-        passed: cartTotalQty >= minQty,
-      });
-
       if (cartTotalQty < minQty) {
-        const msg = `Minimum ${minQty} items required. Your cart has ${cartTotalQty} item${cartTotalQty !== 1 ? "s" : ""}.`;
-        console.log("[MIN QUANTITY REJECTED]", msg);
-        return NextResponse.json(
-          {
-            valid: false,
-            message: msg,
-            requirementType: "MIN_QUANTITY",
-            required: minQty,
-            current: cartTotalQty,
-          },
-          { status: 200 },
-        );
+        return NextResponse.json({
+          valid: false,
+          message: `Minimum ${minQty} items required. Your cart has ${cartTotalQty} item${cartTotalQty !== 1 ? "s" : ""}.`,
+          requirementType: "MIN_QUANTITY",
+          required: minQty,
+          current: cartTotalQty,
+        });
       }
     }
 
-    // 4) calculateDraftOrder ile amount'u hesapla
+    // 4) Gerçek draft oluştur → amount oku → hemen sil
     const lines = (lineItems as IncomingLine[]).map((li) => ({
       variantId: li.variantId
         ? `gid://shopify/ProductVariant/${li.variantId}`
@@ -158,22 +123,10 @@ export async function POST(req: NextRequest) {
       requiresShipping: true,
     }));
 
-    console.log("[CALC DRAFT ORDER INPUT]", {
-      linesCount: lines.length,
-      firstLine: lines[0],
-      appliedDiscount: {
-        code: code.trim(),
-        title: code.trim(),
-        value: 0,
-        valueType: "PERCENTAGE",
-        description: code.trim(),
-      },
-    });
-
-    const result = await calculateDraftOrder({
+    const created = await createDraftOrder({
       lineItems: lines,
       appliedDiscount: {
-        code: code.trim(),
+        // code yok — title ile eşleştirme yapıyoruz
         title: code.trim(),
         value: 0,
         valueType: "PERCENTAGE",
@@ -181,76 +134,42 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    console.log("[CALC RESULT]", JSON.stringify(result, null, 2));
+    const draft = created?.draftOrder;
+    const userErrors = created?.userErrors;
 
-    const calculated = result?.calculatedDraftOrder;
-    const userErrors = result?.userErrors;
-
-    console.log("[CALC RESULT PARSED]", {
-      hasCalculated: !!calculated,
-      userErrors: userErrors,
-      calculatedDraft: calculated
-        ? {
-            subtotalPrice: calculated.subtotalPrice,
-            totalPrice: calculated.totalPrice,
-            totalTax: calculated.totalTax,
-            appliedDiscount: calculated.appliedDiscount,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            lineItems: calculated.lineItems?.map((li: any) => ({
-              title: li.title,
-              quantity: li.quantity,
-              originalUnitPrice: li.originalUnitPrice?.amount,
-              totalDiscount: li.totalDiscount?.amount,
-            })),
-          }
-        : null,
-    });
+    // Draft'ı hemen sil
+    if (draft?.id) {
+      await deleteDraftOrder(draft.id).catch((e) =>
+        console.warn("[DISCOUNT] cleanup failed:", e),
+      );
+    }
 
     if (userErrors?.length > 0) {
-      console.log("[USER ERROR]", userErrors[0]?.message);
       return NextResponse.json(
         { valid: false, message: userErrors[0]?.message ?? "Invalid code" },
         { status: 200 },
       );
     }
 
-    if (!calculated) {
-      console.log("[NO CALCULATED DRAFT]");
+    if (!draft) {
       return NextResponse.json(
-        { valid: false, message: "Could not calculate discount" },
+        { valid: false, message: "Could not validate code" },
         { status: 400 },
       );
     }
 
-    const applied = calculated.appliedDiscount;
+    const applied = draft.appliedDiscount;
     if (!applied) {
-      console.log("[NO APPLIED DISCOUNT]");
       return NextResponse.json(
         { valid: false, message: "Discount could not be applied to your cart" },
         { status: 200 },
       );
     }
 
-    // 5) Amount hesapla — subtotal vs totalPrice (MoneyV2 -> .amount)
-    const subtotal = parseFloat(calculated.subtotalPrice?.amount ?? "0");
-    const totalPrice = parseFloat(calculated.totalPrice?.amount ?? "0");
-    const tax = parseFloat(calculated.totalTax?.amount ?? "0");
-    const discountAmount = Math.max(0, subtotal - (totalPrice - tax));
-
-    console.log("[DISCOUNT AMOUNT CALC]", {
-      subtotal,
-      totalPrice,
-      tax,
-      formula: `${subtotal} - (${totalPrice} - ${tax})`,
-      discountAmount,
-    });
-
-    console.log("[SUCCESS]", {
-      code: code.trim(),
-      amount: discountAmount,
-      valueType: applied.valueType,
-      value: applied.value,
-    });
+    // Amount = subtotal - totalPrice (tax hariç)
+    const subtotal = parseFloat(draft.subtotalPrice ?? "0");
+    const totalPrice = parseFloat(draft.totalPrice ?? "0");
+    const discountAmount = Math.max(0, subtotal - totalPrice);
 
     return NextResponse.json({
       valid: true,
@@ -260,7 +179,7 @@ export async function POST(req: NextRequest) {
       value: applied.value,
     });
   } catch (err) {
-    console.error("[/api/cart/discount] EXCEPTION", err);
+    console.error("[/api/cart/discount] error:", err);
     return NextResponse.json(
       { valid: false, message: "Server error" },
       { status: 500 },
