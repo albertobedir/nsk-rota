@@ -29,16 +29,17 @@ export async function POST(req: NextRequest) {
     // 1) Discount detayını çek — status + minimum requirement
     const discount = await getDiscountByCode(code.trim());
 
-    console.log(`[DISCOUNT LOOKUP] code="${code.trim()}"`, {
-      found: !!discount,
-      discount: discount
-        ? {
-            title: discount.title,
-            status: discount.status,
-            minimumRequirement: discount.minimumRequirement,
-          }
-        : null,
-    });
+    console.log(
+      `[DISCOUNT LOOKUP] code="${code.trim()}"`,
+      JSON.stringify(
+        {
+          found: !!discount,
+          discount,
+        },
+        null,
+        2,
+      ),
+    );
 
     if (!discount) {
       return NextResponse.json(
@@ -111,6 +112,26 @@ export async function POST(req: NextRequest) {
     const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN!;
     const shopifyToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!;
 
+    const body = JSON.stringify({
+      draft_order: {
+        line_items: (lineItems as IncomingLine[]).map((li) => ({
+          variant_id: li.variantId,
+          quantity: Number(li.quantity ?? 1),
+          price: String(li.price ?? "0"),
+          title: li.title ?? "Item",
+        })),
+        applied_discount: {
+          code: code.trim(),
+          value_type: "percentage",
+          value: "0",
+          title: code.trim(),
+          description: code.trim(),
+        },
+      },
+    });
+
+    console.log("[REST REQUEST BODY]", body);
+
     const restResp = await fetch(
       `https://${shopifyDomain}/admin/api/2025-01/draft_orders.json`,
       {
@@ -119,27 +140,14 @@ export async function POST(req: NextRequest) {
           "Content-Type": "application/json",
           "X-Shopify-Access-Token": shopifyToken,
         },
-        body: JSON.stringify({
-          draft_order: {
-            line_items: (lineItems as IncomingLine[]).map((li) => ({
-              variant_id: li.variantId,
-              quantity: Number(li.quantity ?? 1),
-              price: String(li.price ?? "0"),
-              title: li.title ?? "Item",
-            })),
-            applied_discount: {
-              code: code.trim(),
-              value_type: "percentage",
-              value: "0",
-              title: code.trim(),
-              description: code.trim(),
-            },
-          },
-        }),
+        body,
       },
     );
 
-    const restJson = await restResp.json();
+    const restText = await restResp.text();
+    console.log("[REST RAW RESPONSE]", restText);
+
+    const restJson = JSON.parse(restText);
 
     console.log(
       "[REST DRAFT RESPONSE]",
@@ -150,6 +158,15 @@ export async function POST(req: NextRequest) {
           total: restJson?.draft_order?.total_price,
           appliedDiscount: restJson?.draft_order?.applied_discount,
           errors: restJson?.errors,
+          lineItems: restJson?.draft_order?.line_items?.map(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (li: any) => ({
+              title: li.title,
+              price: li.price,
+              quantity: li.quantity,
+              appliedDiscount: li.applied_discount,
+            }),
+          ),
         },
         null,
         2,
