@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
       customerId,
       userTier,
       discountPercentage,
+      discountCode,
     } = body;
 
     if (!Array.isArray(lineItems) || lineItems.length === 0) {
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
       customerId,
       userTier,
       discountPercentage,
+      discountCode,
       lineItemsCount: lineItems.length,
       firstItem: lineItems[0],
     });
@@ -167,6 +169,19 @@ export async function POST(request: NextRequest) {
       note: customerId
         ? `B2B Order - Custom pricing for ${customerId}`
         : undefined,
+
+      // Order-level discount code (tier discount'tan bağımsız çalışır)
+      ...(discountCode?.trim()
+        ? {
+            appliedDiscount: {
+              code: discountCode.trim(),
+              value: 0,
+              valueType: "PERCENTAGE" as const,
+              title: discountCode.trim(),
+              description: `Discount code: ${discountCode.trim()}`,
+            },
+          }
+        : {}),
     };
 
     // ✅ LOG 2: Shopify'a gönderilen tam input

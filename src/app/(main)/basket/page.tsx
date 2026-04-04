@@ -25,6 +25,14 @@ export default function BasketPage() {
   const router = useRouter();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
+  // Discount states
+  const [discountCode, setDiscountCode] = useState("");
+  const [discountApplied, setDiscountApplied] = useState<{
+    code: string;
+    amount: number;
+  } | null>(null);
+  const [discountLoading, setDiscountLoading] = useState(false);
+
   // map of itemId -> available stock (number)
   const [stockMap, setStockMap] = useState<Record<string, number | undefined>>(
     {},
@@ -44,6 +52,45 @@ export default function BasketPage() {
     } catch (e) {
       console.error("Clear cart failed:", e);
       toast.error("Failed to clear cart");
+    }
+  };
+
+  // Handle discount code validation
+  const handleApplyDiscount = async () => {
+    if (!discountCode.trim()) return;
+    setDiscountLoading(true);
+    try {
+      const resp = await fetch("/api/cart/discount", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: discountCode.trim(),
+          lineItems: cart.map((i) => ({
+            variantId: i.variantId?.toString().includes("/")
+              ? i.variantId.toString().split("/").pop()
+              : i.variantId,
+            quantity: i.quantity,
+            price: String(i.price),
+            title: i.title,
+          })),
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.valid) {
+        toast.error(json.message || "Invalid discount code");
+        return;
+      }
+      setDiscountApplied({ code: json.code, amount: json.amount });
+      toast.success(
+        `Discount applied: -${json.amount.toLocaleString("en-US", {
+          style: "currency",
+          currency: "USD",
+        })}`,
+      );
+    } catch {
+      toast.error("Failed to apply discount");
+    } finally {
+      setDiscountLoading(false);
     }
   };
 
@@ -71,6 +118,7 @@ export default function BasketPage() {
             customerId: sessionUser?.id,
             userTier: sessionUser?.tier,
             discountPercentage,
+            discountCode: discountApplied?.code ?? null,
             lineItems: cart.map((i) => ({
               merchandiseId: i.variantId,
               quantity: i.quantity,
@@ -181,7 +229,7 @@ export default function BasketPage() {
     try {
       const merch = item.variantId;
       if (!merch) return;
-      const resp = await fetch("/api/cart/update", {
+      await fetch("/api/cart/update", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ merchandiseId: merch, quantity: newQty }),
@@ -277,6 +325,11 @@ export default function BasketPage() {
 
   const cartTotalPrice = () =>
     cart.reduce((s, i) => s + (i.price ?? 0) * (i.quantity ?? 0), 0);
+
+  const finalTotal = () => {
+    const base = cartTotalPrice();
+    return discountApplied ? Math.max(0, base - discountApplied.amount) : base;
+  };
 
   return (
     <Hydrate>
@@ -679,18 +732,63 @@ export default function BasketPage() {
                   </span>
                 </div>
 
-                <div className="mt-4 opacity-0">
-                  <div className="flex gap-2">
-                    <input
-                      disabled
-                      placeholder="Discount code"
-                      className="flex-1 rounded-md border px-3 py-2 text-sm"
-                    />
-                    <button className="rounded-md bg-gray-100 px-3 py-2 text-sm">
-                      Apply
-                    </button>
-                  </div>
+                <div className="mt-4">
+                  {discountApplied ? (
+                    <div className="flex items-center justify-between text-sm bg-green-50 rounded-md px-3 py-2">
+                      <span className="text-green-700 font-semibold">
+                        🎟 {discountApplied.code}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-700 font-semibold">
+                          -{discountApplied.amount.toLocaleString("en-US", {
+                            style: "currency",
+                            currency: "USD",
+                          })}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setDiscountApplied(null);
+                            setDiscountCode("");
+                          }}
+                          className="text-gray-400 hover:text-red-500 text-xs ml-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        value={discountCode}
+                        onChange={(e) => setDiscountCode(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleApplyDiscount();
+                        }}
+                        placeholder="Discount code"
+                        className="flex-1 rounded-md border px-3 py-2 text-sm"
+                      />
+                      <button
+                        onClick={handleApplyDiscount}
+                        disabled={discountLoading || cart.length === 0}
+                        className="rounded-md bg-gray-100 px-3 py-2 text-sm hover:bg-gray-200 disabled:opacity-50"
+                      >
+                        {discountLoading ? "..." : "Apply"}
+                      </button>
+                    </div>
+                  )}
                 </div>
+
+                {discountApplied && (
+                  <div className="mt-2 text-sm text-green-600 translate-y-5 flex items-center justify-between">
+                    <span>Discount ({discountApplied.code})</span>
+                    <span className="font-semibold">
+                      -{discountApplied.amount.toLocaleString("en-US", {
+                        style: "currency",
+                        currency: "USD",
+                      })}
+                    </span>
+                  </div>
+                )}
 
                 <div className="mt-4 border-t pt-4">
                   <div className="flex items-center justify-between">
@@ -698,7 +796,7 @@ export default function BasketPage() {
                       Total ({cartTotalItems()} items)
                     </div>
                     <div className="font-extrabold text-xl">
-                      {cartTotalPrice().toLocaleString("en-US", {
+                      {finalTotal().toLocaleString("en-US", {
                         style: "currency",
                         currency: "USD",
                       })}
@@ -709,7 +807,7 @@ export default function BasketPage() {
                     const remaining = Number(
                       sessionUser?.creditRemaining ?? Number.POSITIVE_INFINITY,
                     );
-                    const disabledByCredit = cartTotalPrice() > remaining;
+                    const disabledByCredit = finalTotal() > remaining;
 
                     return (
                       <button

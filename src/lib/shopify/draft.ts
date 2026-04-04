@@ -51,9 +51,11 @@ export interface DraftOrderInput {
   tags?: string[];
   taxExempt?: boolean;
   appliedDiscount?: {
+    code?: string;
     value: number;
     valueType: "PERCENTAGE" | "FIXED_AMOUNT";
     description?: string;
+    title?: string;
   };
   shippingLine?: {
     price: string;
