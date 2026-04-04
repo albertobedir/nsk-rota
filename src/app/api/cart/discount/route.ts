@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  createDraftOrder,
-  deleteDraftOrder,
-  getDiscountByCode,
-} from "@/lib/shopify/draft";
+import { getDiscountByCode } from "@/lib/shopify/draft";
 
 type IncomingLine = {
   variantId?: string;
@@ -111,54 +107,79 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4) Gerçek draft oluştur → amount oku → hemen sil
-    const lines = (lineItems as IncomingLine[]).map((li) => ({
-      variantId: li.variantId
-        ? `gid://shopify/ProductVariant/${li.variantId}`
-        : undefined,
-      quantity: Number(li.quantity ?? 1),
-      originalUnitPrice: String(li.price ?? "0"),
-      title: li.title ?? "Item",
-      taxable: true,
-      requiresShipping: true,
-    }));
+    // 4) REST API ile gerçek draft oluştur → amount oku → hemen sil
+    const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN!;
+    const shopifyToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!;
 
-    const created = await createDraftOrder({
-      lineItems: lines,
-      appliedDiscount: {
-        // code yok — title ile eşleştirme yapıyoruz
-        title: code.trim(),
-        value: 0,
-        valueType: "PERCENTAGE",
-        description: code.trim(),
+    const restResp = await fetch(
+      `https://${shopifyDomain}/admin/api/2025-01/draft_orders.json`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Access-Token": shopifyToken,
+        },
+        body: JSON.stringify({
+          draft_order: {
+            line_items: (lineItems as IncomingLine[]).map((li) => ({
+              variant_id: li.variantId,
+              quantity: Number(li.quantity ?? 1),
+              price: String(li.price ?? "0"),
+              title: li.title ?? "Item",
+            })),
+            applied_discount: {
+              code: code.trim(),
+              value_type: "percentage",
+              value: "0",
+              title: code.trim(),
+              description: code.trim(),
+            },
+          },
+        }),
       },
-    });
+    );
 
-    const draft = created?.draftOrder;
-    const userErrors = created?.userErrors;
+    const restJson = await restResp.json();
+
+    console.log(
+      "[REST DRAFT RESPONSE]",
+      JSON.stringify(
+        {
+          id: restJson?.draft_order?.id,
+          subtotal: restJson?.draft_order?.subtotal_price,
+          total: restJson?.draft_order?.total_price,
+          appliedDiscount: restJson?.draft_order?.applied_discount,
+          errors: restJson?.errors,
+        },
+        null,
+        2,
+      ),
+    );
 
     // Draft'ı hemen sil
-    if (draft?.id) {
-      await deleteDraftOrder(draft.id).catch((e) =>
-        console.warn("[DISCOUNT] cleanup failed:", e),
-      );
+    if (restJson?.draft_order?.id) {
+      await fetch(
+        `https://${shopifyDomain}/admin/api/2025-01/draft_orders/${restJson.draft_order.id}.json`,
+        {
+          method: "DELETE",
+          headers: { "X-Shopify-Access-Token": shopifyToken },
+        },
+      ).catch((e) => console.warn("[DISCOUNT] cleanup failed:", e));
     }
 
-    if (userErrors?.length > 0) {
+    const draft = restJson?.draft_order;
+    if (!draft || restJson?.errors) {
+      const errorMsg =
+        restJson?.errors?.base?.[0] ??
+        restJson?.errors?.[0] ??
+        "Could not validate code";
       return NextResponse.json(
-        { valid: false, message: userErrors[0]?.message ?? "Invalid code" },
+        { valid: false, message: errorMsg },
         { status: 200 },
       );
     }
 
-    if (!draft) {
-      return NextResponse.json(
-        { valid: false, message: "Could not validate code" },
-        { status: 400 },
-      );
-    }
-
-    const applied = draft.appliedDiscount;
+    const applied = draft.applied_discount;
     if (!applied) {
       return NextResponse.json(
         { valid: false, message: "Discount could not be applied to your cart" },
@@ -166,16 +187,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Amount = subtotal - totalPrice (tax hariç)
-    const subtotal = parseFloat(draft.subtotalPrice ?? "0");
-    const totalPrice = parseFloat(draft.totalPrice ?? "0");
+    const subtotal = parseFloat(draft.subtotal_price ?? "0");
+    const totalPrice = parseFloat(draft.total_price ?? "0");
     const discountAmount = Math.max(0, subtotal - totalPrice);
+
+    console.log("[SUCCESS]", {
+      code: code.trim(),
+      amount: discountAmount,
+      valueType: applied.value_type,
+      value: applied.value,
+    });
 
     return NextResponse.json({
       valid: true,
       code: code.trim(),
       amount: discountAmount,
-      valueType: applied.valueType,
+      valueType: applied.value_type,
       value: applied.value,
     });
   } catch (err) {
