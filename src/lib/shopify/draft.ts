@@ -402,22 +402,10 @@ export async function calculateDraftOrder(input: DraftOrderInput) {
     mutation draftOrderCalculate($input: DraftOrderInput!) {
       draftOrderCalculate(input: $input) {
         calculatedDraftOrder {
-          totalPrice {
-            amount
-            currencyCode
-          }
-          subtotalPrice {
-            amount
-            currencyCode
-          }
-          totalTax {
-            amount
-            currencyCode
-          }
-          totalShippingPrice {
-            amount
-            currencyCode
-          }
+          totalPrice
+          subtotalPrice
+          totalTax
+          totalShippingPrice
           lineItems {
             title
             quantity

@@ -199,8 +199,8 @@ export async function POST(req: NextRequest) {
             lineItems: calculated.lineItems?.map((li: any) => ({
               title: li.title,
               quantity: li.quantity,
-              originalUnitPrice: li.originalUnitPrice,
-              totalDiscount: li.totalDiscount,
+              originalUnitPrice: li.originalUnitPrice?.amount,
+              totalDiscount: li.totalDiscount?.amount,
             })),
           }
         : null,
