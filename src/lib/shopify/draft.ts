@@ -430,3 +430,77 @@ export async function calculateDraftOrder(input: DraftOrderInput) {
   const response = await shopifyAdminFetch({ query: mutation, variables });
   return response.data?.draftOrderCalculate;
 }
+
+// 9. Discount Code Detayını Getir
+export async function getDiscountByCode(code: string) {
+  const query = `
+    query getDiscount($query: String!) {
+      codeDiscountNodes(first: 1, query: $query) {
+        edges {
+          node {
+            id
+            codeDiscount {
+              ... on DiscountCodeBasic {
+                title
+                status
+                minimumRequirement {
+                  ... on DiscountMinimumSubtotal {
+                    greaterThanOrEqualToSubtotal {
+                      amount
+                      currencyCode
+                    }
+                  }
+                  ... on DiscountMinimumQuantity {
+                    greaterThanOrEqualToQuantity
+                  }
+                }
+                customerGets {
+                  value {
+                    ... on DiscountPercentage {
+                      percentage
+                    }
+                    ... on DiscountAmount {
+                      amount {
+                        amount
+                        currencyCode
+                      }
+                    }
+                  }
+                }
+                usageLimit
+                appliesOncePerCustomer
+              }
+              ... on DiscountCodeFreeShipping {
+                title
+                status
+                minimumRequirement {
+                  ... on DiscountMinimumSubtotal {
+                    greaterThanOrEqualToSubtotal {
+                      amount
+                      currencyCode
+                    }
+                  }
+                  ... on DiscountMinimumQuantity {
+                    greaterThanOrEqualToQuantity
+                  }
+                }
+              }
+              ... on DiscountCodeBxgy {
+                title
+                status
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const response = await shopifyAdminFetch({
+    query,
+    variables: { query: `code:${code}` },
+  });
+
+  const node = response.data?.codeDiscountNodes?.edges?.[0]?.node?.codeDiscount;
+  return node ?? null;
+}
