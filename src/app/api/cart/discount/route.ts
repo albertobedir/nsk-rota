@@ -58,14 +58,18 @@ export async function POST(req: NextRequest) {
 
     // Eğer appliedDiscount yoksa veya boşsa kod geçersiz
     const applied = calculated.appliedDiscount;
-    if (!applied || (Number(applied.value) === 0 && applied.valueType === "PERCENTAGE")) {
+    if (
+      !applied ||
+      (Number(applied.value) === 0 && applied.valueType === "PERCENTAGE")
+    ) {
       // Shopify kodu tanımadıysa discount uygulanmaz
       // totalDiscount kontrolü daha güvenilir:
-      const totalDiscount = calculated.lineItems?.reduce(
-        (sum: number, li: { totalDiscount?: string }) =>
-          sum + parseFloat(li.totalDiscount ?? "0"),
-        0,
-      ) ?? 0;
+      const totalDiscount =
+        calculated.lineItems?.reduce(
+          (sum: number, li: { totalDiscount?: string }) =>
+            sum + parseFloat(li.totalDiscount ?? "0"),
+          0,
+        ) ?? 0;
 
       if (totalDiscount === 0) {
         return NextResponse.json(
@@ -75,11 +79,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const discountAmount = calculated.lineItems?.reduce(
-      (sum: number, li: { totalDiscount?: string }) =>
-        sum + parseFloat(li.totalDiscount ?? "0"),
-      0,
-    ) ?? 0;
+    const discountAmount =
+      calculated.lineItems?.reduce(
+        (sum: number, li: { totalDiscount?: string }) =>
+          sum + parseFloat(li.totalDiscount ?? "0"),
+        0,
+      ) ?? 0;
 
     return NextResponse.json({
       valid: true,

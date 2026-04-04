@@ -740,7 +740,8 @@ export default function BasketPage() {
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-green-700 font-semibold">
-                          -{discountApplied.amount.toLocaleString("en-US", {
+                          -
+                          {discountApplied.amount.toLocaleString("en-US", {
                             style: "currency",
                             currency: "USD",
                           })}
@@ -782,7 +783,8 @@ export default function BasketPage() {
                   <div className="mt-2 text-sm text-green-600 translate-y-5 flex items-center justify-between">
                     <span>Discount ({discountApplied.code})</span>
                     <span className="font-semibold">
-                      -{discountApplied.amount.toLocaleString("en-US", {
+                      -
+                      {discountApplied.amount.toLocaleString("en-US", {
                         style: "currency",
                         currency: "USD",
                       })}
