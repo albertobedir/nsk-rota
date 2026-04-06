@@ -67,6 +67,7 @@ interface ProductCardProps {
   code: string;
   title: string;
   price: number;
+  originalPrice?: number;
   image: string;
   shopifyId?: number | string;
   oems?: string[]; // OEM list
@@ -84,6 +85,7 @@ export default function SingleProdCard({
   code,
   title,
   price,
+  originalPrice,
   image,
   oems = [],
   location = "",
