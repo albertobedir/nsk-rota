@@ -1017,6 +1017,10 @@ export default function ProductsPage() {
                 return undefined;
               })();
 
+              const originalPrice = (product as any)?.originalPrice
+                ? Number((product as any).originalPrice)
+                : price;
+
               return (
                 <SingleProdCard
                   key={product._id}
@@ -1026,6 +1030,7 @@ export default function ProductsPage() {
                   shopifyId={shopifyId}
                   productRaw={product.raw}
                   price={price}
+                  originalPrice={originalPrice}
                   image={image}
                   oems={oemsArr}
                   variantId={`gid://shopify/ProductVariant/${product.raw.variants?.[0]?.id}`}

@@ -16,6 +16,17 @@ enum UserRole {
   admin
 }
 
+enum StackingType {
+  COMPOUND
+  ADDITIVE
+  MAX
+}
+
+enum DiscountValueType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -93,6 +104,76 @@ model PricingTier {
   @@index([tierTag])
 }
 
+model DiscountCode {
+  id             String            @id @default(cuid())
+  code           String            @unique
+  shopifyId      String?           @unique
+  title          String?
+  
+  // Discount tipi
+  discountType   String?           // "BASIC" | "BXGY" | "FREE_SHIPPING"
+  
+  // Değer
+  valueType      DiscountValueType @default(PERCENTAGE)
+  value          Float             // % veya sabit tutar
+  
+  // BxGy alanları
+  buyQuantity          Int?
+  buyPurchaseAmount    Float?        // DiscountPurchaseAmount için (minimum spend)
+  buyProductIds        String[]
+  buyCollectionIds     String[]
+  buyAnyProduct        Boolean      @default(false)
+  getQuantity          Int?
+  getProductIds        String[]
+  getCollectionIds     String[]
+  getAnyProduct        Boolean      @default(false)
+  
+  // Stacking
+  stackingType   StackingType      @default(COMPOUND)
+  allowedTiers   String[]          // ["GOLD", "SILVER"] boşsa herkese açık
+  combinesWithOrderDiscounts    Boolean @default(false)
+  combinesWithProductDiscounts  Boolean @default(false)
+  combinesWithShippingDiscounts Boolean @default(false)
+  
+  // Koşullar
+  minimumCartAmount     Float?        // min sepet tutarı
+  minimumQuantity       Int?          // min ürün miktarı
+  usageLimit            Int?          // null = sınırsız
+  usedCount             Int           @default(0)
+  appliesOncePerCustomer Boolean      @default(false)
+  
+  // Müşteri seçimi
+  allCustomers      Boolean       @default(true)
+  specificCustomers String[]      // Shopify customer GID'leri
+  customerSegments  Json[]        // { id: String, name: String }[]
+  
+  // Ürün/koleksiyon seçimi (BASIC için)
+  appliesToAll       Boolean       @default(false)
+  appliesToProducts  String[]      // Shopify product GID'leri
+  appliesToCollections String[]    // Shopify collection GID'leri
+  
+  // Durum
+  active         Boolean           @default(true)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
+  @@index([code])
+  @@index([shopifyId])
+  @@index([active])
+  @@index([allCustomers])
+}
 
+model DiscountUsage {
+  id            String    @id @default(cuid())
+  discountId    String
+  customerId    String
+  usedAt        DateTime  @default(now())
+  createdAt     DateTime  @default(now())
 
+  @@unique([discountId, customerId])
+  @@index([discountId])
+  @@index([customerId])
+}

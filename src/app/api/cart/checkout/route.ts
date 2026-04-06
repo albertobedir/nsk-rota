@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextRequest, NextResponse } from "next/server";
 import { createDraftOrder } from "@/lib/shopify/draft";
 import prisma from "@/lib/prisma/instance";
@@ -7,6 +9,7 @@ type IncomingLine = {
   productId?: string;
   quantity?: number;
   originalUnitPrice?: number | string;
+  originalUntieredPrice?: number | string;
   title?: string;
   customPrice?: number | string;
 };
@@ -23,6 +26,7 @@ export async function POST(request: NextRequest) {
       userTier,
       discountPercentage,
       discountCode,
+      creditRemaining,
     } = body;
 
     if (!Array.isArray(lineItems) || lineItems.length === 0) {
@@ -48,56 +52,176 @@ export async function POST(request: NextRequest) {
       firstItem: lineItems[0],
     });
 
-    if (customerId) {
+    // ===== STEP 1: Validate discount code FIRST =====
+    let resolvedDiscount = Number(discountPercentage ?? 0); // Start with tier discount
+    let validatedDiscount: any = null; // Store validated discount info for later use
+
+    if (discountCode?.trim()) {
       try {
-        const customer = await prisma.customer.findFirst({
-          where: { shopifyId: normalizeShopifyId(String(customerId)) },
-          select: { creditRemaining: true },
-        });
-        const remaining = Number(customer?.creditRemaining ?? 0);
-
-        // Calculate total using tier discount
-        const computedTotal = lines.reduce((sum, li) => {
+        // Calculate cart total — orijinal untiered fiyat üzerinden
+        const cartTotal = lines.reduce((sum, li) => {
           const qty = Number(li.quantity || 1);
-          let price = Number(li.customPrice ?? li.originalUnitPrice ?? 0) || 0;
-
-          // Apply tier discount if no explicit price
-          if (!li.customPrice && discount > 0 && price > 0) {
-            const discountedPrice = price * (1 - discount / 100);
-            console.log(
-              `[CREDIT CHECK] item: price=${price} × (1-${discount}/100) = ${discountedPrice.toFixed(2)}, qty=${qty}`,
-            );
-            price = discountedPrice;
-          }
-
+          const price =
+            Number(li.originalUntieredPrice ?? li.originalUnitPrice ?? 0) || 0;
           return sum + price * qty;
         }, 0);
 
-        console.log(
-          `[CREDIT CHECK TOTAL] computedTotal=${computedTotal.toFixed(2)}, creditRemaining=${remaining}`,
+        // Build cartItems for validation — appliesToProducts kontrolü için
+        const cartItemsForValidation = lines.map((li) => ({
+          productId: li.productId ?? "",
+          variantId: li.merchandiseId ?? "",
+          collectionIds: [],
+          quantity: Number(li.quantity || 1),
+          price:
+            Number(li.originalUntieredPrice ?? li.originalUnitPrice ?? 0) || 0,
+        }));
+
+        // Call validate endpoint
+        const validateUrl = new URL(
+          "/api/discount/validate",
+          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
         );
 
-        if (computedTotal > remaining) {
-          return NextResponse.json(
-            { message: "Insufficient credit" },
-            { status: 402 },
+        console.log(
+          `[DISCOUNT CODE] Validating code="${discountCode}" for cart=${cartTotal.toFixed(2)}`,
+        );
+
+        const validateRes = await fetch(validateUrl.toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: discountCode.trim(),
+            cartTotal,
+            cartItems: cartItemsForValidation,
+            userTier: userTier || "NO_TIER",
+            tierDiscount: resolvedDiscount,
+            customerId,
+          }),
+        });
+
+        const validated = await validateRes.json();
+
+        // 👇 DEBUG: Log raw response ve valid check
+        console.log(
+          "[VALIDATE RAW RESPONSE]",
+          JSON.stringify(validated, null, 2),
+        );
+        console.log("[VALIDATE VALID CHECK]", validated.valid);
+
+        if (validated.valid) {
+          // Store validated for later use (shippingLine, etc)
+          validatedDiscount = validated;
+
+          // ===== COMPOUND DISCOUNT CALCULATION =====
+          // Tier zaten frontend'de uygulanmış, ama Shopify orijinal fiyata uygulaması için
+          // tier + code'u compound olarak hesapla
+          if (
+            validated.discountType === "BASIC" &&
+            validated.codeValueType === "PERCENTAGE"
+          ) {
+            // Compound: tier_multiplier × code_multiplier
+            // Örn: tier %10 = 0.9, code %40 = 0.6 → combined 0.54 → 46% off
+            const tierMult = 1 - Number(discountPercentage ?? 0) / 100;
+            const codeMult = 1 - validated.codeValue / 100;
+            const combinedMult = tierMult * codeMult;
+            resolvedDiscount = (1 - combinedMult) * 100;
+            console.log(
+              `[COMPOUND DISCOUNT] tierMult=${tierMult} codeMult=${codeMult} combined=${resolvedDiscount.toFixed(2)}%`,
+            );
+          } else if (validated.codeValueType === "FIXED_AMOUNT") {
+            // Fixed amount: item'a tier apply ama order-level'a fixed amount
+            resolvedDiscount = Number(discountPercentage ?? 0);
+            console.log(
+              `[FIXED AMOUNT] using tier only for items: ${resolvedDiscount}%`,
+            );
+          } else {
+            // Fallback
+            resolvedDiscount =
+              validated.resolvedDiscountPercent ??
+              ((lineItems.reduce((sum: number, li: any) => {
+                const qty = Number(li.quantity || 1);
+                const price =
+                  Number(
+                    li.originalUntieredPrice ?? li.originalUnitPrice ?? 0,
+                  ) || 0;
+                return sum + price * qty;
+              }, 0) -
+                (validated.finalTotal - validated.finalShipping)) /
+                lineItems.reduce((sum: number, li: any) => {
+                  const qty = Number(li.quantity || 1);
+                  const price =
+                    Number(
+                      li.originalUntieredPrice ?? li.originalUnitPrice ?? 0,
+                    ) || 0;
+                  return sum + price * qty;
+                }, 0)) *
+                100;
+            console.log(
+              `[FALLBACK DISCOUNT] resolvedDiscount=${resolvedDiscount.toFixed(2)}%`,
+            );
+          }
+
+          resolvedDiscount = Math.round(resolvedDiscount * 100) / 100;
+
+          console.log(
+            `[DISCOUNT RESOLVED] code=${discountCode} type=${validated.discountType} resolvedDiscount=${resolvedDiscount.toFixed(2)}%`,
           );
+        } else {
+          console.warn(
+            `[DISCOUNT INVALID] code=${discountCode} reason=${validated.reason}`,
+          );
+          // On error, continue with tier discount only
+          resolvedDiscount = Number(discountPercentage ?? 0);
         }
       } catch (e) {
-        console.warn("Credit check failed", e);
+        console.warn("[DISCOUNT VALIDATE] request failed:", e);
+        // On error, continue with tier discount only
+        resolvedDiscount = Number(discountPercentage ?? 0);
+      }
+    }
+
+    // ===== STEP 2: Credit check AFTER discount is resolved =====
+    if (customerId && creditRemaining != null) {
+      const remaining = Number(creditRemaining);
+
+      const computedTotal = lines.reduce((sum, li) => {
+        const qty = Number(li.quantity || 1);
+        const price = Number(li.originalUnitPrice ?? 0) || 0;
+        const discounted =
+          resolvedDiscount > 0 ? price * (1 - resolvedDiscount / 100) : price;
+        return sum + discounted * qty;
+      }, 0);
+
+      console.log(
+        `[CREDIT CHECK] computedTotal=${computedTotal.toFixed(2)}, creditRemaining=${remaining}`,
+      );
+
+      if (computedTotal > remaining) {
+        return NextResponse.json(
+          { message: "Insufficient credit" },
+          { status: 402 },
+        );
       }
     }
 
     // Get user's tier and discount percentage from request
     console.log(
-      `[TIER] customerId=${customerId} userTier=${userTier} discount=${discount}%`,
+      `[TIER] customerId=${customerId} userTier=${userTier} resolvedDiscount=${resolvedDiscount}%`,
     );
+
+    // ===== customerId is already in Shopify GID format from frontend =====
+    // Format: gid://shopify/Customer/123456 or undefined
+    console.log(`[SHOPIFY GID] Using customerId: ${customerId}`);
+
+    // Determine if discount is FIXED_AMOUNT type
+    const tierOnly = Number(discountPercentage ?? 0); // sadece tier %
+    const isFixedAmount = validatedDiscount?.codeValueType === "FIXED_AMOUNT";
 
     const items = lines.map((li) => {
       const qty = Number(li.quantity || 1);
-      const originalPrice = Number(li.originalUnitPrice ?? 0);
+      const originalPrice =
+        Number(li.originalUntieredPrice ?? li.originalUnitPrice ?? 0) || 0;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const baseItem: any = {
         quantity: qty,
         taxable: true,
@@ -118,15 +242,15 @@ export async function POST(request: NextRequest) {
       if (explicit != null) {
         customPrice = Number(explicit);
         console.log(`[ITEM] EXPLICIT price found: customPrice=${customPrice}`);
-      } else if (discount > 0 && originalPrice > 0) {
-        // Apply tier-based discount
-        customPrice = originalPrice * (1 - discount / 100);
+      } else if (resolvedDiscount > 0 && originalPrice > 0) {
+        // Apply resolved discount (tier + code combination)
+        customPrice = originalPrice * (1 - resolvedDiscount / 100);
         console.log(
-          `[ITEM] TIER DISCOUNT applied: originalPrice=${originalPrice} × (1 - ${discount}/100) = ${customPrice.toFixed(2)}`,
+          `[ITEM] RESOLVED DISCOUNT applied: originalPrice=${originalPrice} × (1 - ${resolvedDiscount.toFixed(2)}/100) = ${customPrice.toFixed(2)}`,
         );
       } else {
         console.log(
-          `[ITEM] NO discount applied (discount=${discount}, originalPrice=${originalPrice})`,
+          `[ITEM] NO discount applied (resolvedDiscount=${resolvedDiscount}, originalPrice=${originalPrice})`,
         );
       }
 
@@ -136,16 +260,30 @@ export async function POST(request: NextRequest) {
         originalPrice > 0 &&
         customPrice < originalPrice
       ) {
-        // Use PERCENTAGE so Shopify applies discount on its own recorded price
-        // (not on frontend's potentially discounted originalUnitPrice)
-        baseItem.appliedDiscount = {
-          value: discount,
-          valueType: "PERCENTAGE",
-          description: `B2B Tier Pricing - ${discount}% off`,
-        };
-        console.log(
-          `[DISCOUNT APPLIED] PERCENTAGE approach: ${discount}% off (Shopify will apply to its recorded price)`,
-        );
+        // ===== FIXED_AMOUNT vs PERCENTAGE handler =====
+        if (isFixedAmount) {
+          // Sadece tier'ı item'a uygula, fixed amount order-level'a gidecek
+          if (tierOnly > 0) {
+            baseItem.appliedDiscount = {
+              value: tierOnly,
+              valueType: "PERCENTAGE",
+              description: `B2B Tier - ${tierOnly.toFixed(2)}% off`,
+            };
+            console.log(
+              `[DISCOUNT APPLIED] TIER ONLY (FIXED_AMOUNT detected): ${tierOnly.toFixed(2)}% off`,
+            );
+          }
+        } else {
+          // PERCENTAGE: tier + code combined
+          baseItem.appliedDiscount = {
+            value: resolvedDiscount,
+            valueType: "PERCENTAGE",
+            description: `B2B Tier & Discount Code - ${resolvedDiscount.toFixed(2)}% off`,
+          };
+          console.log(
+            `[DISCOUNT APPLIED] PERCENTAGE approach: ${resolvedDiscount.toFixed(2)}% off`,
+          );
+        }
       } else {
         console.log(
           `[NO DISCOUNT] This item won't have discount (customPrice=${customPrice}, originalPrice=${originalPrice})`,
@@ -159,8 +297,34 @@ export async function POST(request: NextRequest) {
       return baseItem;
     });
 
+    // 👇 DEBUG: Validated discount info
+    console.log("[VALIDATED DISCOUNT DEBUG]", {
+      codeValueType: validatedDiscount?.codeValueType,
+      codeValue: validatedDiscount?.codeValue,
+      discountType: validatedDiscount?.discountType,
+      isFixedAmount: validatedDiscount?.codeValueType === "FIXED_AMOUNT",
+    });
+
+    // Spread yerine explicit assign
+    const orderDiscount =
+      validatedDiscount?.codeValueType === "FIXED_AMOUNT"
+        ? {
+            value: validatedDiscount.codeValue,
+            valueType: "FIXED_AMOUNT" as const,
+            description: `Discount Code: ${discountCode}`,
+          }
+        : undefined;
+
+    const shippingLine =
+      validatedDiscount?.discountType === "FREE_SHIPPING"
+        ? {
+            title: `Free Shipping (${discountCode})`,
+            price: "0.00",
+          }
+        : undefined;
+
     const input = {
-      customerId: customerId ? String(customerId) : undefined,
+      customerId: customerId ?? undefined, // Already in GID format: gid://shopify/Customer/123
       email: email ?? undefined,
       phone: phone ?? undefined,
       lineItems: items,
@@ -169,19 +333,8 @@ export async function POST(request: NextRequest) {
       note: customerId
         ? `B2B Order - Custom pricing for ${customerId}`
         : undefined,
-
-      // Order-level discount code (tier discount'tan bağımsız çalışır)
-      ...(discountCode?.trim()
-        ? {
-            appliedDiscount: {
-              code: discountCode.trim(),
-              value: 0,
-              valueType: "PERCENTAGE" as const,
-              title: discountCode.trim(),
-              description: `Discount code: ${discountCode.trim()}`,
-            },
-          }
-        : {}),
+      appliedDiscount: orderDiscount,
+      shippingLine: shippingLine,
     };
 
     // ✅ LOG 2: Shopify'a gönderilen tam input
@@ -191,6 +344,69 @@ export async function POST(request: NextRequest) {
 
     // ✅ LOG 3: Shopify'dan dönen response
     console.log("[DRAFT ORDER RESPONSE]", JSON.stringify(created, null, 2));
+
+    // 👇 DEBUG: Check for errors
+    console.log("[DRAFT CREATED RAW]", JSON.stringify(created, null, 2));
+    console.log("[INVOICE URL CHECK]", created?.draftOrder?.invoiceUrl);
+
+    if (created?.userErrors?.length > 0) {
+      console.error("[DRAFT USER ERRORS]", created.userErrors);
+      return NextResponse.json(
+        { message: created.userErrors[0].message },
+        { status: 400 },
+      );
+    }
+
+    if (!created?.draftOrder?.id) {
+      console.error("[DRAFT FAILED] No draft order ID returned", created);
+      return NextResponse.json(
+        {
+          message: "Failed to create draft order - no ID returned from Shopify",
+        },
+        { status: 400 },
+      );
+    }
+
+    // ===== Track discount usage if order was created successfully =====
+    if (created?.draftOrder?.id && discountCode?.trim()) {
+      try {
+        // Find discount record
+        const discountRec = await prisma.discountCode.findUnique({
+          where: { code: discountCode.trim().toUpperCase() },
+        });
+
+        if (discountRec) {
+          // Increment usedCount
+          await prisma.discountCode.update({
+            where: { id: discountRec.id },
+            data: { usedCount: { increment: 1 } },
+          });
+
+          // Record DiscountUsage for appliesOncePerCustomer tracking
+          if (discountRec.appliesOncePerCustomer && customerId) {
+            await prisma.discountUsage.upsert({
+              where: {
+                discountId_customerId: {
+                  discountId: discountRec.id,
+                  customerId: customerId,
+                },
+              },
+              update: { usedAt: new Date() },
+              create: {
+                discountId: discountRec.id,
+                customerId: customerId,
+              },
+            });
+          }
+
+          console.log(
+            `[DISCOUNT TRACKING] code=${discountCode} usedCount incremented, appliesOncePerCustomer=${discountRec.appliesOncePerCustomer}`,
+          );
+        }
+      } catch (e) {
+        console.warn(`[DISCOUNT TRACKING] Failed:`, e);
+      }
+    }
 
     // Enable discount codes in Shopify checkout
     const draftId = created?.draftOrder?.id;

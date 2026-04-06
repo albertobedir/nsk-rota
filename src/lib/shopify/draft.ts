@@ -169,6 +169,17 @@ export async function createDraftOrder(input: DraftOrderInput) {
 
   const variables = { input };
   const response = await shopifyAdminFetch({ query: mutation, variables });
+
+  // 👇 DEBUG: Log raw response
+  console.log("[SHOPIFY RAW RESPONSE]", JSON.stringify(response, null, 2));
+
+  if (response.data?.draftOrderCreate?.userErrors?.length > 0) {
+    console.error(
+      "[SHOPIFY USER ERRORS]",
+      response.data.draftOrderCreate.userErrors,
+    );
+  }
+
   return response.data?.draftOrderCreate;
 }
 

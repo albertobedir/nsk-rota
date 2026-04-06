@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import PDFDocument from "pdfkit";
 import fs from "fs";
@@ -569,7 +570,7 @@ export async function GET(req: Request) {
         .font(FONT_REGULAR)
         .fillColor(TEXT_DARK)
         .text(val, summaryX + summaryLabelW + 4, sy, { width: summaryValW });
-      sy += 13;
+      sy += 17;
     });
 
     // Totals block — right side
@@ -610,7 +611,7 @@ export async function GET(req: Request) {
           .fillColor(TEXT_DARK)
           .text(val, totX + 126, totY, { width: totW - 132, align: "right" });
       }
-      totY += 18;
+      totY += 17;
     };
 
     const shipping = Number(order?.shipping || 0) || 0;
@@ -628,10 +629,10 @@ export async function GET(req: Request) {
       .strokeColor(ACCENT)
       .lineWidth(1)
       .stroke();
-    totY += 4;
+    totY += 8;
     totRow("Total", formatMoney(grandTotal, currency), true, true);
 
-    curY = Math.max(sy, totY) + 20;
+    curY = Math.max(sy, totY) + 15;
 
     // ─────────────────────────────────────────────────────────────────────────
     // SECTION 5 — Payment Information
@@ -652,7 +653,7 @@ export async function GET(req: Request) {
       .fontSize(9)
       .fillColor(ACCENT)
       .text("BANKING DETAILS", margin, curY);
-    curY += 13;
+    curY += 14;
     const bankRows: [string, string][] = [
       ["Name:", "ROTA NORTH AMERICA LLC"],
       ["Bank:", "CHASE BANK"],
@@ -670,24 +671,24 @@ export async function GET(req: Request) {
         .fontSize(8.5)
         .fillColor(TEXT_DARK)
         .text(val, margin + 82, curY, { width: halfW - 82 });
-      curY += 12;
+      curY += 14;
     });
 
     // Pay by check / wire (right)
     const payX = margin + halfW + 20;
-    let payY = curY - bankRows.length * 12 - 13;
+    let payY = curY - bankRows.length * 14 - 14;
     doc
       .font(FONT_BOLD)
       .fontSize(9)
       .fillColor(ACCENT)
       .text("PAYMENT INSTRUCTIONS", payX, payY);
-    payY += 13;
+    payY += 14;
     doc
       .font(FONT_BOLD)
       .fontSize(8.5)
       .fillColor(TEXT_DARK)
       .text("PAY BY CHECK", payX, payY);
-    payY += 12;
+    payY += 14;
     doc
       .font(FONT_REGULAR)
       .fontSize(8.5)
@@ -698,13 +699,13 @@ export async function GET(req: Request) {
         payY,
         { width: halfW },
       );
-    payY += 20;
+    payY += 16;
     doc
       .font(FONT_BOLD)
       .fontSize(8.5)
       .fillColor(TEXT_DARK)
       .text("FOR WIRE TRANSFERS:", payX, payY);
-    payY += 12;
+    payY += 14;
     doc
       .font(FONT_REGULAR)
       .fontSize(8.5)
@@ -712,13 +713,13 @@ export async function GET(req: Request) {
       .text("Please use routing number 021000021", payX, payY, {
         width: halfW,
       });
-    payY += 20;
+    payY += 16;
     doc
       .font(FONT_BOLD)
       .fontSize(8.5)
       .fillColor(TEXT_DARK)
       .text("PAY BY ZELLE", payX, payY);
-    payY += 12;
+    payY += 14;
     doc
       .font(FONT_REGULAR)
       .fontSize(8.5)
@@ -727,7 +728,7 @@ export async function GET(req: Request) {
         width: halfW,
       });
 
-    curY += 16;
+    curY += 32;
 
     // ─────────────────────────────────────────────────────────────────────────
     // SECTION 6 — Notes
@@ -738,7 +739,7 @@ export async function GET(req: Request) {
       .strokeColor(DIVIDER)
       .lineWidth(0.5)
       .stroke();
-    curY += 8;
+    curY += 10;
 
     const notes = [
       "* Please send back this commercial invoice to us by e-mail with your signature and stamp within 15 days after receiving the shipment complete and correct related to this commercial invoice.",

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -5,10 +6,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Trash2 } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import useSessionStore from "@/store/session-store";
 import { toast } from "sonner";
 import Hydrate from "@/store/hydrate";
+import type { DiscountValidateResponse } from "@/types/discount";
 
 export default function BasketPage() {
   const cart = useSessionStore((s) => s.cart);
@@ -27,11 +29,12 @@ export default function BasketPage() {
 
   // Discount states
   const [discountCode, setDiscountCode] = useState("");
-  const [discountApplied, setDiscountApplied] = useState<{
-    code: string;
-    amount: number;
-  } | null>(null);
+  const [discountApplied, setDiscountApplied] = useState<Extract<
+    DiscountValidateResponse,
+    { valid: true }
+  > | null>(null);
   const [discountLoading, setDiscountLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   // map of itemId -> available stock (number)
   const [stockMap, setStockMap] = useState<Record<string, number | undefined>>(
@@ -59,106 +62,151 @@ export default function BasketPage() {
   const handleApplyDiscount = async () => {
     if (!discountCode.trim()) return;
     setDiscountLoading(true);
+
     try {
-      const resp = await fetch("/api/cart/discount", {
+      // Hesapla sepet tutarı (tier discount'ı içermeyen orijinal fiyat)
+      const cartTotal = cart.reduce((sum, item) => {
+        return sum + (item.price || 0) * (item.quantity || 1);
+      }, 0);
+
+      // Build CartItem[] with product/collection info
+      const cartItems = cart.map((item) => ({
+        productId: String(item.id),
+        variantId: item.variantId,
+        collectionIds: [], // TODO: fetch from product API if needed
+        quantity: item.quantity || 1,
+        price: item.price || 0,
+      }));
+
+      // Get user tier discount
+      let tierDiscount = 0;
+      if (sessionUser?.tier && pricingTiers && pricingTiers.length > 0) {
+        const matchingTier = pricingTiers.find(
+          (t) => (t as any).fieldsMap?.tier_tag === sessionUser.tier,
+        );
+        if (matchingTier) {
+          const discountStr = (matchingTier as any).fieldsMap
+            ?.discount_percentage;
+          tierDiscount = parseFloat(discountStr) || 0;
+        }
+      }
+
+      // API'ye discount validate kontrolü gönder
+      const resp = await fetch("/api/discount/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: discountCode.trim(),
-          lineItems: cart.map((i) => ({
-            variantId: i.variantId?.toString().includes("/")
-              ? i.variantId.toString().split("/").pop()
-              : i.variantId,
-            quantity: i.quantity,
-            price: String(i.price),
-            title: i.title,
-          })),
+          cartTotal,
+          cartItems,
+          userTier: sessionUser?.tier || "NO_TIER",
+          tierDiscount,
+          customerId: sessionUser?.id,
         }),
       });
+
       const json = await resp.json();
-      if (!resp.ok || !json.valid) {
-        toast.error(json.message || "Invalid discount code");
+
+      if (!json.valid) {
+        setDiscountApplied(null);
+        toast.error(json.reason || "Invalid discount code");
         return;
       }
-      setDiscountApplied({ code: json.code, amount: json.amount });
-      toast.success(
-        `Discount applied: -${json.amount.toLocaleString("en-US", {
-          style: "currency",
-          currency: "USD",
-        })}`,
-      );
-    } catch {
-      toast.error("Failed to apply discount");
+
+      // Discount kodu başarıyla doğrulandı
+      setDiscountApplied(json);
+
+      // Detaylı toast mesajı
+      let toastMessage = "";
+      if (json.discountType === "FREE_SHIPPING") {
+        toastMessage = `${json.code}: Free shipping applied! 🚚`;
+      } else if (json.codeValueType === "FIXED_AMOUNT") {
+        toastMessage = `${json.code}: $${json.cartDiscount.toFixed(2)} discount applied! ✅`;
+      } else if (json.codeValueType === "PERCENTAGE") {
+        toastMessage = `${json.code}: ${json.codeValue}% discount applied! ✅`;
+      } else {
+        toastMessage = `Discount "${json.code}" applied! Total discount: ${json.totalDiscountPercent.toFixed(1)}%`;
+      }
+
+      toast.success(toastMessage);
+    } catch (err) {
+      console.error("Discount validation failed:", err);
+      setDiscountApplied(null);
+      toast.error("Failed to validate discount code");
     } finally {
       setDiscountLoading(false);
     }
   };
 
-  const handleGetOffer = () => {
-    (async () => {
-      try {
-        // Calculate discount percentage from pricing tiers
-        let discountPercentage = 0;
-        if (sessionUser?.tier && pricingTiers && pricingTiers.length > 0) {
-          const matchingTier = pricingTiers.find(
-            (t) => (t as any).fieldsMap?.tier_tag === sessionUser.tier,
-          );
-          if (matchingTier) {
-            const discountStr = (matchingTier as any).fieldsMap
-              ?.discount_percentage;
-            discountPercentage = parseFloat(discountStr) || 0;
-          }
+  const handleGetOffer = async () => {
+    if (checkoutLoading || cart.length === 0) return;
+    setCheckoutLoading(true);
+
+    try {
+      let discountPercentage = 0;
+      if (sessionUser?.tier && pricingTiers?.length > 0) {
+        const matchingTier = pricingTiers.find(
+          (t) => (t as any).fieldsMap?.tier_tag === sessionUser.tier,
+        );
+        if (matchingTier) {
+          discountPercentage =
+            parseFloat((matchingTier as any).fieldsMap?.discount_percentage) ||
+            0;
         }
-
-        const resp = await fetch("/api/cart/checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            customerEmail: sessionUser?.email,
-            customerId: sessionUser?.id,
-            userTier: sessionUser?.tier,
-            discountPercentage,
-            discountCode: discountApplied?.code ?? null,
-            lineItems: cart.map((i) => ({
-              merchandiseId: i.variantId,
-              quantity: i.quantity,
-              originalUnitPrice: i.price,
-              title: i.title,
-            })),
-          }),
-        });
-
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => null);
-          throw new Error(err?.message || "Failed to create order");
-        }
-
-        const json = await resp.json();
-        const order = json?.order;
-        const invoiceUrl = json?.created?.draftOrder?.invoiceUrl;
-
-        if (order) {
-          toast.success(`Order ${order.name} created!`);
-          // Yönlendirme yapabilirsiniz:
-          // window.location.href = "/invoices";
-          // veya invoice URL'i açabilirsiniz:
-          if (invoiceUrl) {
-            window.open(invoiceUrl, "_blank");
-          }
-        } else {
-          toast.success("Draft created");
-          if (invoiceUrl) {
-            window.open(invoiceUrl, "_blank");
-          }
-          await fetch("/api/cart/clear", { method: "POST" }).catch(() => null);
-          clearCartStore();
-          router.push("/profile/order-history");
-        }
-      } catch (e) {
-        console.error("Request offer failed:", e);
-        toast.error("Failed to create order");
       }
-    })();
+
+      const resp = await fetch("/api/cart/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerEmail: sessionUser?.email,
+          customerId: sessionUser?.billingAddress?.customer_id
+            ? `gid://shopify/Customer/${sessionUser.billingAddress.customer_id}`
+            : undefined,
+          userTier: sessionUser?.tier,
+          discountPercentage,
+          discountCode: discountApplied?.code ?? null,
+          creditRemaining: sessionUser?.creditRemaining,
+          lineItems: cart.map((i) => ({
+            merchandiseId: i.variantId,
+            productId: i.id,
+            quantity: i.quantity,
+            originalUnitPrice: i.price,
+            originalUntieredPrice:
+              discountPercentage > 0
+                ? i.price / (1 - discountPercentage / 100)
+                : i.price,
+            title: i.title,
+          })),
+        }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => null);
+        throw new Error(err?.message || "Failed to create order");
+      }
+
+      const json = await resp.json();
+      const invoiceUrl = json?.created?.draftOrder?.invoiceUrl;
+
+      if (!invoiceUrl) {
+        console.error("[CHECKOUT] invoiceUrl missing:", json);
+        toast.error("Checkout URL alınamadı, lütfen tekrar deneyin");
+        return;
+      }
+
+      // ✅ Önce temizle, sonra invoice'ı yeni pencerede aç
+      await fetch("/api/cart/clear", { method: "POST" }).catch(() => null);
+      clearCartStore();
+
+      // ✅ Yeni pencerede aç (FREE_SHIPPING kargo backend'de shippingLine olarak uygulanır)
+      window.open(invoiceUrl, "_blank");
+    } catch (e) {
+      console.error("Checkout failed:", e);
+      toast.error("Failed to create order");
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   // elde yazılan quantity'yi store'a uygular
@@ -327,8 +375,9 @@ export default function BasketPage() {
     cart.reduce((s, i) => s + (i.price ?? 0) * (i.quantity ?? 0), 0);
 
   const finalTotal = () => {
-    const base = cartTotalPrice();
-    return discountApplied ? Math.max(0, base - discountApplied.amount) : base;
+    if (!discountApplied) return cartTotalPrice();
+    // Validate endpoint returns finalTotal (cart + shipping - discounts)
+    return discountApplied.finalTotal;
   };
 
   return (
@@ -717,12 +766,12 @@ export default function BasketPage() {
             </div>
 
             {/* Summary panel */}
-            <aside className="w-full lg:w-auto lg:max-w-xs order-last lg:order-0">
+            <aside className="w-full lg:w-80 order-last lg:order-0">
               <div className="bg-white border rounded-xl p-5 lg:sticky lg:top-28">
                 <h3 className="font-bold text-lg translate-y-5">
                   Cart Summary
                 </h3>
-                <div className="mt-4 text-sm text-gray-600 translate-y-5 flex items-center justify-between">
+                <div className="mt-4 text-sm text-gray-600 translate-y-5 flex items-center justify-between pb-4">
                   <span>Subtotal</span>
                   <span className="font-semibold">
                     {cartTotalPrice().toLocaleString("en-US", {
@@ -732,67 +781,84 @@ export default function BasketPage() {
                   </span>
                 </div>
 
-                <div className="mt-4 opacity-0 pointer-events-none">
-                  {discountApplied ? (
-                    <div className="flex items-center justify-between text-sm bg-green-50 rounded-md px-3 py-2">
-                      <span className="text-green-700 font-semibold">
-                        🎟 {discountApplied.code}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-green-700 font-semibold">
+                {discountApplied && (
+                  <div className="mt-4 text-sm text-green-600 flex items-center justify-between">
+                    <span>Discount</span>
+                    <span className="font-semibold">
+                      {discountApplied.discountType === "FREE_SHIPPING" ? (
+                        "Free Shipping"
+                      ) : (
+                        <>
                           -
-                          {discountApplied.amount.toLocaleString("en-US", {
-                            style: "currency",
-                            currency: "USD",
-                          })}
+                          {discountApplied.cartDiscount.toLocaleString(
+                            "en-US",
+                            {
+                              style: "currency",
+                              currency: "USD",
+                            },
+                          )}
+                        </>
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                <div className="mt-4">
+                  <div
+                    className={`flex gap-2 transition-opacity ${
+                      discountApplied ? "opacity-50 pointer-events-none" : ""
+                    }`}
+                  >
+                    <input
+                      value={discountCode}
+                      onChange={(e) => setDiscountCode(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleApplyDiscount();
+                      }}
+                      disabled={discountApplied !== null}
+                      placeholder="Discount code"
+                      className="flex-1 rounded-md border px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    />
+                    <button
+                      onClick={handleApplyDiscount}
+                      disabled={
+                        discountLoading ||
+                        cart.length === 0 ||
+                        discountApplied !== null
+                      }
+                      className="rounded-md bg-gray-100 px-3 py-2 text-sm hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {discountLoading
+                        ? "..."
+                        : discountApplied
+                          ? "Applied"
+                          : "Apply"}
+                    </button>
+                  </div>
+
+                  {discountApplied && (
+                    <div className="flex items-center justify-between gap-2 w-full bg-gray-50 px-3 py-2 rounded-md border mt-2">
+                      <span className="text-sm font-semibold text-gray-700 flex-1">
+                        Discount code:{" "}
+                        <span className="text-green-600">
+                          {discountApplied.code}
                         </span>
-                        <button
-                          onClick={() => {
-                            setDiscountApplied(null);
-                            setDiscountCode("");
-                          }}
-                          className="text-gray-400 hover:text-red-500 text-xs ml-1"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        value={discountCode}
-                        onChange={(e) => setDiscountCode(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleApplyDiscount();
-                        }}
-                        placeholder="Discount code"
-                        className="flex-1 rounded-md border px-3 py-2 text-sm"
-                      />
+                      </span>
                       <button
-                        onClick={handleApplyDiscount}
-                        disabled={discountLoading || cart.length === 0}
-                        className="rounded-md bg-gray-100 px-3 py-2 text-sm hover:bg-gray-200 disabled:opacity-50"
+                        onClick={() => {
+                          setDiscountApplied(null);
+                          setDiscountCode("");
+                        }}
+                        className="text-gray-400 hover:text-gray-600 shrink-0"
+                        aria-label="Remove discount"
                       >
-                        {discountLoading ? "..." : "Apply"}
+                        <X size={18} />
                       </button>
                     </div>
                   )}
                 </div>
 
-                {discountApplied && (
-                  <div className="mt-2 text-sm text-green-600 translate-y-5 flex items-center justify-between">
-                    <span>Discount ({discountApplied.code})</span>
-                    <span className="font-semibold">
-                      -
-                      {discountApplied.amount.toLocaleString("en-US", {
-                        style: "currency",
-                        currency: "USD",
-                      })}
-                    </span>
-                  </div>
-                )}
-
-                <div className="mt-4 border-t pt-4">
+                <div className="mt-4 pt-4">
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-600">
                       Total ({cartTotalItems()} items)
@@ -814,21 +880,31 @@ export default function BasketPage() {
                     return (
                       <button
                         onClick={handleGetOffer}
-                        disabled={disabledByCredit}
+                        disabled={
+                          disabledByCredit ||
+                          checkoutLoading ||
+                          cart.length === 0
+                        }
                         className={`mt-5 w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-extrabold text-white text-base ${
-                          disabledByCredit
+                          disabledByCredit || cart.length === 0
                             ? "bg-gray-300 text-gray-700 cursor-not-allowed"
-                            : "bg-[#f59e0b] hover:bg-[#e58f0a]"
+                            : checkoutLoading
+                              ? "bg-yellow-300 cursor-wait text-gray-800"
+                              : "bg-[#f59e0b] hover:bg-[#e58f0a]"
                         }`}
                         title={
                           disabledByCredit
                             ? "Cart exceeds available credit"
-                            : "Proceed to checkout"
+                            : checkoutLoading
+                              ? "Creating order..."
+                              : "Proceed to checkout"
                         }
                       >
-                        {disabledByCredit
-                          ? "Insufficient credit"
-                          : "Proceed to Checkout"}
+                        {checkoutLoading
+                          ? "Creating order..."
+                          : disabledByCredit
+                            ? "Insufficient credit"
+                            : "Proceed to Checkout"}
                       </button>
                     );
                   })()}

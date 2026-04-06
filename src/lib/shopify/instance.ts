@@ -36,7 +36,7 @@ export async function shopifyAdminFetch<TVariables>({
   }
 
   const response = await fetch(
-    `https://${domain}/admin/api/2024-10/graphql.json`,
+    `https://${domain}/admin/api/2025-01/graphql.json`,
     {
       method: "POST",
       headers: {
@@ -44,7 +44,7 @@ export async function shopifyAdminFetch<TVariables>({
         "X-Shopify-Access-Token": adminAccessToken,
       },
       body: JSON.stringify({ query, variables }),
-    }
+    },
   );
 
   if (!response.ok) {
