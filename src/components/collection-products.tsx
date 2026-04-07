@@ -106,6 +106,26 @@ export default function CollectionProducts({
           const image = product.raw?.images?.[0]?.src ?? "";
           const shopifyId = product.shopifyId ?? (product.raw as any)?.id;
 
+          // Extract stock information from inventory_locations if available
+          const firstVariant = product.raw?.variants?.[0];
+          const invs = firstVariant?.inventory_locations;
+          let stockLocation = "CHICAGO";
+          let stockAmount: number | undefined = undefined;
+          let hasStockInfo = false;
+
+          if (Array.isArray(invs) && invs.length > 0) {
+            // prefer index 1 if available, otherwise first
+            const preferred = invs[1] ?? invs[0];
+            if (preferred) {
+              stockLocation =
+                preferred.location_name || preferred.location || "CHICAGO";
+              stockAmount = Number(
+                preferred.available ?? preferred.quantity ?? 0,
+              );
+              hasStockInfo = true;
+            }
+          }
+
           return (
             <SingleProdCard
               key={product._id}
@@ -118,8 +138,9 @@ export default function CollectionProducts({
               image={image}
               oems={oemsArr}
               variantId={`gid://shopify/ProductVariant/${product.raw?.variants?.[0]?.id}`}
-              location="CHICAGO"
-              inStock={true}
+              location={stockLocation}
+              inStock={hasStockInfo ? (stockAmount ?? 0) > 0 : true}
+              stock={hasStockInfo ? stockAmount : undefined}
               matchType={matchType}
               searchTerm={searchTerm}
             />
