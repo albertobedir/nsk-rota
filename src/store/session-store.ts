@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -29,6 +30,7 @@ export interface SessionUser {
   creditUsed?: number | null;
   creditRemaining?: number | null;
   // Shopify tags and tier for B2B pricing
+  shopifyCustomerId?: string | null;
   tags?: string[] | null;
   tier?: string | null;
 }
@@ -38,12 +40,14 @@ export interface CartItem {
   title: string;
   subtitle?: string;
   price: number;
+  originalPrice?: number;
   image: string;
   quantity: number;
   oems?: string[];
   brand?: string;
   model?: string;
   variantId: string;
+  productGid?: string;
 }
 
 interface SessionState {

@@ -367,69 +367,6 @@ export async function GET(req: NextRequest) {
 
     const total = await Product.countDocuments(finalQuery);
 
-    // If a customer is logged in, try to fetch customer-specific pricing
-    // from Shopify metaobjects and override product prices in the results.
-    try {
-      const customerId = req.cookies.get("customer_id")?.value;
-      if (customerId) {
-        const META_Q = `
-          query GetCustomerPricing($query: String!, $first: Int!) {
-            metaobjects(type: "customer_pricing", first: $first, query: $query) {
-              edges {
-                node {
-                  fields { key value reference { ... on Product { id } } }
-                }
-              }
-            }
-          }
-        `;
-
-        const resp = await shopifyAdminFetch({
-          query: META_Q,
-          variables: { query: `customer:${customerId}`, first: 250 },
-        });
-
-        const metaedges = resp?.data?.metaobjects?.edges ?? [];
-        const priceMap: Record<string, number> = {};
-
-        for (const e of metaedges) {
-          const node = e.node as any;
-          const fields = node.fields as any[];
-          const priceField = fields.find((f) => f.key === "price");
-          const productRef = fields.find((f) => f.key === "product")?.reference;
-          if (priceField?.value && productRef?.id) {
-            // productRef.id is a GID like gid://shopify/Product/12345
-            const match = String(productRef.id).match(/\/(\d+)$/);
-            const numeric = match ? match[1] : null;
-            if (numeric) priceMap[numeric] = parseFloat(priceField.value);
-          }
-        }
-
-        if (Object.keys(priceMap).length > 0) {
-          for (const p of results) {
-            try {
-              const shopifyId = String((p as any).shopifyId);
-              const cp = priceMap[shopifyId];
-              if (
-                cp != null &&
-                Array.isArray((p as any).raw?.variants) &&
-                (p as any).raw.variants.length > 0
-              ) {
-                // override first variant price (string expected)
-                (p as any).raw.variants[0].price = String(cp.toFixed(2));
-                // also expose a convenient currentPrice field
-                (p as any).currentPrice = String(cp.toFixed(2));
-              }
-            } catch (e) {
-              /* ignore per-item errors */
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("Customer pricing override failed:", e);
-    }
-
     return NextResponse.json({
       ok: true,
       total,

@@ -15,6 +15,7 @@ export async function syncCustomerPricingToDatabase() {
         where: { metaobjectId: pricing.id },
         update: {
           customerId: pricing.customerId ?? "",
+          productShopifyId: pricing.productId ?? null,
           price: pricing.price ?? 0,
           updatedAt: pricing.updatedAt
             ? new Date(pricing.updatedAt)
@@ -23,6 +24,7 @@ export async function syncCustomerPricingToDatabase() {
         create: {
           metaobjectId: pricing.id,
           customerId: pricing.customerId ?? "",
+          productShopifyId: pricing.productId ?? null,
           price: pricing.price ?? 0,
           createdAt: pricing.updatedAt
             ? new Date(pricing.updatedAt)
@@ -52,7 +54,7 @@ export async function syncCustomerPricingToDatabase() {
   }
 
   console.log(
-    `✅ Sync completed: ${upsertedCount} upserted, ${errorCount} errors`
+    `✅ Sync completed: ${upsertedCount} upserted, ${errorCount} errors`,
   );
 
   return {

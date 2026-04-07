@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { shopifyAdminFetch } from "./instance";
 import { GET_CUSTOMER_PRICING_METAOBJECTS } from "./queries/customerPricing";
 
@@ -50,7 +51,7 @@ export async function getAllCustomerPricing() {
           }
           return acc;
         },
-        {} as Record<string, any>
+        {} as Record<string, any>,
       );
 
       const customerId = fields.customerRef?.id || fields.customer || null;

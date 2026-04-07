@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
           .map((s) =>
             String(s ?? "")
               .toLowerCase()
-              .trim()
+              .trim(),
           )
           .map((s) => s.replace(/[\s_]+/g, "-"));
         if (normalized.some((s) => /tier[-]?3$/.test(s) || s === "tier3"))
@@ -82,6 +82,33 @@ export async function GET(req: NextRequest) {
     };
 
     const inferredTier = computeTier(tagsArray);
+
+    // Fallback: derive shopifyCustomerId from billingAddress if not set
+    let shopifyCustomerId = user.shopifyCustomerId;
+    if (
+      !shopifyCustomerId &&
+      user.billingAddress &&
+      typeof user.billingAddress === "object" &&
+      "customer_id" in user.billingAddress
+    ) {
+      const billingCustomerId = (user.billingAddress as any).customer_id;
+      if (billingCustomerId) {
+        shopifyCustomerId = `gid://shopify/Customer/${billingCustomerId}`;
+
+        // Save in background (fire & forget)
+        prisma.user
+          .update({
+            where: { id: user.id },
+            data: { shopifyCustomerId },
+          })
+          .catch((err) =>
+            console.warn(
+              "[get-session] Failed to save shopifyCustomerId:",
+              err,
+            ),
+          );
+      }
+    }
 
     const sessionUser = {
       id: user.id,
@@ -107,7 +134,8 @@ export async function GET(req: NextRequest) {
       creditLimit: safeNumber(user.creditLimit),
       creditUsed: safeNumber(user.creditUsed),
       creditRemaining: safeNumber(user.creditRemaining),
-      // include shopify tags + inferred tier for client
+      // include shopify customer ID + tags + inferred tier for client
+      shopifyCustomerId: shopifyCustomerId ?? null,
       tags: tagsArray,
       tier: user.tier ?? inferredTier ?? null,
     };

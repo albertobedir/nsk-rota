@@ -12,7 +12,9 @@ type Product = {
   code: string;
   title: string;
   price: number;
+  originalPrice?: number;
   image: string;
+  shopifyId?: string | number;
   oems?: string[];
   location?: string;
   inStock?: boolean;
@@ -191,7 +193,9 @@ export default function MiniPaginationGroup({
                 code: codeVal,
                 title: raw?.title ?? raw?.name ?? r.title ?? `Product ${i + 1}`,
                 price,
+                originalPrice: Number(raw?.variants?.[0]?.price ?? price),
                 image,
+                shopifyId: r.shopifyId ?? raw?.shopifyId,
                 oems: oemsArr,
                 productRaw: raw,
                 location: "",
@@ -308,7 +312,9 @@ export default function MiniPaginationGroup({
               code: codeVal,
               title: raw?.title ?? raw?.name ?? `Product ${i + 1}`,
               price,
+              originalPrice: Number(raw?.variants?.[0]?.price ?? price),
               image,
+              shopifyId: r.shopifyId ?? raw?.shopifyId,
               oems: oemsArr,
               productRaw: raw,
               location: "",
@@ -448,7 +454,9 @@ export default function MiniPaginationGroup({
                   code={p.code}
                   title={p.title}
                   price={p.price}
+                  originalPrice={p.originalPrice}
                   image={p.image}
+                  shopifyId={p.shopifyId}
                   oems={p.oems}
                   productRaw={p.productRaw}
                   location={p.location}

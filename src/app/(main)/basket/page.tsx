@@ -160,22 +160,17 @@ export default function BasketPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerEmail: sessionUser?.email,
-          customerId: sessionUser?.billingAddress?.customer_id
-            ? `gid://shopify/Customer/${sessionUser.billingAddress.customer_id}`
-            : undefined,
+          customerId: sessionUser?.id,
           userTier: sessionUser?.tier,
           discountPercentage,
           discountCode: discountApplied?.code ?? null,
           creditRemaining: sessionUser?.creditRemaining,
           lineItems: cart.map((i) => ({
             merchandiseId: i.variantId,
-            productId: i.id,
+            productId: i.productGid ?? `gid://shopify/Product/${i.id}`,
             quantity: i.quantity,
             originalUnitPrice: i.price,
-            originalUntieredPrice:
-              discountPercentage > 0
-                ? i.price / (1 - discountPercentage / 100)
-                : i.price,
+            originalUntieredPrice: i.originalPrice ?? i.price,
             title: i.title,
           })),
         }),
@@ -199,8 +194,14 @@ export default function BasketPage() {
       await fetch("/api/cart/clear", { method: "POST" }).catch(() => null);
       clearCartStore();
 
+      // ✅ Invoice URL'e logged_in_customer_id ekle
+      const numericId = sessionUser?.id?.split("/").pop();
+      const finalUrl = numericId
+        ? `${invoiceUrl}?logged_in_customer_id=${numericId}`
+        : invoiceUrl;
+
       // ✅ Yeni pencerede aç (FREE_SHIPPING kargo backend'de shippingLine olarak uygulanır)
-      window.open(invoiceUrl, "_blank");
+      window.open(finalUrl, "_blank");
     } catch (e) {
       console.error("Checkout failed:", e);
       toast.error("Failed to create order");
@@ -481,19 +482,19 @@ export default function BasketPage() {
 
               {/* Empty */}
               {cart.length === 0 && (
-                <div className="mt-10 w-[1200px] bg-white border rounded-xl p-10 text-center">
-                  <p className="text-2xl font-bold text-gray-500">
+                <div className="mt-4 md:mt-10 w-[310px] sm:w-full bg-white border rounded-xl p-4 md:p-8 text-center">
+                  <p className="text-lg md:text-xl font-bold text-gray-500">
                     Your cart is empty.
                   </p>
                 </div>
               )}
 
               {/* Items */}
-              <div className="mt-6 wf space-y-5">
+              <div className="mt-6 space-y-5 w-full">
                 {cart.map((item) => (
                   <div key={item.id}>
                     {/* Desktop row */}
-                    <div className="hidden lg:block w-[1200px]">
+                    <div className="hidden lg:block">
                       <div className="bg-white  border rounded-xl px-8 py-6 overflow-hidden">
                         <div className="grid grid-cols-[140px_1fr_230px_120px_80px] items-center gap-4">
                           {/* Matching Type */}
@@ -558,19 +559,23 @@ export default function BasketPage() {
                           </div>
 
                           {/* Qty (INPUT) */}
-                          <div className="justify-self-center flex items-center gap-4 text-gray-400">
+                          <div
+                            className={`justify-self-center flex items-center gap-4 ${discountApplied !== null ? "opacity-50 pointer-events-none" : "text-gray-400"}`}
+                          >
                             <button
-                              className="text-xl leading-none hover:text-gray-700"
+                              disabled={discountApplied !== null}
+                              className={`text-xl leading-none ${discountApplied !== null ? "cursor-not-allowed" : "hover:text-gray-700"}`}
                               onClick={() => handleDecrease(item)}
                             >
                               –
                             </button>
 
                             <input
+                              disabled={discountApplied !== null}
                               type="number"
                               inputMode="numeric"
                               min={1}
-                              className="w-14 text-center text-base font-bold text-gray-600 bg-transparent border-b border-transparent focus:border-gray-300 outline-none"
+                              className={`w-14 text-center text-base font-bold bg-transparent border-b border-transparent outline-none ${discountApplied !== null ? "text-gray-400 bg-gray-100 cursor-not-allowed" : "text-gray-600 focus:border-gray-300"}`}
                               value={
                                 qtyDraft[String(item.id)] ??
                                 String(item.quantity)
@@ -602,7 +607,8 @@ export default function BasketPage() {
                             />
 
                             <button
-                              className="text-xl leading-none hover:text-gray-700"
+                              disabled={discountApplied !== null}
+                              className={`text-xl leading-none ${discountApplied !== null ? "cursor-not-allowed" : "hover:text-gray-700"}`}
                               onClick={() => handleIncrease(item)}
                             >
                               +
@@ -622,7 +628,7 @@ export default function BasketPage() {
                     </div>
 
                     {/* Mobile card */}
-                    <div className="lg:hidden w-[20.4rem] bg-white border rounded-xl p-4">
+                    <div className="lg:hidden w-full bg-white border rounded-xl p-4">
                       <div>
                         <p className="text-sm font-bold text-[#1f3b7b]">
                           Eşleşme Türü:
@@ -699,19 +705,23 @@ export default function BasketPage() {
 
                       <div className="mt-4 flex items-center justify-between">
                         {/* Qty (INPUT) */}
-                        <div className="flex items-center gap-5 rounded-lg bg-gray-100 px-4 py-2 text-gray-500">
+                        <div
+                          className={`flex items-center gap-5 rounded-lg px-4 py-2 ${discountApplied !== null ? "bg-gray-200 opacity-50" : "bg-gray-100 text-gray-500"}`}
+                        >
                           <button
-                            className="text-xl leading-none hover:text-gray-700"
+                            disabled={discountApplied !== null}
+                            className={`text-xl leading-none ${discountApplied !== null ? "cursor-not-allowed text-gray-400" : "hover:text-gray-700"}`}
                             onClick={() => handleDecrease(item)}
                           >
                             –
                           </button>
 
                           <input
+                            disabled={discountApplied !== null}
                             type="number"
                             inputMode="numeric"
                             min={1}
-                            className="w-14 text-center text-base font-bold text-gray-600 bg-transparent outline-none"
+                            className={`w-14 text-center text-base font-bold bg-transparent outline-none ${discountApplied !== null ? "text-gray-400 cursor-not-allowed" : "text-gray-600"}`}
                             value={
                               qtyDraft[String(item.id)] ?? String(item.quantity)
                             }
@@ -742,7 +752,8 @@ export default function BasketPage() {
                           />
 
                           <button
-                            className="text-xl leading-none hover:text-gray-700"
+                            disabled={discountApplied !== null}
+                            className={`text-xl leading-none ${discountApplied !== null ? "cursor-not-allowed text-gray-400" : "hover:text-gray-700"}`}
                             onClick={() => handleIncrease(item)}
                           >
                             +
@@ -767,10 +778,8 @@ export default function BasketPage() {
 
             {/* Summary panel */}
             <aside className="w-full lg:w-80 order-last lg:order-0">
-              <div className="bg-white border rounded-xl p-5 lg:sticky lg:top-28">
-                <h3 className="font-bold text-lg translate-y-5">
-                  Cart Summary
-                </h3>
+              <div className="bg-white border rounded-xl p-4 md:p-5 lg:sticky lg:top-28">
+                <h3 className="font-bold text-base md:text-lg">Cart Summary</h3>
                 <div className="mt-4 text-sm text-gray-600 translate-y-5 flex items-center justify-between pb-4">
                   <span>Subtotal</span>
                   <span className="font-semibold">

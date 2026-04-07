@@ -66,21 +66,42 @@ export default function OrderDetailPage() {
         const lineItemsEdges = ((): any[] => {
           if (src.lineItems?.edges) return src.lineItems.edges;
           const arr = raw.line_items || raw.lineItems || [];
-          return arr.map((li: any) => ({
-            node: {
-              title: li.title || li.name,
-              quantity: li.quantity ?? li.current_quantity ?? 1,
-              productId: li.product_id ?? null,
-              variant: {
-                image: { url: li.image?.src || li.image?.url || null },
-                price: {
-                  amount: li.price || li.price_set?.shop_money?.amount || null,
-                  currencyCode:
-                    raw.currency || raw.presentment_currency || null,
+          const discountApplications: any[] = raw.discount_applications || [];
+
+          return arr.map((li: any) => {
+            const originalPrice = Number(li.price || 0);
+            const qty = li.quantity ?? li.current_quantity ?? 1;
+
+            // Find discount using discount_application_index
+            const allocation = li.discount_allocations?.[0];
+            const appIndex = allocation?.discount_application_index ?? null;
+            const discountApp =
+              appIndex != null ? discountApplications[appIndex] : null;
+
+            const totalDiscount = Number(li.total_discount || 0);
+            const discountPerItem = qty > 0 ? totalDiscount / qty : 0;
+            const discountedPrice = originalPrice - discountPerItem;
+
+            return {
+              node: {
+                title: li.title || li.name,
+                quantity: qty,
+                productId: li.product_id ?? null,
+                originalUnitPrice: originalPrice,
+                discountedUnitPrice: discountedPrice,
+                discountDescription:
+                  discountApp?.description ?? discountApp?.title ?? null,
+                discountValue: discountApp?.value ?? null,
+                variant: {
+                  image: { url: li.image?.src || li.image?.url || null },
+                  price: {
+                    amount: li.price || null,
+                    currencyCode: raw.currency || null,
+                  },
                 },
               },
-            },
-          }));
+            };
+          });
         })();
 
         const normalized = {
@@ -338,6 +359,9 @@ export default function OrderDetailPage() {
             onClick={() => {
               const params = new URLSearchParams();
               params.append("id", id as string);
+              if (user?.id) {
+                params.append("customerId", user.id);
+              }
               if (userDiscount) {
                 params.append("discount", String(userDiscount));
               }
@@ -498,31 +522,41 @@ export default function OrderDetailPage() {
                       <div className="text-sm text-slate-600">
                         Qty: {node.quantity}
                       </div>
-                      {node.variant?.price?.amount && (
-                        <div className="flex items-center gap-2">
-                          {userDiscount && userDiscount > 0 ? (
-                            <>
-                              <span className="text-sm font-medium text-gray-400 line-through">
-                                ${Number(node.variant.price.amount).toFixed(2)}{" "}
-                                {node.variant.price.currencyCode}
-                              </span>
-                              <span className="text-sm font-semibold text-secondary">
-                                $
-                                {(
-                                  Number(node.variant.price.amount) *
-                                  (1 - userDiscount / 100)
-                                ).toFixed(2)}{" "}
-                                {node.variant.price.currencyCode}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-sm">
-                              ${Number(node.variant.price.amount).toFixed(2)}{" "}
-                              {node.variant.price.currencyCode}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      {node.variant?.price?.amount &&
+                        (() => {
+                          const originalAmt = Number(node.variant.price.amount);
+                          const discountedAmt = node.discountedUnitPrice;
+                          const hasDiscount =
+                            discountedAmt != null &&
+                            discountedAmt < originalAmt;
+
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              {hasDiscount ? (
+                                <>
+                                  <span className="text-sm text-gray-400 line-through">
+                                    ${originalAmt.toFixed(2)}{" "}
+                                    {node.variant.price.currencyCode}
+                                  </span>
+                                  <span className="text-sm font-semibold text-secondary">
+                                    ${discountedAmt.toFixed(2)}{" "}
+                                    {node.variant.price.currencyCode}
+                                  </span>
+                                  {node.discountDescription && (
+                                    <span className="text-xs text-green-600">
+                                      {node.discountDescription}
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-sm">
+                                  ${originalAmt.toFixed(2)}{" "}
+                                  {node.variant.price.currencyCode}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                     </div>
                   </div>
                 );

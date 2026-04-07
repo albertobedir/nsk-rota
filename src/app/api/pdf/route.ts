@@ -4,6 +4,7 @@ import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
+import prisma from "@/lib/prisma/instance";
 
 export const runtime = "nodejs";
 
@@ -14,9 +15,22 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
+    const customerId = url.searchParams.get("customerId");
     const discountParam = url.searchParams.get("discount");
     const userDiscount = discountParam ? Number(discountParam) : null;
     const origin = url.origin;
+
+    // Fetch customer data from database if customerId provided
+    let customer: Record<string, any> | null = null;
+    if (customerId) {
+      try {
+        customer = await prisma.user.findUnique({
+          where: { id: customerId },
+        });
+      } catch (_err) {
+        customer = null;
+      }
+    }
 
     // Fetch and normalise order data
     let order: Record<string, any> | null = null;
@@ -33,21 +47,37 @@ export async function GET(req: Request) {
           const lineItemsEdges = ((): any[] => {
             if (src.lineItems?.edges) return src.lineItems.edges;
             const arr = raw.line_items || raw.lineItems || [];
-            return arr.map((li: any) => ({
-              node: {
-                title: li.title || li.name,
-                quantity: li.quantity ?? li.current_quantity ?? 1,
-                sku: li.sku || li.variant_title || "",
-                variant: {
-                  price: {
-                    amount:
-                      li.price || li.price_set?.shop_money?.amount || null,
-                    currencyCode:
-                      raw.currency || raw.presentment_currency || null,
+            const discountApplications: any[] = raw.discount_applications || [];
+
+            return arr.map((li: any) => {
+              const originalPrice = Number(li.price || 0);
+              const qty = li.quantity ?? li.current_quantity ?? 1;
+              const allocation = li.discount_allocations?.[0];
+              const appIndex = allocation?.discount_application_index ?? null;
+              const discountApp =
+                appIndex != null ? discountApplications[appIndex] : null;
+              const totalDiscount = Number(li.total_discount || 0);
+              const discountPerItem = qty > 0 ? totalDiscount / qty : 0;
+              const discountedPrice = originalPrice - discountPerItem;
+
+              return {
+                node: {
+                  title: li.title || li.name,
+                  quantity: qty,
+                  sku: li.sku || li.variant_title || "",
+                  originalUnitPrice: originalPrice,
+                  discountedUnitPrice: discountedPrice,
+                  discountDescription:
+                    discountApp?.description ?? discountApp?.title ?? null,
+                  variant: {
+                    price: {
+                      amount: li.price || null,
+                      currencyCode: raw.currency || null,
+                    },
                   },
                 },
-              },
-            }));
+              };
+            });
           })();
 
           order = {
@@ -281,6 +311,47 @@ export async function GET(req: Request) {
       ].filter(Boolean) as string[];
     };
 
+    // Build BILL TO lines with customer info + address
+    const buildBillToLines = (
+      customer: Record<string, any> | null,
+      addr: Record<string, any> | null,
+    ): string[] => {
+      const lines: string[] = [];
+
+      if (customer) {
+        // Handle both snake_case (Shopify) and camelCase (MongoDB)
+        const firstName = customer.first_name || customer.firstName || "";
+        const lastName = customer.last_name || customer.lastName || "";
+        const fullName = [firstName, lastName].filter(Boolean).join(" ");
+        if (fullName) lines.push(fullName);
+
+        const email = customer.email || "";
+        if (email) lines.push(email);
+
+        const phone = customer.phone || "";
+        if (phone) lines.push(phone);
+      }
+
+      if (addr) {
+        const company = addr.company || "";
+        if (company) lines.push(company);
+
+        const addr1 = addr.address1 || "";
+        if (addr1) lines.push(addr1);
+
+        const addr2 = addr.address2 || "";
+        if (addr2) lines.push(addr2);
+
+        const cityZip = [addr.city, addr.zip].filter(Boolean).join(", ");
+        if (cityZip) lines.push(cityZip);
+
+        const country = addr.country || "";
+        if (country) lines.push(country);
+      }
+
+      return lines.length > 0 ? lines : ["-"];
+    };
+
     const thirdW = (contentWidth - 20) / 3;
 
     // "Bill To"
@@ -289,7 +360,8 @@ export async function GET(req: Request) {
       .fontSize(8.5)
       .fillColor(ACCENT)
       .text("BILL TO", margin + 8, curY + 8);
-    const billLines = buildAddrLines(
+    const billLines = buildBillToLines(
+      customer || order?.customer || null,
       order?.billingAddress || order?.shippingAddress || null,
     );
     let lineY = curY + 21;
@@ -414,10 +486,13 @@ export async function GET(req: Request) {
         const node = (e?.node || e) as Record<string, any>;
         const title = node?.title || node?.name || "Item";
         const qty = Number(node?.quantity ?? node?.current_quantity ?? 1);
-        const priceNum = Number(
-          node?.variant?.price?.amount || node?.price || 0,
+        const originalPrice = Number(
+          node?.originalUnitPrice ?? node?.variant?.price?.amount ?? 0,
         );
-        const unitPrice = Number.isFinite(priceNum) ? priceNum : 0;
+        const discountedPrice = Number(
+          node?.discountedUnitPrice ?? originalPrice,
+        );
+        const unitPrice = discountedPrice;
         const lineTotal = unitPrice * qty;
         subtotal += lineTotal;
         const rotaNo = node?.sku || "";
@@ -459,7 +534,44 @@ export async function GET(req: Request) {
         rCell(rotaNo, COL.rotaNo);
         rCell(title, COL.desc, { align: "left" });
         rCell(String(qty), COL.qty);
-        rCell(formatMoney(unitPrice, currency), COL.price, { align: "right" });
+
+        // UNIT PRICE cell with discount visualization
+        if (originalPrice > unitPrice) {
+          // Original price — strikethrough
+          const strikeTextY = rowTextY - 3;
+          doc
+            .font(FONT_REGULAR)
+            .fontSize(7)
+            .fillColor(TEXT_MUTED)
+            .text(formatMoney(originalPrice, currency), rx + 3, strikeTextY, {
+              width: COL.price - 6,
+              align: "right",
+            });
+          // Manual strikethrough line
+          const strikeLineY = strikeTextY + 3;
+          const strikeStartX = rx + 3;
+          doc
+            .moveTo(strikeStartX, strikeLineY)
+            .lineTo(rx + COL.price - 3, strikeLineY)
+            .strokeColor(TEXT_MUTED)
+            .lineWidth(0.5)
+            .stroke();
+          // Discounted price — green
+          doc
+            .font(FONT_BOLD)
+            .fontSize(8.5)
+            .fillColor("#16a34a")
+            .text(formatMoney(unitPrice, currency), rx + 3, rowTextY + 4, {
+              width: COL.price - 6,
+              align: "right",
+            });
+        } else {
+          rCell(formatMoney(unitPrice, currency), COL.price, {
+            align: "right",
+          });
+        }
+        rx += COL.price;
+
         rCell(formatMoney(lineTotal, currency), COL.total, {
           bold: true,
           align: "right",
@@ -469,18 +581,22 @@ export async function GET(req: Request) {
       });
     }
 
-    let grandTotal = Number(order?.totalPrice?.amount) || subtotal;
     const totalQty = itemsList.reduce(
       (s, e) => s + Number((e?.node || e)?.quantity ?? 1),
       0,
     );
 
-    // Calculate discount amount if tier discount is provided
-    let discountAmount = 0;
-    if (userDiscount && userDiscount > 0) {
-      discountAmount = subtotal * (userDiscount / 100);
-      grandTotal = subtotal - discountAmount;
-    }
+    // Calculate original subtotal and total discount
+    const originalSubtotal = itemsList.reduce((s, e) => {
+      const node = e?.node || e;
+      const orig = Number(
+        node?.originalUnitPrice ?? node?.variant?.price?.amount ?? 0,
+      );
+      const qty = Number(node?.quantity ?? 1);
+      return s + orig * qty;
+    }, 0);
+    const totalDiscountAmount = originalSubtotal - subtotal;
+    const grandTotal = Number(order?.totalPrice?.amount) || subtotal;
 
     // Helper: draw a footer row with pre-computed X offsets for each column
     const footerLabelOffset = COL.no + COL.orderNo + COL.custNo + COL.rotaNo;
@@ -616,9 +732,12 @@ export async function GET(req: Request) {
 
     const shipping = Number(order?.shipping || 0) || 0;
     const taxes = Number(order?.taxes || 0) || 0;
-    totRow("Subtotal", formatMoney(subtotal, currency));
-    if (userDiscount && userDiscount > 0) {
-      totRow("B2B Tier Discount", `-${formatMoney(discountAmount, currency)}`);
+    totRow("Subtotal", formatMoney(originalSubtotal, currency));
+    if (totalDiscountAmount > 0) {
+      totRow(
+        "Total Discount",
+        `-${formatMoney(totalDiscountAmount, currency)}`,
+      );
     }
     totRow("Sales Tax", formatMoney(taxes, currency));
     totRow("Shipping", formatMoney(shipping, currency));

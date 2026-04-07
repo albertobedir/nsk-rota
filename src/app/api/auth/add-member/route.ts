@@ -87,6 +87,7 @@ export async function POST(req: Request) {
         lastName: shopifyCustomer.lastName || "",
         role: "user",
         password: hashedPassword,
+        shopifyCustomerId: shopifyCustomer.id,
       },
     });
 

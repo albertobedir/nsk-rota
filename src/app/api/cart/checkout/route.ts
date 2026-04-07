@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       discountPercentage,
       discountCode,
       creditRemaining,
+      customerAccessToken,
     } = body;
 
     if (!Array.isArray(lineItems) || lineItems.length === 0) {
@@ -48,6 +49,9 @@ export async function POST(request: NextRequest) {
       userTier,
       discountPercentage,
       discountCode,
+      customerAccessToken: customerAccessToken
+        ? customerAccessToken.substring(0, 20) + "..."
+        : "NONE",
       lineItemsCount: lineItems.length,
       firstItem: lineItems[0],
     });
@@ -180,7 +184,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ===== STEP 2: Credit check AFTER discount is resolved =====
+    // ===== STEP 2: Fetch customer pricing =====
+    const customerPricingMap: Record<string, number> = {};
+    if (customerId) {
+      for (const li of lines) {
+        const productGid = li.productId ?? "";
+        if (!productGid) continue;
+        try {
+          const cp = await prisma.customerPricing.findFirst({
+            where: {
+              customerId: String(customerId),
+              productShopifyId: String(productGid),
+            },
+          });
+          if (cp) {
+            const variantKey = li.merchandiseId ?? productGid;
+            customerPricingMap[variantKey] = Number(cp.price);
+          }
+        } catch {}
+      }
+    }
+    console.log("[CUSTOMER PRICING MAP]", customerPricingMap);
+
+    // ===== STEP 3: Credit check AFTER discount is resolved =====
     if (customerId && creditRemaining != null) {
       const remaining = Number(creditRemaining);
 
@@ -242,52 +268,75 @@ export async function POST(request: NextRequest) {
       if (explicit != null) {
         customPrice = Number(explicit);
         console.log(`[ITEM] EXPLICIT price found: customPrice=${customPrice}`);
-      } else if (resolvedDiscount > 0 && originalPrice > 0) {
-        // Apply resolved discount (tier + code combination)
-        customPrice = originalPrice * (1 - resolvedDiscount / 100);
-        console.log(
-          `[ITEM] RESOLVED DISCOUNT applied: originalPrice=${originalPrice} × (1 - ${resolvedDiscount.toFixed(2)}/100) = ${customPrice.toFixed(2)}`,
-        );
       } else {
-        console.log(
-          `[ITEM] NO discount applied (resolvedDiscount=${resolvedDiscount}, originalPrice=${originalPrice})`,
-        );
-      }
+        const itemKey = li.merchandiseId ?? li.productId ?? "";
+        const cpPrice = customerPricingMap[itemKey];
 
-      // Apply discount if custom price differs from original
-      if (
-        customPrice != null &&
-        originalPrice > 0 &&
-        customPrice < originalPrice
-      ) {
-        // ===== FIXED_AMOUNT vs PERCENTAGE handler =====
-        if (isFixedAmount) {
-          // Sadece tier'ı item'a uygula, fixed amount order-level'a gidecek
-          if (tierOnly > 0) {
-            baseItem.appliedDiscount = {
-              value: tierOnly,
-              valueType: "PERCENTAGE",
-              description: `B2B Tier - ${tierOnly.toFixed(2)}% off`,
-            };
+        if (cpPrice != null && originalPrice > 0) {
+          // Customer pricing base
+          let finalPrice = cpPrice;
+          let discountDesc = "";
+
+          // Discount code varsa customer price üstüne uygula
+          if (
+            validatedDiscount &&
+            !isFixedAmount &&
+            resolvedDiscount > tierOnly
+          ) {
+            // Sadece code kısmını al: compound'dan tier'ı çıkar
+            const codeMult = 1 - validatedDiscount.codeValue / 100;
+            finalPrice = cpPrice * codeMult;
+            discountDesc = `Customer Pricing + Code - ${(
+              (1 - finalPrice / originalPrice) *
+              100
+            ).toFixed(2)}% off`;
             console.log(
-              `[DISCOUNT APPLIED] TIER ONLY (FIXED_AMOUNT detected): ${tierOnly.toFixed(2)}% off`,
+              `[CUSTOMER PRICING + CODE] cpPrice=${cpPrice} × (1 - ${validatedDiscount.codeValue}%) = ${finalPrice}, total discount=${(
+                ((originalPrice - finalPrice) / originalPrice) *
+                100
+              ).toFixed(2)}%`,
+            );
+          } else {
+            discountDesc = `Customer Pricing - ${(
+              ((originalPrice - cpPrice) / originalPrice) *
+              100
+            ).toFixed(2)}% off`;
+            console.log(
+              `[CUSTOMER PRICING ONLY] ${originalPrice} → ${cpPrice} (${(
+                ((originalPrice - cpPrice) / originalPrice) *
+                100
+              ).toFixed(2)}% off)`,
             );
           }
-        } else {
-          // PERCENTAGE: tier + code combined
+
+          const totalDiscountPct =
+            ((originalPrice - finalPrice) / originalPrice) * 100;
+          customPrice = finalPrice;
           baseItem.appliedDiscount = {
-            value: resolvedDiscount,
+            value: Math.round(totalDiscountPct * 100) / 100,
             valueType: "PERCENTAGE",
-            description: `B2B Tier & Discount Code - ${resolvedDiscount.toFixed(2)}% off`,
+            description: discountDesc,
           };
-          console.log(
-            `[DISCOUNT APPLIED] PERCENTAGE approach: ${resolvedDiscount.toFixed(2)}% off`,
-          );
+        } else if (resolvedDiscount > 0 && originalPrice > 0) {
+          customPrice = originalPrice * (1 - resolvedDiscount / 100);
+          if (customPrice < originalPrice) {
+            if (isFixedAmount) {
+              if (tierOnly > 0) {
+                baseItem.appliedDiscount = {
+                  value: tierOnly,
+                  valueType: "PERCENTAGE",
+                  description: `B2B Tier - ${tierOnly.toFixed(2)}% off`,
+                };
+              }
+            } else {
+              baseItem.appliedDiscount = {
+                value: resolvedDiscount,
+                valueType: "PERCENTAGE",
+                description: `B2B Tier & Discount Code - ${resolvedDiscount.toFixed(2)}% off`,
+              };
+            }
+          }
         }
-      } else {
-        console.log(
-          `[NO DISCOUNT] This item won't have discount (customPrice=${customPrice}, originalPrice=${originalPrice})`,
-        );
       }
 
       console.log(
@@ -348,6 +397,15 @@ export async function POST(request: NextRequest) {
     // 👇 DEBUG: Check for errors
     console.log("[DRAFT CREATED RAW]", JSON.stringify(created, null, 2));
     console.log("[INVOICE URL CHECK]", created?.draftOrder?.invoiceUrl);
+
+    // 🛒 DEBUG: Token ve checkout bilgisi
+    console.log("🛒 CHECKOUT TOKEN DEBUG", {
+      customerAccessToken: customerAccessToken
+        ? customerAccessToken.substring(0, 20) + "..."
+        : "NONE PROVIDED",
+      customerId: customerId,
+      invoiceUrl: created?.draftOrder?.invoiceUrl,
+    });
 
     if (created?.userErrors?.length > 0) {
       console.error("[DRAFT USER ERRORS]", created.userErrors);
@@ -441,7 +499,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ created });
+    return NextResponse.json({
+      created,
+      // Debug: token bilgisi dön
+      _debug: {
+        customerAccessToken: customerAccessToken
+          ? customerAccessToken.substring(0, 20) + "..."
+          : "NONE",
+        customerId: customerId,
+      },
+    });
   } catch (err) {
     console.error("/api/cart/checkout error:", err);
     return NextResponse.json(

@@ -212,6 +212,7 @@ export default async function Page({ params }: { params: any }) {
         code: codeVal,
         title: rawSerializable.title ?? `Product ${i + 1}`,
         price,
+        originalPrice: Number(raw?.variants?.[0]?.price ?? price),
         image,
         oems: oemsArr,
       };

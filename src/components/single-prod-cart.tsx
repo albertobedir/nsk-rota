@@ -53,6 +53,7 @@ import useSessionStore from "@/store/session-store";
 import Icons from "./icons";
 import { Check, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
+import { calculateProductPrice } from "@/lib/pricing";
 import {
   Dialog,
   DialogContent,
@@ -87,6 +88,7 @@ export default function SingleProdCard({
   price,
   originalPrice,
   image,
+  shopifyId,
   oems = [],
   location = "",
   inStock = false,
@@ -97,6 +99,7 @@ export default function SingleProdCard({
   productRaw,
 }: ProductCardProps) {
   const addToCart = useSessionStore((s) => s.addToCart);
+  const user = useSessionStore((s) => s.user);
   const cart = useSessionStore((s) => s.cart);
 
   // Prefer an image from productRaw.images that contains `/files/<digits>` (4+ digits)
@@ -130,6 +133,9 @@ export default function SingleProdCard({
   const [imgSrc, setImgSrc] = useState<string>(
     displayImage || "/image_not_found.png",
   );
+  const [customerPrice, setCustomerPrice] = React.useState<number | null>(null);
+  const [isLoadingCustomerPrice, setIsLoadingCustomerPrice] =
+    React.useState<boolean>(false);
 
   // Test if image URL actually loads (handles cases where URL returns 200 but broken content)
   const testImageLoads = (url: string): Promise<boolean> => {
@@ -366,10 +372,25 @@ export default function SingleProdCard({
     null,
   );
 
-  const effectiveDiscount = prismaDiscount ?? discountPercentage ?? null;
-  const tierPrice = effectiveDiscount
-    ? Number((Number(price) * (1 - effectiveDiscount / 100)).toFixed(2))
+  // Price calculation with priority:
+  // 1. Customer pricing (if exists) - NO tier discount applied
+  // 2. Tier discount (if no customer pricing)
+  // 3. Original price (if no customer pricing or tier discount)
+  const priceOriginal = originalPrice ?? Number(price);
+  const tierDiscountPercentage = !customerPrice
+    ? (prismaDiscount ?? discountPercentage ?? null)
     : null;
+
+  const priceCalc = calculateProductPrice({
+    originalPrice: priceOriginal,
+    customerPrice: customerPrice,
+    tierDiscountPercentage: tierDiscountPercentage,
+  });
+
+  const displayPrice = priceCalc.displayPrice;
+  const strikethroughPrice = priceCalc.strikethroughPrice;
+  const hasCustomerPrice = priceCalc.hasCustomerPrice;
+  const hasTierDiscount = priceCalc.hasTierDiscount;
 
   // Use rota/code as product link identifier (prefer `code` always)
   const productLinkId = (() => {
@@ -410,6 +431,44 @@ export default function SingleProdCard({
       mounted = false;
     };
   }, [tierTag]);
+
+  // Fetch customer pricing for this product
+  React.useEffect(() => {
+    const customerId = user?.shopifyCustomerId;
+    if (!customerId || !shopifyId) {
+      setCustomerPrice(null);
+      setIsLoadingCustomerPrice(false);
+      return;
+    }
+
+    let mounted = true;
+    setIsLoadingCustomerPrice(true);
+    (async () => {
+      try {
+        // Convert numeric product ID to Shopify GID format for database lookup
+        const productGid = `gid://shopify/Product/${shopifyId}`;
+        const resp = await fetch(
+          `/api/customer/pricing?customerId=${encodeURIComponent(
+            customerId,
+          )}&productShopifyId=${encodeURIComponent(productGid)}`,
+        );
+        const json = await resp.json().catch(() => null);
+        if (mounted) {
+          setCustomerPrice(json?.price ?? null);
+          setIsLoadingCustomerPrice(false);
+        }
+      } catch (e) {
+        if (mounted) {
+          setCustomerPrice(null);
+          setIsLoadingCustomerPrice(false);
+        }
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.shopifyCustomerId, shopifyId]);
 
   // Determine displayed location and stock.
   // Preference order:
@@ -708,30 +767,39 @@ export default function SingleProdCard({
           </Link>
 
           {/* Price under title (hidden when price is 0) */}
-          {Number(price) > 0 && (
+          {Number(priceOriginal) > 0 && (
             <div className="mt-1 flex items-baseline gap-2 flex-wrap">
-              <span className="text-lg md:text-xl font-extrabold text-secondary">
-                $
-                {effectiveDiscount
-                  ? tierPrice?.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })
-                  : Number(price).toLocaleString("en-US", {
+              {isLoadingCustomerPrice ? (
+                <span className="text-lg md:text-xl font-extrabold text-gray-300 animate-pulse">
+                  Calculating price...
+                </span>
+              ) : (
+                <>
+                  <span
+                    className="text-lg md:text-xl font-extrabold text-secondary"
+                    suppressHydrationWarning
+                  >
+                    $
+                    {displayPrice.toLocaleString("en-US", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{" "}
-                USD
-              </span>
-              {effectiveDiscount && (
-                <span className="text-sm font-medium text-gray-400 line-through select-none">
-                  $
-                  {Number(price).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  USD
-                </span>
+                    USD
+                  </span>
+                  {strikethroughPrice && (
+                    <span
+                      className="text-sm font-medium text-gray-400 line-through select-none"
+                      suppressHydrationWarning
+                    >
+                      $
+                      {Number(strikethroughPrice).toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      USD
+                    </span>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -1160,13 +1228,22 @@ export default function SingleProdCard({
                             );
                           }
                         }
+                        // Gerçek orijinal fiyat — customer pricing varsa strikethroughPrice kullan
+                        const trueOriginalPrice =
+                          priceCalc.strikethroughPrice ??
+                          (Number(productRaw?.variants?.[0]?.price ?? 0) ||
+                            undefined);
                         addToCart({
                           id: String(code),
                           title,
-                          price: Number(tierPrice ?? Number(price)),
+                          price: displayPrice,
+                          originalPrice: trueOriginalPrice,
                           image,
                           quantity: desiredQty,
                           variantId: variantId ?? "",
+                          productGid: shopifyId
+                            ? `gid://shopify/Product/${shopifyId}`
+                            : undefined,
                         });
                         toast.success("Product added to cart!");
                       } catch (e) {

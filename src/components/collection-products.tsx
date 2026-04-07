@@ -135,6 +135,7 @@ export default function CollectionProducts({
               shopifyId={shopifyId}
               productRaw={product.raw}
               price={price}
+              originalPrice={product.originalPrice}
               image={image}
               oems={oemsArr}
               variantId={`gid://shopify/ProductVariant/${product.raw?.variants?.[0]?.id}`}

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma/instance";
 import { shopifyFetch } from "@/lib/shopify/instance";
 import { createCart, getCart } from "@/lib/shopify/cart";
+import { getShopifyCustomerIdByEmail } from "@/lib/shopify-customer";
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET!;
@@ -57,6 +58,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: userMessage }, { status: 401 });
     }
 
+    // DEBUG: Token oluşturuldu, sahibini doğrula
+    console.log("🔑 Shopify token created for email:", email);
+    console.log(
+      "🔑 Token value:",
+      shopifyToken.accessToken.substring(0, 20) + "...",
+    );
+    console.log("🔑 Token expires at:", shopifyToken.expiresAt);
+
     // Shopify customer bilgilerini al
     const customerQuery = `
       query getCustomer($customerAccessToken: String!) {
@@ -75,6 +84,16 @@ export async function POST(request: NextRequest) {
     });
 
     const shopifyCustomer = customerResponse.data.customer;
+
+    // DEBUG: Token'ın hangi müşteriye ait olduğunu doğrula
+    console.log("👤 Token sahibi (Shopify customer):", {
+      id: shopifyCustomer?.id,
+      email: shopifyCustomer?.email,
+      firstName: shopifyCustomer?.firstName,
+      lastName: shopifyCustomer?.lastName,
+      tags: shopifyCustomer?.tags,
+    });
+
     if (!shopifyCustomer) {
       return NextResponse.json(
         { message: "Customer found but data unavailable." },
@@ -104,6 +123,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Fetch and store Shopify customer ID if not already present
+    if (!user.shopifyCustomerId) {
+      const shopifyCustomerId = await getShopifyCustomerIdByEmail(
+        shopifyCustomer.email,
+      );
+
+      if (shopifyCustomerId) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { shopifyCustomerId },
+        });
+      }
+    }
+
     const accessToken = jwt.sign(
       { id: user.id, email: user.email },
       ACCESS_TOKEN_SECRET,
@@ -114,6 +147,18 @@ export async function POST(request: NextRequest) {
       REFRESH_TOKEN_SECRET,
       { expiresIn: "7d" },
     );
+
+    // DEBUG: Session'a yazılacak user bilgisi
+    console.log("💾 Session/Cookie'ye yazılacak bilgiler:");
+    console.log("   - User ID (JWT):", user.id);
+    console.log("   - User Email (JWT):", user.email);
+    console.log(
+      "   - Shopify Access Token:",
+      shopifyToken.accessToken.substring(0, 20) + "...",
+    );
+    console.log("   - Shopify Customer ID:", shopifyCustomer.id);
+    console.log("   - Shopify Email:", shopifyCustomer.email);
+    console.log("   - Shopify Tags:", shopifyCustomer.tags);
 
     const res = NextResponse.json({
       message: "Login successful",

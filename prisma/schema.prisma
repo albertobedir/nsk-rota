@@ -59,19 +59,22 @@ model User {
   creditRemaining Decimal  @db.Decimal(10, 2) @default(0.00)
   
   // Shopify customer fields
-  shopifyTags    Json?
-  tier           String?
+  shopifyCustomerId String?  // Shopify customer GID (gid://shopify/Customer/...)
+  shopifyTags       Json?
+  tier              String?
 }
 
 model CustomerPricing {
-  id            String   @id @default(cuid())
-  metaobjectId  String   @unique // Shopify metaobject GID
-  customerId    String   // Shopify customer GID
-  price         Decimal  @db.Decimal(10, 2)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  metaobjectId    String   @unique // Shopify metaobject GID
+  customerId      String   // Shopify customer GID
+  productShopifyId String?  // Shopify product GID (for lookup by product)
+  price           Decimal  @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([customerId])
+  @@index([productShopifyId])
   @@index([metaobjectId])
 }
 

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/carousel";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { calculateProductPrice } from "@/lib/pricing";
 import {
   Dialog,
   DialogContent,
@@ -106,10 +107,12 @@ export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const addToCart = useSessionStore((s) => s.addToCart);
   const cart = useSessionStore((s) => s.cart);
+  const user = useSessionStore((s) => s.user);
   // hook for computing tier discounts — must be called unconditionally
   const getDiscountForTier = useSessionStore((s) => s.getDiscountForTier);
   const tierTag = useSessionStore((s) => s.tierTag);
   const [prismaDiscount, setPrismaDiscount] = useState<number | null>(null);
+  const [customerPrice, setCustomerPrice] = useState<number | null>(null);
 
   // Log Prisma-backed discountPercentage for current session tierTag
   // Placed before any early returns to keep hook order stable
@@ -182,6 +185,66 @@ export default function ProductDetailPage() {
       );
     } catch {}
   }, [product]);
+
+  // Fetch customer pricing for current user + product
+  useEffect(() => {
+    console.log(
+      "[product-page] customer pricing effect - checking conditions:",
+      {
+        hasShopifyCustomerId: !!user?.shopifyCustomerId,
+        shopifyCustomerId: user?.shopifyCustomerId,
+        hasShopifyId: !!product?.shopifyId,
+        shopifyId: product?.shopifyId,
+      },
+    );
+
+    if (!user?.shopifyCustomerId || !product?.shopifyId) {
+      console.log(
+        "[product-page] early return - missing customerId or productId",
+      );
+      setCustomerPrice(null);
+      return;
+    }
+
+    let mounted = true;
+    (async () => {
+      try {
+        const customerId = user.shopifyCustomerId ?? "";
+        // Convert numeric product ID to Shopify GID format for database lookup
+        const productGid = `gid://shopify/Product/${product.shopifyId}`;
+        console.log("[product-page] fetching customer pricing with:", {
+          customerId,
+          productGid,
+        });
+
+        const resp = await fetch(
+          `/api/customer/pricing?customerId=${encodeURIComponent(customerId)}&productShopifyId=${encodeURIComponent(productGid)}`,
+        );
+
+        const json = await resp.json().catch(() => null);
+        console.log("DENEMEEEEE", {
+          customerId,
+          productGid,
+          response: json,
+        });
+        if (mounted) {
+          setCustomerPrice(json?.price ?? null);
+          if (json?.price) {
+            console.log(
+              `[product-page] customer pricing: $${json.price} for customerId=${customerId}, productGid=${productGid}`,
+            );
+          }
+        }
+      } catch (e) {
+        console.warn("[product-page] customer pricing fetch failed", e);
+        if (mounted) setCustomerPrice(null);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.shopifyCustomerId, product?.shopifyId]);
 
   // Test each image for validity (handles URLs that return 200 with broken content)
   useEffect(() => {
@@ -306,6 +369,11 @@ export default function ProductDetailPage() {
   }, [product]);
 
   const handleAddToCart = async () => {
+    if (!product) {
+      toast.error("Product data not available");
+      return;
+    }
+
     setAddingToCart(true);
 
     try {
@@ -369,14 +437,19 @@ export default function ProductDetailPage() {
         throw new Error(err?.message || "Failed to add to cart");
       }
 
-      // Update local session store for immediate UI feedback (apply tier price)
+      // Get Shopify original price from product variant
+      const originalPrice = Number(raw?.variants?.[0]?.price ?? 0) || undefined;
+
+      // Update local session store for immediate UI feedback (apply customer price or tier price)
       await addToCart({
         id: rotaNo || String(id),
         title,
-        price: Number(tierPrice ?? Number(price)),
+        price: displayPrice,
+        originalPrice: originalPrice,
         image,
         variantId,
         quantity: desiredQty,
+        productGid: `gid://shopify/Product/${product.shopifyId}`,
       });
 
       toast.success("Product added to cart!");
@@ -484,18 +557,36 @@ export default function ProductDetailPage() {
     (raw.title ?? "").replace(/\s*-\s*[\w\d]+$/, "").trim() ||
     (raw.title ?? "");
   const price = raw.variants?.[0]?.price ?? "0";
-  const formattedPrice = Number(price).toLocaleString("en-US", {
+  const originalPrice = Number(price);
+
+  // Price calculation with priority:
+  // 1. Customer pricing (if exists) - NO tier discount applied
+  // 2. Tier discount (if no customer pricing)
+  // 3. Original price (if no customer pricing or tier discount)
+  const discountPercentage = getDiscountForTier();
+  const tierDiscountPercentage = !customerPrice
+    ? (prismaDiscount ?? discountPercentage ?? null)
+    : null;
+
+  const priceCalc = calculateProductPrice({
+    originalPrice: originalPrice,
+    customerPrice: customerPrice,
+    tierDiscountPercentage: tierDiscountPercentage,
+  });
+
+  const displayPrice = priceCalc.displayPrice;
+  const strikethroughPrice = priceCalc.strikethroughPrice;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _hasCustomerPrice = priceCalc.hasCustomerPrice;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _hasTierDiscount = priceCalc.hasTierDiscount;
+
+  const formattedPrice = displayPrice.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  // tier pricing from session store, prefer Prisma-fetched discount when present
-  const discountPercentage = getDiscountForTier();
-  const effectiveDiscount = prismaDiscount ?? discountPercentage ?? null;
-  const tierPrice = effectiveDiscount
-    ? Number((Number(price) * (1 - effectiveDiscount / 100)).toFixed(2))
-    : null;
-  const formattedTierPrice = tierPrice
-    ? tierPrice.toLocaleString("en-US", {
+  const formattedStrikethrough = strikethroughPrice
+    ? Number(strikethroughPrice).toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })
@@ -828,14 +919,14 @@ export default function ProductDetailPage() {
           <h2 className="text-2xl md:text-6xl font-semibold text-gray-700">
             {rotaNo}
           </h2>
-          {Number(price) > 0 && (
+          {Number(originalPrice) > 0 && (
             <div className="flex items-baseline gap-3 flex-wrap">
               <span className="text-3xl font-extrabold text-secondary">
-                ${effectiveDiscount ? formattedTierPrice : formattedPrice} USD
+                ${formattedPrice} USD
               </span>
-              {effectiveDiscount && (
+              {formattedStrikethrough && (
                 <span className="text-base font-medium text-gray-400 line-through select-none">
-                  ${formattedPrice} USD
+                  ${formattedStrikethrough} USD
                 </span>
               )}
             </div>

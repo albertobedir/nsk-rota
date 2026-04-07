@@ -63,6 +63,14 @@ export default function SessionRefresher() {
     } catch (e) {
       console.debug("SessionRefresher: failed to fetch pricing tiers", e);
     }
+
+    try {
+      // Sync customer pricing from Shopify to database
+      await fetch(`/api/customer/sync-pricing`, { method: "POST" });
+      console.debug("SessionRefresher: customer pricing synced");
+    } catch (e) {
+      console.debug("SessionRefresher: failed to sync customer pricing", e);
+    }
   }, []);
 
   useEffect(() => {
