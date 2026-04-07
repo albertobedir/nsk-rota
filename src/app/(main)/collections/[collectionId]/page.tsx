@@ -172,6 +172,25 @@ export default async function Page({ params }: { params: any }) {
           ? raw.variants.map((v: any) => ({
               id: v?.id ? String(v.id) : undefined,
               price: v?.price ?? v?.price_amount,
+              inventory_locations: Array.isArray(v?.inventory_locations)
+                ? v.inventory_locations.map((inv: any) => ({
+                    location_id: inv?.location_id
+                      ? String(inv.location_id)
+                      : undefined,
+                    location_name: inv?.location_name
+                      ? String(inv.location_name)
+                      : undefined,
+                    location: inv?.location ? String(inv.location) : undefined,
+                    available:
+                      typeof inv?.available === "number"
+                        ? inv.available
+                        : undefined,
+                    quantity:
+                      typeof inv?.quantity === "number"
+                        ? inv.quantity
+                        : undefined,
+                  }))
+                : [],
             }))
           : [],
         metafields: Array.isArray(raw?.metafields)
