@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use server";
 
 import prisma from "@/lib/prisma/instance";
@@ -24,7 +25,16 @@ export async function POST(req: Request) {
       );
     }
 
-    const { email, firstName, lastName } = parsed.data;
+    const {
+      email,
+      firstName,
+      lastName,
+      companyName,
+      address1,
+      city,
+      state,
+      zip,
+    } = parsed.data;
     const normalizedEmail = email.trim().toLowerCase();
 
     const existingUser = await prisma.user.findUnique({
@@ -85,10 +95,22 @@ export async function POST(req: Request) {
                 <td style="padding:8px 0; font-weight:700; color:#111827;">E‑posta</td>
                 <td style="color:#374151;">${normalizedEmail}</td>
               </tr>
+              <tr>
+                <td style="padding:8px 0; font-weight:700; color:#111827;">Firma</td>
+                <td style="color:#374151;">${companyName}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0; font-weight:700; color:#111827;">Adres</td>
+                <td style="color:#374151;">${address1}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0; font-weight:700; color:#111827;">Şehir</td>
+                <td style="color:#374151;">${city}, ${state} ${zip}</td>
+              </tr>
             </table>
 
             <p style="margin-top:20px;">
-              <a href="https://rota-usa.com/add-member?email=${encodeURIComponent(normalizedEmail)}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}" style="display:inline-block; padding:12px 20px; background:#0a66c2; color:#fff; text-decoration:none; border-radius:8px; font-weight:700;">Kullanıcıyı Kaydet</a>
+              <a href="https://rota-usa.com/add-member?email=${encodeURIComponent(normalizedEmail)}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&companyName=${encodeURIComponent(companyName)}&address1=${encodeURIComponent(address1)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&zip=${encodeURIComponent(zip)}" style="display:inline-block; padding:12px 20px; background:#0a66c2; color:#fff; text-decoration:none; border-radius:8px; font-weight:700;">Kullanıcıyı Kaydet</a>
             </p>
 
             <p style="font-size:13px; color:#6b7280; margin-top:18px;">Bu e‑posta otomatik olarak gönderilmiştir. Destek için <a href="mailto:support@rota-usa.com" style="color:#0a66c2; text-decoration:none;">support@rota-usa.com</a> ile iletişime geçin.</p>

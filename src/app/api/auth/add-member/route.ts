@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use server";
 
 import { NextResponse } from "next/server";
@@ -14,6 +15,11 @@ type CreateUserBody = {
   email: string;
   firstName: string;
   lastName: string;
+  companyName: string;
+  address1: string;
+  city: string;
+  state: string;
+  zip: string;
 };
 
 const generateRandomPassword = (length: number = 12) =>
@@ -23,9 +29,27 @@ export async function POST(req: Request) {
   try {
     console.log("Step 1: Reading request body");
     const body: CreateUserBody = await req.json();
-    const { email, firstName, lastName } = body;
+    const {
+      email,
+      firstName,
+      lastName,
+      companyName,
+      address1,
+      city,
+      state,
+      zip,
+    } = body;
 
-    if (!email || !firstName || !lastName) {
+    if (
+      !email ||
+      !firstName ||
+      !lastName ||
+      !companyName ||
+      !address1 ||
+      !city ||
+      !state ||
+      !zip
+    ) {
       console.error("Step 1 Error: Missing required fields", body);
       return NextResponse.json(
         { message: "Missing required fields", received: body },
@@ -76,6 +100,183 @@ export async function POST(req: Request) {
     }
 
     // -------------------------------
+    // Step 4.5: Set Tax Exempt via Admin API
+    // -------------------------------
+    console.log("Step 4.5: Setting tax exempt for customer");
+    const shopifyCustomerId = shopifyCustomer.id; // gid://shopify/Customer/...
+
+    const adminMutation = `
+      mutation customerUpdate($input: CustomerInput!) {
+        customerUpdate(input: $input) {
+          customer {
+            id
+            taxExempt
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    try {
+      const adminResponse = await fetch(
+        `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-01/graphql.json`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!,
+          },
+          body: JSON.stringify({
+            query: adminMutation,
+            variables: {
+              input: {
+                id: shopifyCustomerId,
+                taxExempt: true, // ✅ Vergi tahsil etme
+              },
+            },
+          }),
+        },
+      );
+
+      const adminData = await adminResponse.json();
+      console.log("Step 4.5: Tax exempt response", JSON.stringify(adminData));
+
+      if (adminData.data?.customerUpdate?.userErrors?.length > 0) {
+        console.warn(
+          "Step 4.5 Warning: Tax exempt setting had errors",
+          adminData.data.customerUpdate.userErrors,
+        );
+      } else {
+        console.log(
+          "Step 4.5: Tax exempt set successfully for customer",
+          shopifyCustomerId,
+        );
+      }
+    } catch (taxErr) {
+      console.error("Step 4.5 Error: Failed to set tax exempt", taxErr);
+      // Continue anyway - don't fail the entire flow
+    }
+
+    // -------------------------------
+    // Step 4.6: Create Company in Shopify
+    // -------------------------------
+    console.log("Step 4.6: Creating company for customer");
+    let shopifyCompanyId: string | null = null;
+    try {
+      const companyRes = await fetch(
+        `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-01/graphql.json`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!,
+          },
+          body: JSON.stringify({
+            query: `mutation companyCreate($input: CompanyCreateInput!) {
+              companyCreate(input: $input) {
+                company { 
+                  id 
+                  name
+                  locations(first: 1) { edges { node { id } } }
+                }
+                userErrors { field message }
+              }
+            }`,
+            variables: {
+              input: {
+                company: { name: companyName },
+                companyLocation: {
+                  name: "Main Location",
+                  billingSameAsShipping: true,
+                  shippingAddress: {
+                    address1: address1,
+                    city: city,
+                    countryCode: "US",
+                    zoneCode: state,
+                    zip: zip,
+                  },
+                },
+              },
+            },
+          }),
+        },
+      );
+      const companyData = await companyRes.json();
+      const company = companyData?.data?.companyCreate?.company;
+      console.log("Step 4.6: Company created", company);
+
+      if (companyData.data?.companyCreate?.userErrors?.length > 0) {
+        console.warn(
+          "Step 4.6 Warning: Company creation had errors",
+          companyData.data.companyCreate.userErrors,
+        );
+      } else {
+        shopifyCompanyId = company?.id || null;
+      }
+
+      // Step 4.7: Assign Customer as Contact
+      // -----------------------------------
+      if (company?.id) {
+        console.log("Step 4.7: Assigning customer as company contact");
+        try {
+          const contactRes = await fetch(
+            `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-01/graphql.json`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Shopify-Access-Token":
+                  process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!,
+              },
+              body: JSON.stringify({
+                query: `mutation companyAssignCustomerAsContact($companyId: ID!, $customerId: ID!) {
+                  companyAssignCustomerAsContact(companyId: $companyId, customerId: $customerId) {
+                    companyContact {
+                      id
+                      customer { id email }
+                      isMainContact
+                    }
+                    userErrors { field message }
+                  }
+                }`,
+                variables: {
+                  companyId: company.id,
+                  customerId: shopifyCustomer.id,
+                },
+              }),
+            },
+          );
+          const contactData = await contactRes.json();
+          console.log(
+            "Step 4.7: Contact assigned",
+            JSON.stringify(contactData, null, 2),
+          );
+
+          if (
+            contactData.data?.companyAssignCustomerAsContact?.userErrors
+              ?.length > 0
+          ) {
+            console.warn(
+              "Step 4.7 Warning: Contact assignment had errors",
+              contactData.data.companyAssignCustomerAsContact.userErrors,
+            );
+          } else {
+            console.log("Step 4.7: Customer assigned as contact successfully");
+          }
+        } catch (contactErr) {
+          console.error("Step 4.7 Error: Failed to assign contact", contactErr);
+          // Continue anyway - don't fail the entire flow
+        }
+      }
+    } catch (companyErr) {
+      console.error("Step 4.6 Error: Failed to create company", companyErr);
+      // Continue anyway - don't fail the entire flow
+    }
+
+    // -------------------------------
     // DB kaydı
     // -------------------------------
     console.log("Step 5: Saving user to DB");
@@ -88,6 +289,12 @@ export async function POST(req: Request) {
         role: "user",
         password: hashedPassword,
         shopifyCustomerId: shopifyCustomer.id,
+        companyName: companyName,
+        shopifyCompanyId: shopifyCompanyId,
+        companyAddress1: address1,
+        companyCity: city,
+        companyState: state,
+        companyZip: zip,
       },
     });
 

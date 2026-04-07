@@ -64,39 +64,152 @@ export default function OrderDetailPage() {
 
         // Normalize line items: convert raw.line_items -> { edges: [{ node: {...} }] }
         const lineItemsEdges = ((): any[] => {
-          if (src.lineItems?.edges) return src.lineItems.edges;
-          const arr = raw.line_items || raw.lineItems || [];
+          console.log("\n=== 📦 LINE ITEMS DEBUG (Frontend) ===");
+          console.log("src.lineItems:", JSON.stringify(src.lineItems, null, 2));
+          console.log("raw.lineItems:", JSON.stringify(raw.lineItems, null, 2));
+          console.log(
+            "raw.line_items:",
+            JSON.stringify(raw.line_items, null, 2),
+          );
+          console.log("typeof raw.line_items:", typeof raw.line_items);
+          console.log(
+            "Array.isArray(raw.line_items):",
+            Array.isArray(raw.line_items),
+          );
+          console.log("=== END DEBUG ===\n");
+
+          // GraphQL formatı (Mongo'dan gelen yeni kayıtlar)
+          if (src.lineItems?.edges) {
+            return src.lineItems.edges.map((e: any) => {
+              const node = e.node;
+              const originalPrice = Number(
+                node.originalUnitPriceSet?.shopMoney?.amount || 0,
+              );
+              const discountedPrice = Number(
+                node.discountedUnitPriceSet?.shopMoney?.amount || originalPrice,
+              );
+              const currencyCode =
+                node.originalUnitPriceSet?.shopMoney?.currencyCode || "USD";
+              const discountDescription =
+                node.discountAllocations?.[0]?.discountApplication
+                  ?.description ||
+                node.discountAllocations?.[0]?.discountApplication?.title ||
+                null;
+
+              return {
+                node: {
+                  ...node,
+                  originalUnitPrice: originalPrice,
+                  discountedUnitPrice: discountedPrice,
+                  discountDescription,
+                  variant: {
+                    ...node.variant,
+                    price: {
+                      amount: String(originalPrice),
+                      currencyCode,
+                    },
+                  },
+                },
+              };
+            });
+          }
+
+          // raw içinde GraphQL formatı
+          if (raw.lineItems?.edges) {
+            return raw.lineItems.edges.map((e: any) => {
+              const node = e.node;
+              const originalPrice = Number(
+                node.originalUnitPriceSet?.shopMoney?.amount || 0,
+              );
+              const discountedPrice = Number(
+                node.discountedUnitPriceSet?.shopMoney?.amount || originalPrice,
+              );
+              const currencyCode =
+                node.originalUnitPriceSet?.shopMoney?.currencyCode ||
+                raw.currency ||
+                "USD";
+              const discountDescription =
+                node.discountAllocations?.[0]?.discountApplication
+                  ?.description ||
+                node.discountAllocations?.[0]?.discountApplication?.title ||
+                null;
+
+              return {
+                node: {
+                  ...node,
+                  originalUnitPrice: originalPrice,
+                  discountedUnitPrice: discountedPrice,
+                  discountDescription,
+                  variant: {
+                    ...node.variant,
+                    price: {
+                      amount: String(originalPrice),
+                      currencyCode,
+                    },
+                  },
+                },
+              };
+            });
+          }
+
+          // REST formatı (eski kayıtlar)
+          const arr = Array.isArray(raw.line_items)
+            ? raw.line_items
+            : Array.isArray(raw.lineItems)
+              ? raw.lineItems
+              : [];
+
           const discountApplications: any[] = raw.discount_applications || [];
 
+          // Safety check
+          if (!Array.isArray(arr)) {
+            console.warn("line_items is not an array, returning empty");
+            return [];
+          }
+
           return arr.map((li: any) => {
-            const originalPrice = Number(li.price || 0);
-            const qty = li.quantity ?? li.current_quantity ?? 1;
+            // GraphQL formatı
+            const originalPrice = Number(
+              li.originalUnitPriceSet?.shopMoney?.amount || li.price || 0,
+            );
+            const discountedPrice = Number(
+              li.discountedUnitPriceSet?.shopMoney?.amount || originalPrice,
+            );
+            const currencyCode =
+              li.originalUnitPriceSet?.shopMoney?.currencyCode ||
+              raw.currency ||
+              "USD";
 
-            // Find discount using discount_application_index
-            const allocation = li.discount_allocations?.[0];
-            const appIndex = allocation?.discount_application_index ?? null;
-            const discountApp =
-              appIndex != null ? discountApplications[appIndex] : null;
-
-            const totalDiscount = Number(li.total_discount || 0);
-            const discountPerItem = qty > 0 ? totalDiscount / qty : 0;
-            const discountedPrice = originalPrice - discountPerItem;
+            const discountDescription =
+              li.discountAllocations?.[0]?.discountApplication?.description ||
+              li.discountAllocations?.[0]?.discountApplication?.title ||
+              ((): string | null => {
+                const allocation = li.discount_allocations?.[0];
+                const appIndex = allocation?.discount_application_index ?? null;
+                const discountApp =
+                  appIndex != null ? discountApplications[appIndex] : null;
+                return discountApp?.description ?? discountApp?.title ?? null;
+              })() ||
+              null;
 
             return {
               node: {
                 title: li.title || li.name,
-                quantity: qty,
+                quantity: li.quantity ?? 1,
                 productId: li.product_id ?? null,
                 originalUnitPrice: originalPrice,
                 discountedUnitPrice: discountedPrice,
-                discountDescription:
-                  discountApp?.description ?? discountApp?.title ?? null,
-                discountValue: discountApp?.value ?? null,
+                discountDescription,
+                discountValue:
+                  li.discountAllocations?.[0]?.allocatedAmountSet?.shopMoney
+                    ?.amount ?? null,
                 variant: {
-                  image: { url: li.image?.src || li.image?.url || null },
+                  image: {
+                    url: li.variant?.image?.url || li.image?.src || null,
+                  },
                   price: {
-                    amount: li.price || null,
-                    currencyCode: raw.currency || null,
+                    amount: String(originalPrice),
+                    currencyCode,
                   },
                 },
               },
@@ -110,15 +223,25 @@ export default function OrderDetailPage() {
           orderNumber:
             src.orderNumber || src.order_number || raw.order_number || src.name,
           processedAt: src.processedAt || raw.processed_at || src.createdAt,
-          financialStatus: src.financialStatus || raw.financial_status,
-          fulfillmentStatus: src.fulfillmentStatus || raw.fulfillment_status,
+          financialStatus:
+            src.financialStatus ||
+            raw.displayFinancialStatus ||
+            raw.financial_status,
+          fulfillmentStatus:
+            src.fulfillmentStatus ||
+            raw.displayFulfillmentStatus ||
+            raw.fulfillment_status,
           totalPrice: {
             amount:
+              src.totalPriceSet?.shopMoney?.amount ||
+              raw.totalPriceSet?.shopMoney?.amount ||
               src.totalPrice?.amount ||
               raw.total_price ||
               raw.current_total_price ||
               null,
             currencyCode:
+              src.totalPriceSet?.shopMoney?.currencyCode ||
+              raw.totalPriceSet?.shopMoney?.currencyCode ||
               src.totalPrice?.currencyCode ||
               raw.currency ||
               raw.presentment_currency ||
@@ -159,8 +282,17 @@ export default function OrderDetailPage() {
           lineItems: { edges: lineItemsEdges },
           trackings: (() => {
             const fulfillments: any[] = raw.fulfillments || [];
-            return fulfillments.flatMap((f: any) =>
-              (f.tracking_numbers || [f.tracking_number])
+            return fulfillments.flatMap((f: any) => {
+              // GraphQL formatı
+              if (f.trackingInfo) {
+                return (f.trackingInfo || []).map((t: any) => ({
+                  company: t.company || f.trackingCompany || null,
+                  number: t.number || null,
+                  url: t.url || null,
+                }));
+              }
+              // REST formatı (eski kayıtlar)
+              return (f.tracking_numbers || [f.tracking_number])
                 .filter(Boolean)
                 .map((_: string, i: number) => ({
                   company: f.tracking_company || null,
@@ -170,8 +302,8 @@ export default function OrderDetailPage() {
                     (f.tracking_urls || [f.tracking_url])[i] ||
                     f.tracking_url ||
                     null,
-                })),
-            );
+                }));
+            });
           })(),
         } as any;
 
@@ -353,12 +485,21 @@ export default function OrderDetailPage() {
           ← Back to orders
         </button>
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-semibold">Order Detail</h2>
+          <div className="flex flex-col">
+            <div className="text-xs text-slate-500">Order Details</div>
+            <h2 className="text-lg font-semibold">
+              {loading ? "Loading..." : order?.orderNumber || "Order"}
+            </h2>
+          </div>
           <button
             type="button"
             onClick={() => {
               const params = new URLSearchParams();
-              params.append("id", id as string);
+              // Extract numeric ID from full GID if present
+              const numericId = (id as string).includes("/")
+                ? (id as string).split("/").pop() || (id as string)
+                : (id as string);
+              params.append("id", numericId as string);
               if (user?.id) {
                 params.append("customerId", user.id);
               }
@@ -522,10 +663,24 @@ export default function OrderDetailPage() {
                       <div className="text-sm text-slate-600">
                         Qty: {node.quantity}
                       </div>
-                      {node.variant?.price?.amount &&
+                      {(node.originalUnitPriceSet?.shopMoney?.amount ||
+                        node.variant?.price?.amount) &&
                         (() => {
-                          const originalAmt = Number(node.variant.price.amount);
-                          const discountedAmt = node.discountedUnitPrice;
+                          const originalAmt = Number(
+                            node.originalUnitPriceSet?.shopMoney?.amount ||
+                              node.variant?.price?.amount ||
+                              0,
+                          );
+                          const discountedAmt = Number(
+                            node.discountedUnitPriceSet?.shopMoney?.amount ||
+                              node.discountedUnitPrice ||
+                              originalAmt,
+                          );
+                          const currencyCode =
+                            node.originalUnitPriceSet?.shopMoney
+                              ?.currencyCode ||
+                            node.variant?.price?.currencyCode ||
+                            "USD";
                           const hasDiscount =
                             discountedAmt != null &&
                             discountedAmt < originalAmt;
@@ -535,12 +690,10 @@ export default function OrderDetailPage() {
                               {hasDiscount ? (
                                 <>
                                   <span className="text-sm text-gray-400 line-through">
-                                    ${originalAmt.toFixed(2)}{" "}
-                                    {node.variant.price.currencyCode}
+                                    ${originalAmt.toFixed(2)} {currencyCode}
                                   </span>
                                   <span className="text-sm font-semibold text-secondary">
-                                    ${discountedAmt.toFixed(2)}{" "}
-                                    {node.variant.price.currencyCode}
+                                    ${discountedAmt.toFixed(2)} {currencyCode}
                                   </span>
                                   {node.discountDescription && (
                                     <span className="text-xs text-green-600">
@@ -550,8 +703,7 @@ export default function OrderDetailPage() {
                                 </>
                               ) : (
                                 <span className="text-sm">
-                                  ${originalAmt.toFixed(2)}{" "}
-                                  {node.variant.price.currencyCode}
+                                  ${originalAmt.toFixed(2)} {currencyCode}
                                 </span>
                               )}
                             </div>

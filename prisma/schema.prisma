@@ -62,6 +62,16 @@ model User {
   shopifyCustomerId String?  // Shopify customer GID (gid://shopify/Customer/...)
   shopifyTags       Json?
   tier              String?
+
+  // Company information
+  companyName       String?   // Müşteri şirket adı
+  shopifyCompanyId  String?   // Shopify company GID (gid://shopify/Company/...)
+  
+  // Company address (Shopify company location için kullanılır)
+  companyAddress1   String?   // Şirket adresi
+  companyCity       String?   // Şirket şehri
+  companyState      String?   // Şirket eyalet (IL, NY, vb)
+  companyZip        String?   // Şirket posta kodu
 }
 
 model CustomerPricing {

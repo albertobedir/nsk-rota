@@ -18,6 +18,11 @@ export default function AddMemberPageClient() {
   const [email, setEmail] = useState<string>("");
   const [firstName, setFirstName] = useState<string>("");
   const [lastName, setLastName] = useState<string>("");
+  const [companyName, setCompanyName] = useState<string>("");
+  const [address1, setAddress1] = useState<string>("");
+  const [city, setCity] = useState<string>("");
+  const [state, setState] = useState<string>("");
+  const [zip, setZip] = useState<string>("");
   const router = useRouter();
 
   useEffect(() => {
@@ -25,9 +30,19 @@ export default function AddMemberPageClient() {
       const e = searchParams.get("email") || "";
       const f = searchParams.get("firstName") || "";
       const l = searchParams.get("lastName") || "";
+      const c = searchParams.get("companyName") || "";
+      const a = searchParams.get("address1") || "";
+      const ci = searchParams.get("city") || "";
+      const st = searchParams.get("state") || "";
+      const z = searchParams.get("zip") || "";
       setEmail(e);
       setFirstName(f);
       setLastName(l);
+      setCompanyName(c);
+      setAddress1(a);
+      setCity(ci);
+      setState(st);
+      setZip(z);
       setLoading(false);
     }
 
@@ -35,8 +50,19 @@ export default function AddMemberPageClient() {
   }, [searchParams]);
 
   async function createUserConfirmed() {
-    if (!email || !firstName || !lastName) {
-      setMessage("Missing parameter: email, firstName or lastName");
+    if (
+      !email ||
+      !firstName ||
+      !lastName ||
+      !companyName ||
+      !address1 ||
+      !city ||
+      !state ||
+      !zip
+    ) {
+      setMessage(
+        "Missing parameter: email, firstName, lastName, companyName, address1, city, state or zip",
+      );
       setSuccess(false);
       return;
     }
@@ -48,7 +74,16 @@ export default function AddMemberPageClient() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, firstName, lastName }),
+        body: JSON.stringify({
+          email,
+          firstName,
+          lastName,
+          companyName,
+          address1,
+          city,
+          state,
+          zip,
+        }),
       });
 
       const data = await response.json();
@@ -108,14 +143,22 @@ export default function AddMemberPageClient() {
               </div>
             ) : (
               <div className="space-y-6">
-                {!email || !firstName || !lastName ? (
+                {!email ||
+                !firstName ||
+                !lastName ||
+                !companyName ||
+                !address1 ||
+                !city ||
+                !state ||
+                !zip ? (
                   <div className="p-4 rounded-md border bg-rose-50 border-rose-200">
                     <h3 className="text-lg font-medium mb-2">
                       Missing Parameter
                     </h3>
                     <p className="text-sm text-muted-foreground">
                       URL parameters are missing. Please include email,
-                      firstName and lastName parameters.
+                      firstName, lastName, companyName, address1, city, state
+                      and zip parameters.
                     </p>
                     <div className="mt-4 flex gap-3">
                       <Link
@@ -137,6 +180,13 @@ export default function AddMemberPageClient() {
                       </div>
                       <div>
                         <strong>Email:</strong> {email}
+                      </div>
+                      <div>
+                        <strong>Company:</strong> {companyName}
+                      </div>
+                      <div>
+                        <strong>Address:</strong> {address1}, {city}, {state}{" "}
+                        {zip}
                       </div>
                     </div>
 

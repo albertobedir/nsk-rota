@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -134,7 +135,7 @@ export default function LoginForm() {
         <span className="text-center w-full mt-10 text-xl">
           Are you new here?{" "}
           <Link href={"/auth/subscribe"} className="text-secondary">
-            Subscribe now
+            Create now
           </Link>
         </span>
       </CardContent>

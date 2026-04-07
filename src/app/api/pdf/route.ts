@@ -24,8 +24,13 @@ export async function GET(req: Request) {
     let customer: Record<string, any> | null = null;
     if (customerId) {
       try {
-        customer = await prisma.user.findUnique({
-          where: { id: customerId },
+        customer = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { id: customerId }, // cuid ile dene
+              { shopifyCustomerId: customerId }, // GID ile dene
+            ],
+          },
         });
       } catch (_err) {
         customer = null;
@@ -45,58 +50,188 @@ export async function GET(req: Request) {
           const raw = (src.raw || {}) as any;
 
           const lineItemsEdges = ((): any[] => {
-            if (src.lineItems?.edges) return src.lineItems.edges;
-            const arr = raw.line_items || raw.lineItems || [];
+            console.log("\n=== 📦 PDF LINE ITEMS DEBUG ===");
+            console.log(
+              "PDF src.lineItems:",
+              JSON.stringify(src.lineItems, null, 2),
+            );
+            console.log(
+              "PDF raw.lineItems:",
+              JSON.stringify(raw.lineItems, null, 2),
+            );
+
+            // GraphQL formatı (Mongo'dan gelen yeni kayıtlar)
+            if (src.lineItems?.edges) {
+              console.log("✅ Using src.lineItems.edges");
+              return src.lineItems.edges.map((e: any) => {
+                const node = e.node;
+                const originalPrice = Number(
+                  node.originalUnitPriceSet?.shopMoney?.amount || 0,
+                );
+                const discountedPrice = Number(
+                  node.discountedUnitPriceSet?.shopMoney?.amount ||
+                    originalPrice,
+                );
+                const currencyCode =
+                  node.originalUnitPriceSet?.shopMoney?.currencyCode || "USD";
+                const discountDescription =
+                  node.discountAllocations?.[0]?.discountApplication
+                    ?.description ||
+                  node.discountAllocations?.[0]?.discountApplication?.title ||
+                  null;
+
+                return {
+                  node: {
+                    ...node,
+                    originalUnitPrice: originalPrice,
+                    discountedUnitPrice: discountedPrice,
+                    discountDescription,
+                    variant: {
+                      ...node.variant,
+                      price: {
+                        amount: String(originalPrice),
+                        currencyCode,
+                      },
+                    },
+                  },
+                };
+              });
+            }
+
+            // raw içinde GraphQL formatı
+            if (raw.lineItems?.edges) {
+              console.log("✅ Using raw.lineItems.edges");
+              return raw.lineItems.edges.map((e: any) => {
+                const node = e.node;
+                const originalPrice = Number(
+                  node.originalUnitPriceSet?.shopMoney?.amount || 0,
+                );
+                const discountedPrice = Number(
+                  node.discountedUnitPriceSet?.shopMoney?.amount ||
+                    originalPrice,
+                );
+                const currencyCode =
+                  node.originalUnitPriceSet?.shopMoney?.currencyCode ||
+                  raw.currency ||
+                  "USD";
+                const discountDescription =
+                  node.discountAllocations?.[0]?.discountApplication
+                    ?.description ||
+                  node.discountAllocations?.[0]?.discountApplication?.title ||
+                  null;
+
+                return {
+                  node: {
+                    ...node,
+                    originalUnitPrice: originalPrice,
+                    discountedUnitPrice: discountedPrice,
+                    discountDescription,
+                    variant: {
+                      ...node.variant,
+                      price: {
+                        amount: String(originalPrice),
+                        currencyCode,
+                      },
+                    },
+                  },
+                };
+              });
+            }
+
+            // REST formatı (eski kayıtlar)
+            const arr = Array.isArray(raw.line_items)
+              ? raw.line_items
+              : Array.isArray(raw.lineItems)
+                ? raw.lineItems
+                : [];
+
+            console.log("Using REST fallback, arr length:", arr.length);
+
             const discountApplications: any[] = raw.discount_applications || [];
 
-            return arr.map((li: any) => {
-              const originalPrice = Number(li.price || 0);
-              const qty = li.quantity ?? li.current_quantity ?? 1;
-              const allocation = li.discount_allocations?.[0];
-              const appIndex = allocation?.discount_application_index ?? null;
-              const discountApp =
-                appIndex != null ? discountApplications[appIndex] : null;
-              const totalDiscount = Number(li.total_discount || 0);
-              const discountPerItem = qty > 0 ? totalDiscount / qty : 0;
-              const discountedPrice = originalPrice - discountPerItem;
+            // Safety check
+            if (!Array.isArray(arr)) {
+              console.warn("line_items is not an array, returning empty");
+              return [];
+            }
+
+            const edges = arr.map((li: any) => {
+              // GraphQL formatı
+              const originalPrice = Number(
+                li.originalUnitPriceSet?.shopMoney?.amount || li.price || 0,
+              );
+              const discountedPrice = Number(
+                li.discountedUnitPriceSet?.shopMoney?.amount || originalPrice,
+              );
+              const currencyCode =
+                li.originalUnitPriceSet?.shopMoney?.currencyCode ||
+                raw.currency ||
+                "USD";
+
+              // Get discount description from discountAllocations (GraphQL) or discount_applications (REST)
+              const discountDescription =
+                li.discountAllocations?.[0]?.discountApplication?.description ||
+                li.discountAllocations?.[0]?.discountApplication?.title ||
+                ((): string | null => {
+                  const allocation = li.discount_allocations?.[0];
+                  const appIndex =
+                    allocation?.discount_application_index ?? null;
+                  const discountApp =
+                    appIndex != null ? discountApplications[appIndex] : null;
+                  return discountApp?.description ?? discountApp?.title ?? null;
+                })() ||
+                null;
 
               return {
                 node: {
                   title: li.title || li.name,
-                  quantity: qty,
+                  quantity: li.quantity ?? 1,
                   sku: li.sku || li.variant_title || "",
                   originalUnitPrice: originalPrice,
                   discountedUnitPrice: discountedPrice,
-                  discountDescription:
-                    discountApp?.description ?? discountApp?.title ?? null,
+                  discountDescription,
                   variant: {
                     price: {
-                      amount: li.price || null,
-                      currencyCode: raw.currency || null,
+                      amount: String(originalPrice),
+                      currencyCode,
                     },
                   },
                 },
               };
             });
+            console.log("PDF lineItemsEdges length:", edges.length);
+            console.log("=== END PDF DEBUG ===\n");
+            return edges;
           })();
 
           order = {
-            id: src._id?.toString?.() || src.id || src.shopifyId || raw.id,
+            fulfillmentStatus:
+              src.fulfillmentStatus ||
+              raw.displayFulfillmentStatus ||
+              raw.fulfillment_status,
+            financialStatus:
+              src.financialStatus ||
+              raw.displayFinancialStatus ||
+              raw.financial_status,
+            processedAt:
+              src.processedAt ||
+              src.createdAt ||
+              raw.createdAt ||
+              raw.processed_at ||
+              null,
             orderNumber:
-              src.orderNumber ||
-              src.order_number ||
-              raw.order_number ||
-              src.name,
-            processedAt: src.processedAt || raw.processed_at || src.createdAt,
-            financialStatus: src.financialStatus || raw.financial_status,
-            fulfillmentStatus: src.fulfillmentStatus || raw.fulfillment_status,
+              src.orderNumber || src.name || raw.name || raw.order_number || id,
             totalPrice: {
               amount:
+                src.totalPriceSet?.shopMoney?.amount ||
+                raw.totalPriceSet?.shopMoney?.amount ||
                 src.totalPrice?.amount ||
                 raw.total_price ||
                 raw.current_total_price ||
                 null,
               currencyCode:
+                src.totalPriceSet?.shopMoney?.currencyCode ||
+                raw.totalPriceSet?.shopMoney?.currencyCode ||
                 src.totalPrice?.currencyCode ||
                 raw.currency ||
                 raw.presentment_currency ||
@@ -148,6 +283,11 @@ export async function GET(req: Request) {
                 : null),
             lineItems: { edges: lineItemsEdges },
             customer: src.customer || raw.customer || null,
+            shipping:
+              raw.totalShippingPriceSet?.shopMoney?.amount ||
+              raw.shipping_lines?.[0]?.price ||
+              0,
+            taxes: raw.totalTaxSet?.shopMoney?.amount || raw.total_tax || 0,
           } as any;
         }
       } catch (_err) {
@@ -272,7 +412,7 @@ export async function GET(req: Request) {
       .text("Schaumburg, IL 60173, USA", supplierX, supplierBodyY + 23);
 
     // Meta block: Date / Invoice No / Page
-    const orderNum = order?.orderNumber || order?.id || id || "-";
+    const orderNum = order?.name || `#${order?.orderNumber}` || id || "-";
     const dateStr = formatDate(order?.processedAt);
 
     const metaRow = (label: string, val: string, y: number) => {
@@ -288,7 +428,7 @@ export async function GET(req: Request) {
         .text(val, metaX + metaLabelW, y, { width: metaValW });
     };
     metaRow("Date:", dateStr, curY);
-    metaRow("Invoice No:", `#${orderNum}`, curY + 13);
+    metaRow("Invoice No:", orderNum, curY + 13);
     metaRow("Page:", "1", curY + 26);
 
     curY += 55;
@@ -330,6 +470,12 @@ export async function GET(req: Request) {
 
         const phone = customer.phone || "";
         if (phone) lines.push(phone);
+
+        const companyName = customer.companyName || "";
+        if (companyName) lines.push(companyName);
+
+        const customerCode = customer.customerCode || "";
+        if (customerCode) lines.push(`Code: ${customerCode}`);
       }
 
       if (addr) {

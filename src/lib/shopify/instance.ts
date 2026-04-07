@@ -48,8 +48,12 @@ export async function shopifyAdminFetch<TVariables>({
   );
 
   if (!response.ok) {
+    const text = await response.text();
+    console.error("Shopify Admin API error:", response.status, text);
     throw new Error("Shopify Admin API request failed");
   }
 
-  return response.json();
+  const json = await response.json();
+  console.log("shopifyAdminFetch raw json:", JSON.stringify(json, null, 2));
+  return json;
 }

@@ -50,6 +50,46 @@ const formFields: FormFieldProps[] = [
     required: true,
     label: "Email",
   },
+  {
+    register: "companyName",
+    type: "text",
+    placeholder: "Company Name",
+    autoComplete: "organization",
+    required: true,
+    label: "Company Name",
+  },
+  {
+    register: "address1",
+    type: "text",
+    placeholder: "Street Address",
+    autoComplete: "street-address",
+    required: true,
+    label: "Address",
+  },
+  {
+    register: "city",
+    type: "text",
+    placeholder: "City",
+    autoComplete: "address-level2",
+    required: true,
+    label: "City",
+  },
+  {
+    register: "state",
+    type: "text",
+    placeholder: "State (IL, NY, etc)",
+    autoComplete: "address-level1",
+    required: true,
+    label: "State",
+  },
+  {
+    register: "zip",
+    type: "text",
+    placeholder: "Zip Code",
+    autoComplete: "postal-code",
+    required: true,
+    label: "Zip Code",
+  },
 ];
 
 export default function Page() {
@@ -59,6 +99,11 @@ export default function Page() {
       email: "",
       firstName: "",
       lastName: "",
+      companyName: "",
+      address1: "",
+      city: "",
+      state: "",
+      zip: "",
     },
   });
 

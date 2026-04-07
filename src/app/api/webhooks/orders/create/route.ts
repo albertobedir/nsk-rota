@@ -272,6 +272,18 @@ export async function POST(req: NextRequest) {
     console.log("Customer ID:", orderData.customer?.id);
     console.log("Tags:", orderData.tags);
 
+    // 🔍 ADDRESS DEBUGGING
+    console.log("\n=== 📍 ADDRESS DATA ===");
+    console.log(
+      "Billing Address:",
+      JSON.stringify(orderData.billing_address, null, 2),
+    );
+    console.log(
+      "Shipping Address:",
+      JSON.stringify(orderData.shipping_address, null, 2),
+    );
+    console.log("=== END ADDRESS ===\n");
+
     // Check if this is a credit-card-payment order (from Pay Order flow)
     // These orders should NOT have automatic credit deduction
     const orderTags: string[] = (orderData.tags ?? "")

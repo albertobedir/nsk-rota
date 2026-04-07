@@ -34,9 +34,16 @@ export default function OrderHistoryPage() {
     setLoading(true);
     setError(null);
     try {
-      const headers: Record<string, string> = {};
-      if (user?.email) headers["x-user-email"] = user.email;
-      const res = await fetch("/api/orders", { headers });
+      if (!user?.id) {
+        setOrders([]);
+        setError("Not logged in or missing customer info.");
+        setLoading(false);
+        return;
+      }
+
+      const res = await fetch(
+        `/api/orders?customerId=${encodeURIComponent(user.id)}`,
+      );
       if (res.status === 401) {
         setOrders([]);
         setError("Not logged in or missing customer info.");
@@ -44,6 +51,12 @@ export default function OrderHistoryPage() {
         return;
       }
       const data = await res.json();
+
+      // 🔍 DEBUG: Log API response
+      console.log("📦 API response:", data);
+      console.log("Orders array:", data.orders);
+      console.log("Orders count:", data.orders?.length);
+
       if (!data?.ok) {
         setError(data?.error || "Failed to fetch orders");
         setOrders([]);
@@ -66,7 +79,11 @@ export default function OrderHistoryPage() {
         })
         .map((o: any) => {
           const orderNo = o.name || o.order_number || o.id || "";
-          const id = o.id || "";
+          // Extract numeric ID from full GID (e.g., "gid://shopify/Order/6614677946439" → "6614677946439")
+          const fullId = o.id || "";
+          const id = fullId.includes("/")
+            ? fullId.split("/").pop() || fullId
+            : fullId;
           const orderDate = o.createdAt || o.created_at || "";
           const total = o.totalPriceSet?.shopMoney
             ? `${o.totalPriceSet.shopMoney.amount} ${o.totalPriceSet.shopMoney.currencyCode}`
@@ -83,20 +100,37 @@ export default function OrderHistoryPage() {
           const fulfillments: any[] = Array.isArray(o.fulfillments)
             ? o.fulfillments
             : [];
+
           const trackingNumbers = fulfillments
-            .flatMap((f: any) =>
-              f.tracking_numbers?.length
+            .flatMap((f: any) => {
+              // GraphQL formatı
+              if (f.trackingInfo?.length) {
+                return f.trackingInfo.map((t: any) => t.number).filter(Boolean);
+              }
+              // REST formatı
+              return f.tracking_numbers?.length
                 ? f.tracking_numbers
                 : f.tracking_number
                   ? [f.tracking_number]
-                  : [],
-            )
+                  : [];
+            })
             .join(", ");
+
           const trackingUrl: string =
-            fulfillments.find((f: any) => f.tracking_url)?.tracking_url ||
-            fulfillments.find((f: any) => f.tracking_urls?.length)
-              ?.tracking_urls?.[0] ||
-            "";
+            fulfillments
+              .flatMap((f: any) => {
+                // GraphQL formatı
+                if (f.trackingInfo?.length) {
+                  return f.trackingInfo.map((t: any) => t.url).filter(Boolean);
+                }
+                // REST formatı
+                return f.tracking_urls?.length
+                  ? f.tracking_urls
+                  : f.tracking_url
+                    ? [f.tracking_url]
+                    : [];
+              })
+              .find(Boolean) || "";
 
           return {
             id,
@@ -122,7 +156,7 @@ export default function OrderHistoryPage() {
   useEffect(() => {
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.email]);
+  }, [user?.id]);
 
   const rows = orders.filter((o) => {
     if (orderNo && !o.orderNo.includes(orderNo)) return false;

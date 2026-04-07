@@ -7,7 +7,7 @@ import Order from "@/schemas/mongoose/order";
 
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string } | Promise<{ id: string }> }
+  { params }: { params: { id: string } | Promise<{ id: string }> },
 ) {
   // prefer route params (which may be a Promise), but fall back to parsing the id from the request URL
   let resolvedParams: { id: string } | undefined = undefined;
@@ -31,7 +31,7 @@ export async function GET(
     if (!id) {
       return NextResponse.json(
         { ok: false, error: "Missing id" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -50,34 +50,63 @@ export async function GET(
     const shopifyCandidate = shopifyCandidateMatch
       ? shopifyCandidateMatch[1]
       : id.includes("/")
-      ? id.split("/").pop() || id
-      : id;
+        ? id.split("/").pop() || id
+        : id;
 
-    // Try matching by shopifyId (most common for this flow)
+    // Try matching by shopifyId (numeric first)
     if (!order) {
+      console.log("\n=== 🔍 MONGO SEARCH DEBUG ===");
+      console.log("Searching by numeric shopifyId:", shopifyCandidate);
       order = await Order.findOne({ shopifyId: shopifyCandidate }).lean();
+      console.log("Result:", order ? "✅ Found" : "❌ Not found");
+    }
+
+    // Try matching by full GID format
+    if (!order) {
+      const fullGid = `gid://shopify/Order/${shopifyCandidate}`;
+      console.log("Searching by full GID:", fullGid);
+      order = await Order.findOne({
+        shopifyId: fullGid,
+      }).lean();
+      console.log("Result:", order ? "✅ Found" : "❌ Not found");
     }
 
     // Fallback: try numeric orderNumber when candidate is numeric
     if (!order && !Number.isNaN(Number(shopifyCandidate))) {
+      console.log("Searching by orderNumber:", Number(shopifyCandidate));
       order = await Order.findOne({
         orderNumber: Number(shopifyCandidate),
       }).lean();
+      console.log("Result:", order ? "✅ Found" : "❌ Not found");
     }
 
     if (!order) {
+      console.log("❌ ORDER NOT FOUND - No matching records in Mongo");
+      console.log("=== END MONGO SEARCH ===\n");
       return NextResponse.json(
         { ok: false, error: "Order not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
+
+    console.log("✅ ORDER FOUND");
+    console.log("Mongo order raw field exists:", !!order.raw);
+    console.log(
+      "Mongo order raw.line_items:",
+      order.raw?.line_items ? "exists" : "missing",
+    );
+    console.log(
+      "Mongo order raw.lineItems:",
+      order.raw?.lineItems ? "exists" : "missing",
+    );
+    console.log("=== END MONGO SEARCH ===\n");
 
     // Return shape expected by the client page (d.data.data.node)
     return NextResponse.json({ ok: true, data: { data: { node: order } } });
   } catch (err: any) {
     return NextResponse.json(
       { ok: false, error: err?.message || String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
