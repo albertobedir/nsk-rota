@@ -711,12 +711,14 @@ export async function GET(req: Request) {
               width: COL.price - 6,
               align: "right",
             });
+          // Manual rendering yapıldığı için rx artırmamız gerekiyor
+          rx += COL.price;
         } else {
           rCell(formatMoney(unitPrice, currency), COL.price, {
             align: "right",
           });
+          // rCell zaten rx artırıyor, ekstra artırma gerek yok
         }
-        rx += COL.price;
 
         rCell(formatMoney(lineTotal, currency), COL.total, {
           bold: true,

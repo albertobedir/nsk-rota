@@ -1298,6 +1298,7 @@ export default function ProductDetailPage() {
 
                 const href = `/products/${cp.shopifyId ?? cp._id}`;
                 const compTech = getTechnicalRows(cp.raw.metafields || []);
+                const inventory = cp.raw.variants?.[0]?.inventory_quantity ?? 0;
 
                 return (
                   <div
@@ -1327,9 +1328,9 @@ export default function ProductDetailPage() {
                         <a href={href} className="hover:underline">
                           {cpRota}
                         </a>{" "}
-                        {qty > 1 && (
-                          <span className="text-base font-normal">
-                            (X {qty})
+                        {inventory > 0 && (
+                          <span className="text-base font-bold">
+                            (X{inventory})
                           </span>
                         )}
                       </div>

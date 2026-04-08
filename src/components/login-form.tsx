@@ -135,7 +135,7 @@ export default function LoginForm() {
         <span className="text-center w-full mt-10 text-xl">
           Are you new here?{" "}
           <Link href={"/auth/subscribe"} className="text-secondary">
-            Create now
+            Create an account
           </Link>
         </span>
       </CardContent>
