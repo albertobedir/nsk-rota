@@ -60,12 +60,10 @@ export default function LoginForm() {
   });
 
   const { mutate, isPending } = useMutation({
-    mutationFn: async (values: z.infer<typeof loginSchema>) => {
-      await auth.login(values);
-    },
-    onSuccess: () => {
+    mutationFn: (values: z.infer<typeof loginSchema>) => auth.login(values),
+    onSuccess: (data) => {
       const redirect = searchParams.get("redirect") || "/";
-      router.push(redirect);
+      router.replace(redirect);
     },
     onError: (error: unknown) => {
       if (error instanceof Error) {

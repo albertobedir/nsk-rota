@@ -323,14 +323,14 @@ export async function POST(request: NextRequest) {
             if (isFixedAmount) {
               if (tierOnly > 0) {
                 baseItem.appliedDiscount = {
-                  value: tierOnly,
+                  value: Math.round(tierOnly * 100) / 100,
                   valueType: "PERCENTAGE",
                   description: `B2B Tier - ${tierOnly.toFixed(2)}% off`,
                 };
               }
             } else {
               baseItem.appliedDiscount = {
-                value: resolvedDiscount,
+                value: Math.round(resolvedDiscount * 100) / 100,
                 valueType: "PERCENTAGE",
                 description: `B2B Tier & Discount Code - ${resolvedDiscount.toFixed(2)}% off`,
               };
@@ -358,7 +358,7 @@ export async function POST(request: NextRequest) {
     const orderDiscount =
       validatedDiscount?.codeValueType === "FIXED_AMOUNT"
         ? {
-            value: validatedDiscount.codeValue,
+            value: Math.round(validatedDiscount.codeValue * 100) / 100,
             valueType: "FIXED_AMOUNT" as const,
             description: `Discount Code: ${discountCode}`,
           }

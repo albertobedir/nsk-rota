@@ -48,6 +48,7 @@ model User {
   addressLine1  String?
   addressLine2  String?
   city          String?
+  state         String?   // Eyalet (IL, NY, vb)
   zip           String?
 
   // Flexible JSON fields for billing/shipping address objects

@@ -39,7 +39,7 @@ class Auth {
 
       return response.data;
     } catch (error) {
-      return handleAxiosError(error);
+      throw handleAxiosError(error);
     }
   };
 

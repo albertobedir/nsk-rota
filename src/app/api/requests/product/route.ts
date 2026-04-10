@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import { getValidAdminEmails } from "@/lib/email/admin-emails";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@example.com";
+    const adminEmails = getValidAdminEmails();
+    if (!adminEmails || adminEmails.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "ADMIN_EMAILS not configured" },
+        { status: 500 },
+      );
+    }
+
     const siteDomain = process.env.NEXT_PUBLIC_SITE_DOMAIN;
     // Prefer explicit FROM_EMAIL; otherwise only use site domain if it's not example.com
     let fromEmail =
@@ -58,16 +66,20 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        const info = await transporter.sendMail({
-          from: fromEmail,
-          to: adminEmail,
-          subject: `Product request: ${String(query)}`,
-          html: `<p><strong>Query:</strong> ${escapeHtml(
-            String(query),
-          )}</p><p>${escapeHtml(String(message)).replace(/\n/g, "<br />")}</p>`,
-        });
+        // Tüm admin emaillerine gönder
+        const smtpPromises = adminEmails.map((adminEmail) =>
+          transporter.sendMail({
+            from: fromEmail!,
+            to: adminEmail,
+            subject: `Product request: ${String(query)}`,
+            html: `<p><strong>Query:</strong> ${escapeHtml(
+              String(query),
+            )}</p><p>${escapeHtml(String(message)).replace(/\n/g, "<br />")}</p>`,
+          }),
+        );
 
-        results.smtp = { ok: true, info: info?.messageId ?? info };
+        const infos = await Promise.all(smtpPromises);
+        results.smtp = { ok: true, info: infos.map((i) => i?.messageId ?? i) };
       } catch (e: any) {
         results.smtp = { ok: false, error: String(e?.message ?? e) };
       }
@@ -81,32 +93,42 @@ export async function POST(request: NextRequest) {
     // Send via Resend if API key provided and FROM is valid
     if (process.env.RESEND_API_KEY && fromEmail) {
       try {
-        const resp = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: fromEmail,
-            to: adminEmail,
-            subject: `Product request: ${String(query)}`,
-            html: `<p><strong>Query:</strong> ${escapeHtml(
-              String(query),
-            )}</p><p>${escapeHtml(String(message)).replace(
-              /\n/g,
-              "<br />",
-            )}</p>`,
+        // Tüm admin emaillerine gönder
+        const resendPromises = adminEmails.map((adminEmail) =>
+          fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: fromEmail,
+              to: adminEmail,
+              subject: `Product request: ${String(query)}`,
+              html: `<p><strong>Query:</strong> ${escapeHtml(
+                String(query),
+              )}</p><p>${escapeHtml(String(message)).replace(
+                /\n/g,
+                "<br />",
+              )}</p>`,
+            }),
           }),
-        });
+        );
 
-        if (!resp.ok) {
-          const t = await resp.text().catch(() => "");
-          results.resend = { ok: false, status: resp.status, error: t };
-        } else {
-          const json = await resp.json().catch(() => null);
-          results.resend = { ok: true, data: json };
+        const responses = await Promise.all(resendPromises);
+        const resendResults = [];
+
+        for (const resp of responses) {
+          if (!resp.ok) {
+            const t = await resp.text().catch(() => "");
+            resendResults.push({ ok: false, status: resp.status, error: t });
+          } else {
+            const json = await resp.json().catch(() => null);
+            resendResults.push({ ok: true, data: json });
+          }
         }
+
+        results.resend = { ok: true, results: resendResults };
       } catch (e: any) {
         results.resend = { ok: false, error: String(e?.message ?? e) };
       }

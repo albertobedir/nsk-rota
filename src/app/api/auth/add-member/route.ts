@@ -291,10 +291,18 @@ export async function POST(req: Request) {
         shopifyCustomerId: shopifyCustomer.id,
         companyName: companyName,
         shopifyCompanyId: shopifyCompanyId,
+
+        // Company address
         companyAddress1: address1,
         companyCity: city,
         companyState: state,
         companyZip: zip,
+
+        // User address (şirket adresi ile aynı)
+        addressLine1: address1,
+        city: city,
+        state: state,
+        zip: zip,
       },
     });
 

@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 // import nodemailer from "nodemailer";
 import nodemailer from "nodemailer";
+import { getValidAdminEmails } from "@/lib/email/admin-emails";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -48,10 +49,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const adminEmail = process.env.ADMIN_EMAIL;
-    if (!adminEmail) {
+    const adminEmails = getValidAdminEmails();
+    if (!adminEmails || adminEmails.length === 0) {
       return NextResponse.json(
-        { error: "CONFIG_ERROR", message: "ADMIN_EMAIL eksik." },
+        { error: "CONFIG_ERROR", message: "ADMIN_EMAILS eksik veya geçersiz." },
         { status: 500 },
       );
     }
@@ -143,12 +144,17 @@ export async function POST(req: Request) {
       },
     });
 
-    await transporter.sendMail({
-      from: process.env.FROM_EMAIL,
-      to: adminEmail,
-      subject: "Yeni Üyelik Başvurusu",
-      html,
-    });
+    // Tüm admin emaillerine gönder
+    const emailPromises = adminEmails.map((adminEmail) =>
+      transporter.sendMail({
+        from: process.env.FROM_EMAIL,
+        to: adminEmail,
+        subject: "Yeni Üyelik Başvurusu",
+        html,
+      }),
+    );
+
+    await Promise.all(emailPromises);
 
     return NextResponse.json(
       { message: "Üyelik isteğiniz başarıyla iletildi." },
