@@ -62,8 +62,9 @@ export default function LoginForm() {
   const { mutate, isPending } = useMutation({
     mutationFn: (values: z.infer<typeof loginSchema>) => auth.login(values),
     onSuccess: (data) => {
-      const redirect = searchParams.get("redirect") || "/";
-      router.replace(redirect);
+      const redirect = data?.redirect || searchParams.get("redirect") || "/";
+      // Full reload to ensure cookies are read by middleware/layout
+      window.location.href = redirect;
     },
     onError: (error: unknown) => {
       if (error instanceof Error) {

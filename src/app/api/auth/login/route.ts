@@ -162,6 +162,7 @@ export async function POST(request: NextRequest) {
 
     const res = NextResponse.json({
       message: "Login successful",
+      redirect: "/",
       user: {
         id: user.id,
         email: user.email,
