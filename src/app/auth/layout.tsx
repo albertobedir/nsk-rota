@@ -44,7 +44,8 @@ export default function layout({ children }: Props) {
           <p className="text-base sm:text-lg md:text-lg max-w-md sm:max-w-xl md:max-w-2xl leading-relaxed">
             If you are new to our system, please click{" "}
             <span className="font-bold">
-              “Subscribe now” to complete your registration and request access.
+              “Create an account” to complete your registration and request
+              access.
             </span>
           </p>
         </header>

@@ -8,8 +8,6 @@ import type {
   CartItem,
 } from "@/types/discount";
 
-const MAX_COMBINED_DISCOUNT = 50;
-
 function getEligibleItems(
   cartItems: CartItem[],
   appliesToAll: boolean,
@@ -424,15 +422,6 @@ export async function POST(request: NextRequest) {
       const totalDiscountPercent =
         (totalDiscount / (cartTotal + shippingCost)) * 100;
 
-      // Hard cap
-      let cappedBxgyDiscount = bxgyDiscount;
-      if (totalDiscountPercent > MAX_COMBINED_DISCOUNT) {
-        const cappedTotal =
-          (cartTotal + shippingCost) * (MAX_COMBINED_DISCOUNT / 100);
-        const reduction = totalDiscount - cappedTotal;
-        cappedBxgyDiscount = Math.max(0, bxgyDiscount - reduction);
-      }
-
       const response: DiscountValidateResponse = {
         valid: true,
         code: discount.code,
@@ -443,19 +432,14 @@ export async function POST(request: NextRequest) {
         tierDiscount: tier,
         cartDiscount: Math.round(cartDiscount * 100) / 100,
         shippingDiscount: 0,
-        bxgyDiscount: Math.round(cappedBxgyDiscount * 100) / 100,
-        totalDiscount:
-          Math.round((cartDiscount + cappedBxgyDiscount) * 100) / 100,
+        bxgyDiscount: Math.round(bxgyDiscount * 100) / 100,
+        totalDiscount: Math.round((cartDiscount + bxgyDiscount) * 100) / 100,
         finalCartTotal: Math.round(tieredCartTotal * 100) / 100,
         finalShipping: Math.round(shippingCost * 100) / 100,
         finalTotal:
-          Math.round(
-            (tieredCartTotal + shippingCost - cappedBxgyDiscount) * 100,
-          ) / 100,
-        totalDiscountPercent: Math.min(
-          totalDiscountPercent,
-          MAX_COMBINED_DISCOUNT,
-        ),
+          Math.round((tieredCartTotal + shippingCost - bxgyDiscount) * 100) /
+          100,
+        totalDiscountPercent: totalDiscountPercent,
         resolvedDiscountPercent: tier,
       };
 
@@ -500,7 +484,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Hard cap öncesi discount hesaplaması
+    // Calculate discount based on stacking type
     if (discount.stackingType === "COMPOUND") {
       // ⚠️ Frontend zaten tier uygulanmış fiyat gönderiyor, tekrar uygulamayın!
       let discountedAmount = eligibleSubtotal; // $18 (tier sonrası)
@@ -554,47 +538,14 @@ export async function POST(request: NextRequest) {
       shippingDiscount = shippingCost * (codeVal / 100);
     }
 
-    // Hard cap — totalDiscount hesabından ÖNCE yap
+    // Calculate totals
     const totalDiscount = cartDiscount + shippingDiscount;
     const totalDiscountPercent =
       (totalDiscount / (cartTotal + shippingCost)) * 100;
 
-    // Hard cap — sadece PERCENTAGE codes'a uygula, FIXED_AMOUNT'lara değil
-    if (
-      discount.valueType === "PERCENTAGE" &&
-      totalDiscountPercent > MAX_COMBINED_DISCOUNT
-    ) {
-      const cappedTotal =
-        (cartTotal + shippingCost) * (MAX_COMBINED_DISCOUNT / 100);
-      const reduction = totalDiscount - cappedTotal;
-      cartDiscount = Math.max(0, cartDiscount - reduction);
-
-      console.log("[HARD CAP APPLIED]", {
-        discountCode: discount.code,
-        valueType: discount.valueType,
-        totalDiscountPercent,
-        MAX_COMBINED_DISCOUNT,
-        cappedTotal,
-        reduction,
-        cartDiscount,
-      });
-    } else if (discount.valueType === "FIXED_AMOUNT") {
-      console.log("[HARD CAP SKIPPED - FIXED_AMOUNT]", {
-        discountCode: discount.code,
-        valueType: discount.valueType,
-        totalDiscountPercent,
-        cartDiscount,
-      });
-    }
-
     // finalCartTotal hesabında: indirim sepetin tamamından uygulanır
     const finalCartTotal = cartTotal - cartDiscount;
     const finalShippingCost = shippingCost - shippingDiscount;
-
-    // Güncellenmiş totalDiscount (hard cap sonrası)
-    const finalTotalDiscount = cartDiscount + shippingDiscount;
-    const finalTotalDiscountPercent =
-      (finalTotalDiscount / (cartTotal + shippingCost)) * 100;
 
     const response: DiscountValidateResponse = {
       valid: true,
@@ -607,18 +558,12 @@ export async function POST(request: NextRequest) {
       cartDiscount: Math.round(cartDiscount * 100) / 100,
       shippingDiscount: Math.round(shippingDiscount * 100) / 100,
       bxgyDiscount: 0,
-      totalDiscount: Math.round(finalTotalDiscount * 100) / 100,
+      totalDiscount: Math.round((cartDiscount + shippingDiscount) * 100) / 100,
       finalCartTotal: Math.round(finalCartTotal * 100) / 100,
       finalShipping: Math.round(finalShippingCost * 100) / 100,
       finalTotal: Math.round((finalCartTotal + finalShippingCost) * 100) / 100,
-      totalDiscountPercent: Math.min(
-        finalTotalDiscountPercent,
-        MAX_COMBINED_DISCOUNT,
-      ),
-      resolvedDiscountPercent: Math.min(
-        ((cartTotal - finalCartTotal) / cartTotal) * 100,
-        MAX_COMBINED_DISCOUNT,
-      ),
+      totalDiscountPercent: totalDiscountPercent,
+      resolvedDiscountPercent: ((cartTotal - finalCartTotal) / cartTotal) * 100,
     };
 
     console.log(`[DISCOUNT VALIDATED] code=${code}`, response);

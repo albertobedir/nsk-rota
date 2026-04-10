@@ -64,7 +64,8 @@ export default function LoginForm() {
       await auth.login(values);
     },
     onSuccess: () => {
-      router.push("/");
+      const redirect = searchParams.get("redirect") || "/";
+      router.push(redirect);
     },
     onError: (error: unknown) => {
       if (error instanceof Error) {
@@ -132,12 +133,25 @@ export default function LoginForm() {
           </form>
         </Form>
 
-        <span className="text-center w-full mt-10 text-xl">
-          Are you new here?{" "}
-          <Link href={"/auth/subscribe"} className="text-secondary">
-            Create an account
-          </Link>
-        </span>
+        <div className="text-center w-full mt-10 space-y-3">
+          <div className="text-xl">
+            Are you new here?{" "}
+            <Link href={"/auth/subscribe"} className="text-secondary">
+              Create an account
+            </Link>
+          </div>
+          <div className="text-sm">
+            <a
+              href="https://nsk-rota.myshopify.com/account/login#recover
+"
+              className="text-secondary hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Forgot password?
+            </a>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

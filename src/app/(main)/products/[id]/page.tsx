@@ -1327,12 +1327,7 @@ export default function ProductDetailPage() {
                       <div className="text-xl font-bold">
                         <a href={href} className="hover:underline">
                           {cpRota}
-                        </a>{" "}
-                        {inventory > 0 && (
-                          <span className="text-base font-bold">
-                            (X{inventory})
-                          </span>
-                        )}
+                        </a>
                       </div>
                       <div className="font-medium">
                         {(cp.raw.title ?? "")

@@ -112,16 +112,12 @@ export function proxy(req: NextRequest) {
           return res;
         } else {
           // Refresh başarısız: login'e yönlendir
-          return NextResponse.redirect(
-            new URL(`/auth/login?redirect=${pathname}`, req.url),
-          );
+          return NextResponse.redirect(new URL(`/auth/login`, req.url));
         }
       })();
     } else {
       // refresh_token da yok: login'e yönlendir
-      return NextResponse.redirect(
-        new URL(`/auth/login?redirect=${pathname}`, req.url),
-      );
+      return NextResponse.redirect(new URL(`/auth/login`, req.url));
     }
   }
 

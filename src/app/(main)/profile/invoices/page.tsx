@@ -67,14 +67,14 @@ export default function OrderHistoryPage() {
       const mapped: Order[] = (data.orders || []).map((o: any) => {
         const orderNo = o.name || o.order_number || o.id || "";
         // Extract numeric ID from full GID (e.g., "gid://shopify/Order/6614677946439" → "6614677946439")
-        const fullId = o.id || "";
+        const fullId = o.shopifyId || o.id || "";
         const id = fullId.includes("/")
           ? fullId.split("/").pop() || fullId
           : fullId;
-        const orderDate = o.createdAt || o.created_at || "";
-        const total = o.totalPriceSet?.shopMoney
-          ? `${o.totalPriceSet.shopMoney.amount} ${o.totalPriceSet.shopMoney.currencyCode}`
-          : o.total_price || "";
+        const orderDate = o.createdAt || o.raw?.created_at || "";
+        const total = o.raw?.total_price
+          ? `${o.raw.total_price} ${o.raw.currency || "USD"}`
+          : "";
         const shipping = o.shippingAddress || o.shipping_address;
         const deliveryAddress = shipping
           ? `${shipping.address1 || ""}${
@@ -84,40 +84,21 @@ export default function OrderHistoryPage() {
             }`.trim()
           : "";
 
-        const fulfillments: any[] = Array.isArray(o.fulfillments)
-          ? o.fulfillments
+        const fulfillments: any[] = Array.isArray(o.raw?.fulfillments)
+          ? o.raw.fulfillments
           : [];
 
         const trackingNumbers = fulfillments
-          .flatMap((f: any) => {
-            // GraphQL formatı
-            if (f.trackingInfo?.length) {
-              return f.trackingInfo.map((t: any) => t.number).filter(Boolean);
-            }
-            // REST formatı
-            return f.tracking_numbers?.length
-              ? f.tracking_numbers
-              : f.tracking_number
-                ? [f.tracking_number]
-                : [];
-          })
+          .map((f: any) => f.tracking_number)
+          .filter(Boolean)
           .join(", ");
 
         const trackingUrl: string =
-          fulfillments
-            .flatMap((f: any) => {
-              // GraphQL formatı
-              if (f.trackingInfo?.length) {
-                return f.trackingInfo.map((t: any) => t.url).filter(Boolean);
-              }
-              // REST formatı
-              return f.tracking_urls?.length
-                ? f.tracking_urls
-                : f.tracking_url
-                  ? [f.tracking_url]
-                  : [];
-            })
-            .find(Boolean) || "";
+          fulfillments.find((f: any) => f.tracking_url)?.tracking_url || "";
+
+        const trackingCompany: string =
+          fulfillments.find((f: any) => f.tracking_company)?.tracking_company ||
+          "";
 
         return {
           id,
@@ -126,7 +107,7 @@ export default function OrderHistoryPage() {
           total,
           tracking: (o.tracking || trackingNumbers || "") as string,
           trackingUrl,
-          warehouse: o.warehouse || "",
+          warehouse: trackingCompany || o.warehouse || "",
           deliveryAddress,
         } as Order;
       });

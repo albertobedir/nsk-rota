@@ -90,6 +90,24 @@ export async function GET(
     }
 
     console.log("✅ ORDER FOUND");
+    console.log("=== 🏠 RAW ADDRESS DEBUG ===");
+    console.log(
+      "billingAddress:",
+      JSON.stringify(order.billingAddress, null, 2),
+    );
+    console.log(
+      "shippingAddress:",
+      JSON.stringify(order.shippingAddress, null, 2),
+    );
+    console.log(
+      "raw.billing_address:",
+      JSON.stringify(order.raw?.billing_address, null, 2),
+    );
+    console.log(
+      "raw.shippingAddress:",
+      JSON.stringify(order.raw?.shippingAddress, null, 2),
+    );
+    console.log("=== END ADDRESS DEBUG ===");
     console.log("Mongo order raw field exists:", !!order.raw);
     console.log(
       "Mongo order raw.line_items:",

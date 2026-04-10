@@ -74,31 +74,26 @@ export default function ProfilePage() {
               <div className="text-xs text-slate-500">Phone</div>
               <div className="font-medium">{user?.phone ?? "-"}</div>
             </div>
-
-            <div>
-              <div className="text-xs text-slate-500">Customer Code</div>
-              <div className="font-medium">{user?.customerCode ?? "-"}</div>
-            </div>
-
-            <div>
-              <div className="text-xs text-slate-500">Delivery Terms</div>
-              <div className="font-medium">{user?.deliveryTerms ?? "-"}</div>
-            </div>
-
-            <div>
-              <div className="text-xs text-slate-500">Payment Terms</div>
-              <div className="font-medium">{user?.paymentTerms ?? "-"}</div>
-            </div>
           </div>
 
           {/* Logout Button */}
-          <div className="mt-6 pt-4 border-t border-slate-200">
+          <div className="mt-6 pt-4 border-t border-slate-200 space-y-2">
             <button
               onClick={handleLogout}
               className="text-sm font-medium text-red-600 hover:text-red-700 hover:underline transition-colors"
             >
               Logout
             </button>
+            <div>
+              <a
+                href="https://nsk-rota.myshopify.com/account/login#recover"
+                className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Reset Password
+              </a>
+            </div>
           </div>
         </Card>
 

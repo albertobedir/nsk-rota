@@ -33,7 +33,6 @@ export default function OrderDetailPage() {
   );
   const [pricingTiers, setPricingTiers] = useState<any[]>([]);
   const [userDiscount, setUserDiscount] = useState<number | null>(null);
-  const [payLoading, setPayLoading] = useState(false);
 
   // Get user tier from session store
   const tierTag = useSessionStore((s) => s.tierTag);
@@ -42,6 +41,7 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     if (!id) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
     fetch(`/api/orders/${encodeURIComponent(id as string)}`)
@@ -280,6 +280,7 @@ export default function OrderDetailPage() {
                 }
               : null),
           lineItems: { edges: lineItemsEdges },
+          paymentCollectionUrl: src.paymentCollectionUrl || undefined,
           trackings: (() => {
             const fulfillments: any[] = raw.fulfillments || [];
             return fulfillments.flatMap((f: any) => {
@@ -318,9 +319,12 @@ export default function OrderDetailPage() {
     console.log("[order-detail] fetched order:", order);
   }, [order]);
 
-  // Handle Pay Order button click
+  // Handle Pay Order button click - redirect to payment collection URL
   const handlePayOrder = async () => {
-    if (!order) return;
+    if (!order?.paymentCollectionUrl) {
+      toast.error("Payment URL not available for this order.");
+      return;
+    }
 
     // Only pending orders can be paid
     if (order.financialStatus?.toLowerCase() !== "pending") {
@@ -328,34 +332,8 @@ export default function OrderDetailPage() {
       return;
     }
 
-    setPayLoading(true);
-    try {
-      const res = await fetch("/api/order/pay", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId: order.id,
-          shopifyOrderId: order.shopifyId,
-          orderName: order.orderNumber,
-          totalAmount: order.totalPrice?.amount,
-          customerId: user?.id || undefined,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.message || "Failed to initiate payment.");
-        return;
-      }
-
-      // Redirect to Shopify native checkout page in new tab
-      window.open(data.invoiceUrl, "_blank");
-    } catch {
-      toast.error("An error occurred, please try again.");
-    } finally {
-      setPayLoading(false);
-    }
+    // Redirect to payment collection URL
+    window.open(order.paymentCollectionUrl, "_blank");
   };
 
   // Fetch pricing tiers and calculate user discount
@@ -516,14 +494,11 @@ export default function OrderDetailPage() {
             type="button"
             onClick={handlePayOrder}
             disabled={
-              payLoading ||
-              !order ||
-              order.financialStatus?.toLowerCase() !== "pending"
+              !order || order.financialStatus?.toLowerCase() !== "pending"
             }
             className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 hover:brightness-110 transition"
           >
-            {payLoading && <Spinner className="w-3 h-3" />}
-            {payLoading ? "Yönlendiriliyor..." : "Pay Order"}
+            Pay Order
           </button>
         </div>
       </div>
@@ -578,6 +553,28 @@ export default function OrderDetailPage() {
                     : ""}
                   {order.shippingAddress.country
                     ? ", " + order.shippingAddress.country
+                    : ""}
+                </div>
+              ) : (
+                "-"
+              )}
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold">Billing Address</h3>
+            <div className="text-sm text-slate-700">
+              {order.billingAddress ? (
+                <div>
+                  {order.billingAddress.address1}
+                  {order.billingAddress.city
+                    ? ", " + order.billingAddress.city
+                    : ""}
+                  {order.billingAddress.zip
+                    ? " " + order.billingAddress.zip
+                    : ""}
+                  {order.billingAddress.country
+                    ? ", " + order.billingAddress.country
                     : ""}
                 </div>
               ) : (

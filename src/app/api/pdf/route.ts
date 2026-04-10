@@ -5,6 +5,8 @@ import fs from "fs";
 import path from "path";
 import sharp from "sharp";
 import prisma from "@/lib/prisma/instance";
+import { connectDB } from "@/lib/mongoose/instance";
+import Order from "@/schemas/mongoose/order";
 
 export const runtime = "nodejs";
 
@@ -37,262 +39,373 @@ export async function GET(req: Request) {
       }
     }
 
-    // Fetch and normalise order data
+    // Fetch and normalise order data (from MongoDB)
     let order: Record<string, any> | null = null;
     if (id) {
       try {
-        const res = await fetch(
-          `${origin}/api/orders/${encodeURIComponent(id)}`,
-        );
-        const d = await res.json().catch(() => null);
-        const src = d?.data?.data?.node || d?.data || d || null;
-        if (src) {
-          const raw = (src.raw || {}) as any;
+        await connectDB();
 
-          const lineItemsEdges = ((): any[] => {
-            console.log("\n=== 📦 PDF LINE ITEMS DEBUG ===");
-            console.log(
-              "PDF src.lineItems:",
-              JSON.stringify(src.lineItems, null, 2),
-            );
-            console.log(
-              "PDF raw.lineItems:",
-              JSON.stringify(raw.lineItems, null, 2),
-            );
+        const shopifyId = id.startsWith("gid://")
+          ? id
+          : `gid://shopify/Order/${id}`;
 
-            // GraphQL formatı (Mongo'dan gelen yeni kayıtlar)
-            if (src.lineItems?.edges) {
-              console.log("✅ Using src.lineItems.edges");
-              return src.lineItems.edges.map((e: any) => {
-                const node = e.node;
-                const originalPrice = Number(
-                  node.originalUnitPriceSet?.shopMoney?.amount || 0,
-                );
-                const discountedPrice = Number(
-                  node.discountedUnitPriceSet?.shopMoney?.amount ||
-                    originalPrice,
-                );
-                const currencyCode =
-                  node.originalUnitPriceSet?.shopMoney?.currencyCode || "USD";
-                const discountDescription =
-                  node.discountAllocations?.[0]?.discountApplication
-                    ?.description ||
-                  node.discountAllocations?.[0]?.discountApplication?.title ||
-                  null;
+        const dbOrder = await Order.findOne({ shopifyId }).lean();
 
-                return {
-                  node: {
-                    ...node,
-                    originalUnitPrice: originalPrice,
-                    discountedUnitPrice: discountedPrice,
-                    discountDescription,
-                    variant: {
-                      ...node.variant,
-                      price: {
-                        amount: String(originalPrice),
-                        currencyCode,
-                      },
-                    },
-                  },
-                };
-              });
-            }
+        if (dbOrder) {
+          console.log("✅ Order fetched from MongoDB:", shopifyId);
+          const raw = (dbOrder.raw || {}) as any;
 
-            // raw içinde GraphQL formatı
-            if (raw.lineItems?.edges) {
-              console.log("✅ Using raw.lineItems.edges");
-              return raw.lineItems.edges.map((e: any) => {
-                const node = e.node;
-                const originalPrice = Number(
-                  node.originalUnitPriceSet?.shopMoney?.amount || 0,
-                );
-                const discountedPrice = Number(
-                  node.discountedUnitPriceSet?.shopMoney?.amount ||
-                    originalPrice,
-                );
-                const currencyCode =
-                  node.originalUnitPriceSet?.shopMoney?.currencyCode ||
-                  raw.currency ||
-                  "USD";
-                const discountDescription =
-                  node.discountAllocations?.[0]?.discountApplication
-                    ?.description ||
-                  node.discountAllocations?.[0]?.discountApplication?.title ||
-                  null;
+          // Adresleri DB'den al (REST format — snake_case)
+          const billing = (dbOrder.billingAddress ||
+            raw.billing_address) as any;
+          const shipping = (dbOrder.shippingAddress ||
+            raw.shipping_address) as any;
 
-                return {
-                  node: {
-                    ...node,
-                    originalUnitPrice: originalPrice,
-                    discountedUnitPrice: discountedPrice,
-                    discountDescription,
-                    variant: {
-                      ...node.variant,
-                      price: {
-                        amount: String(originalPrice),
-                        currencyCode,
-                      },
-                    },
-                  },
-                };
-              });
-            }
+          const mapAddress = (addr: any) => {
+            if (!addr) return null;
+            return {
+              name:
+                addr.name ||
+                [addr.first_name, addr.last_name].filter(Boolean).join(" ") ||
+                "",
+              company: addr.company || "",
+              address1: addr.address1 || "",
+              address2: addr.address2 || "",
+              city: addr.city || "",
+              zip: addr.zip || "",
+              province: addr.province || "",
+              country: addr.country || "",
+              countryCode: addr.country_code || addr.countryCode || "",
+            };
+          };
 
-            // REST formatı (eski kayıtlar)
-            const arr = Array.isArray(raw.line_items)
-              ? raw.line_items
-              : Array.isArray(raw.lineItems)
-                ? raw.lineItems
-                : [];
-
-            console.log("Using REST fallback, arr length:", arr.length);
-
-            const discountApplications: any[] = raw.discount_applications || [];
-
-            // Safety check
-            if (!Array.isArray(arr)) {
-              console.warn("line_items is not an array, returning empty");
-              return [];
-            }
-
-            const edges = arr.map((li: any) => {
-              // GraphQL formatı
-              const originalPrice = Number(
-                li.originalUnitPriceSet?.shopMoney?.amount || li.price || 0,
-              );
-              const discountedPrice = Number(
-                li.discountedUnitPriceSet?.shopMoney?.amount || originalPrice,
-              );
-              const currencyCode =
-                li.originalUnitPriceSet?.shopMoney?.currencyCode ||
+          order = {
+            name: dbOrder.name,
+            orderNumber: dbOrder.orderNumber,
+            processedAt: raw.created_at || raw.createdAt,
+            financialStatus: raw.financial_status || raw.displayFinancialStatus,
+            fulfillmentStatus:
+              raw.fulfillment_status || raw.displayFulfillmentStatus,
+            totalPrice: {
+              amount: raw.total_price || raw.totalPriceSet?.shopMoney?.amount,
+              currencyCode:
                 raw.currency ||
-                "USD";
+                raw.totalPriceSet?.shopMoney?.currencyCode ||
+                "USD",
+            },
+            shipping:
+              raw.total_shipping_price_set?.shop_money?.amount ||
+              raw.totalShippingPriceSet?.shopMoney?.amount ||
+              0,
+            taxes: raw.total_tax || raw.totalTaxSet?.shopMoney?.amount || 0,
+            billingAddress: mapAddress(billing),
+            shippingAddress: mapAddress(shipping),
+            customer: raw.customer || null,
+            lineItems: { edges: [] }, // aşağıda doldurulacak
+            raw,
+          };
 
-              // Get discount description from discountAllocations (GraphQL) or discount_applications (REST)
-              const discountDescription =
-                li.discountAllocations?.[0]?.discountApplication?.description ||
-                li.discountAllocations?.[0]?.discountApplication?.title ||
-                ((): string | null => {
-                  const allocation = li.discount_allocations?.[0];
-                  const appIndex =
-                    allocation?.discount_application_index ?? null;
-                  const discountApp =
-                    appIndex != null ? discountApplications[appIndex] : null;
-                  return discountApp?.description ?? discountApp?.title ?? null;
-                })() ||
-                null;
+          // Line items
+          const lineItemsArr: any[] = raw.line_items || [];
+          order.lineItems = {
+            edges: lineItemsArr.map((li: any) => {
+              const originalPrice = Number(li.price || 0);
+              const totalDiscount = Number(li.total_discount || 0);
+              const qty = Number(li.quantity ?? 1);
+
+              // ✅ İndirimli birim fiyat = (price * qty - total_discount) / qty
+              const discountedUnitPrice =
+                qty > 0
+                  ? (originalPrice * qty - totalDiscount) / qty
+                  : originalPrice;
+
+              console.log("📦 LINE ITEM:", {
+                title: li.title,
+                price: li.price,
+                total_discount: li.total_discount,
+                qty,
+                discountedUnitPrice,
+              });
 
               return {
                 node: {
                   title: li.title || li.name,
-                  quantity: li.quantity ?? 1,
+                  quantity: qty,
                   sku: li.sku || li.variant_title || "",
-                  originalUnitPrice: originalPrice,
-                  discountedUnitPrice: discountedPrice,
-                  discountDescription,
+                  originalUnitPrice: discountedUnitPrice, // ✅ indirimli fiyatı göster
+                  discountedUnitPrice: discountedUnitPrice,
+                  discountDescription: null,
                   variant: {
                     price: {
-                      amount: String(originalPrice),
-                      currencyCode,
+                      amount: String(discountedUnitPrice),
+                      currencyCode: raw.currency || "USD",
                     },
                   },
                 },
               };
-            });
-            console.log("PDF lineItemsEdges length:", edges.length);
-            console.log("=== END PDF DEBUG ===\n");
-            return edges;
-          })();
-
-          order = {
-            fulfillmentStatus:
-              src.fulfillmentStatus ||
-              raw.displayFulfillmentStatus ||
-              raw.fulfillment_status,
-            financialStatus:
-              src.financialStatus ||
-              raw.displayFinancialStatus ||
-              raw.financial_status,
-            processedAt:
-              src.processedAt ||
-              src.createdAt ||
-              raw.createdAt ||
-              raw.processed_at ||
-              null,
-            orderNumber:
-              src.orderNumber || src.name || raw.name || raw.order_number || id,
-            totalPrice: {
-              amount:
-                src.totalPriceSet?.shopMoney?.amount ||
-                raw.totalPriceSet?.shopMoney?.amount ||
-                src.totalPrice?.amount ||
-                raw.total_price ||
-                raw.current_total_price ||
-                null,
-              currencyCode:
-                src.totalPriceSet?.shopMoney?.currencyCode ||
-                raw.totalPriceSet?.shopMoney?.currencyCode ||
-                src.totalPrice?.currencyCode ||
-                raw.currency ||
-                raw.presentment_currency ||
-                null,
-            },
-            shippingAddress:
-              src.shippingAddress ||
-              (raw.shipping_address
-                ? {
-                    name:
-                      raw.shipping_address.name ||
-                      raw.shipping_address.full_name ||
-                      "",
-                    company: raw.shipping_address.company || "",
-                    address1: raw.shipping_address.address1 || "",
-                    address2: raw.shipping_address.address2 || "",
-                    city:
-                      raw.shipping_address.city ||
-                      raw.shipping_address.province ||
-                      "",
-                    zip: raw.shipping_address.zip || "",
-                    country:
-                      raw.shipping_address.country ||
-                      raw.shipping_address.country_name ||
-                      "",
-                  }
-                : null),
-            billingAddress:
-              src.billingAddress ||
-              (raw.billing_address
-                ? {
-                    name:
-                      raw.billing_address.name ||
-                      raw.billing_address.full_name ||
-                      "",
-                    company: raw.billing_address.company || "",
-                    address1: raw.billing_address.address1 || "",
-                    address2: raw.billing_address.address2 || "",
-                    city:
-                      raw.billing_address.city ||
-                      raw.billing_address.province ||
-                      "",
-                    zip: raw.billing_address.zip || "",
-                    country:
-                      raw.billing_address.country ||
-                      raw.billing_address.country_name ||
-                      "",
-                  }
-                : null),
-            lineItems: { edges: lineItemsEdges },
-            customer: src.customer || raw.customer || null,
-            shipping:
-              raw.totalShippingPriceSet?.shopMoney?.amount ||
-              raw.shipping_lines?.[0]?.price ||
-              0,
-            taxes: raw.totalTaxSet?.shopMoney?.amount || raw.total_tax || 0,
-          } as any;
+            }),
+          };
+        } else {
+          console.log("❌ Order not found in MongoDB:", shopifyId);
         }
-      } catch (_err) {
-        order = null;
+      } catch (err) {
+        console.error("❌ MongoDB fetch error:", err);
       }
+    }
+
+    if (order) {
+      const src = order as any;
+      const raw = (src.raw || {}) as any;
+
+      const lineItemsEdges = ((): any[] => {
+        console.log("\n=== 📦 PDF LINE ITEMS DEBUG ===");
+        console.log(
+          "PDF src.lineItems:",
+          JSON.stringify(src.lineItems, null, 2),
+        );
+        console.log(
+          "PDF raw.lineItems:",
+          JSON.stringify(raw.lineItems, null, 2),
+        );
+
+        // GraphQL formatı (Shopify'dan direkt)
+        if (src.lineItems?.edges) {
+          console.log("✅ Using src.lineItems.edges");
+          return src.lineItems.edges.map((e: any) => {
+            const node = e.node;
+            // ✅ Zaten map edilmiş, direkt kullan
+            const unitPrice = Number(
+              node.discountedUnitPrice ?? node.originalUnitPrice ?? 0,
+            );
+            const currencyCode = node.variant?.price?.currencyCode || "USD";
+
+            return {
+              node: {
+                ...node,
+                originalUnitPrice: unitPrice,
+                discountedUnitPrice: unitPrice,
+                discountDescription: null,
+                variant: {
+                  ...node.variant,
+                  price: {
+                    amount: String(unitPrice),
+                    currencyCode,
+                  },
+                },
+              },
+            };
+          });
+        }
+
+        // raw içinde GraphQL formatı
+        if (raw.lineItems?.edges) {
+          console.log("✅ Using raw.lineItems.edges");
+          return raw.lineItems.edges.map((e: any) => {
+            const node = e.node;
+            const originalPrice = Number(
+              node.originalUnitPriceSet?.shopMoney?.amount || 0,
+            );
+            const discountedPrice = Number(
+              node.discountedUnitPriceSet?.shopMoney?.amount || originalPrice,
+            );
+            const currencyCode =
+              node.originalUnitPriceSet?.shopMoney?.currencyCode ||
+              raw.currency ||
+              "USD";
+            const discountDescription =
+              node.discountAllocations?.[0]?.discountApplication?.description ||
+              node.discountAllocations?.[0]?.discountApplication?.title ||
+              null;
+
+            return {
+              node: {
+                ...node,
+                originalUnitPrice: originalPrice,
+                discountedUnitPrice: discountedPrice,
+                discountDescription,
+                variant: {
+                  ...node.variant,
+                  price: {
+                    amount: String(originalPrice),
+                    currencyCode,
+                  },
+                },
+              },
+            };
+          });
+        }
+
+        // REST formatı (eski kayıtlar)
+        const arr = Array.isArray(raw.line_items)
+          ? raw.line_items
+          : Array.isArray(raw.lineItems)
+            ? raw.lineItems
+            : [];
+
+        console.log("Using REST fallback, arr length:", arr.length);
+
+        const discountApplications: any[] = raw.discount_applications || [];
+
+        // Safety check
+        if (!Array.isArray(arr)) {
+          console.warn("line_items is not an array, returning empty");
+          return [];
+        }
+
+        const edges = arr.map((li: any) => {
+          // GraphQL formatı
+          const originalPrice = Number(
+            li.originalUnitPriceSet?.shopMoney?.amount || li.price || 0,
+          );
+          const discountedPrice = Number(
+            li.discountedUnitPriceSet?.shopMoney?.amount || originalPrice,
+          );
+          const currencyCode =
+            li.originalUnitPriceSet?.shopMoney?.currencyCode ||
+            raw.currency ||
+            "USD";
+
+          // Get discount description from discountAllocations (GraphQL) or discount_applications (REST)
+          const discountDescription =
+            li.discountAllocations?.[0]?.discountApplication?.description ||
+            li.discountAllocations?.[0]?.discountApplication?.title ||
+            ((): string | null => {
+              const allocation = li.discount_allocations?.[0];
+              const appIndex = allocation?.discount_application_index ?? null;
+              const discountApp =
+                appIndex != null ? discountApplications[appIndex] : null;
+              return discountApp?.description ?? discountApp?.title ?? null;
+            })() ||
+            null;
+
+          return {
+            node: {
+              title: li.title || li.name,
+              quantity: li.quantity ?? 1,
+              sku: li.sku || li.variant_title || "",
+              originalUnitPrice: originalPrice,
+              discountedUnitPrice: discountedPrice,
+              discountDescription,
+              variant: {
+                price: {
+                  amount: String(originalPrice),
+                  currencyCode,
+                },
+              },
+            },
+          };
+        });
+        console.log("PDF lineItemsEdges length:", edges.length);
+        console.log("=== END PDF DEBUG ===\n");
+        return edges;
+      })();
+
+      order = {
+        fulfillmentStatus:
+          src.fulfillmentStatus ||
+          raw.displayFulfillmentStatus ||
+          raw.fulfillment_status,
+        financialStatus:
+          src.financialStatus ||
+          raw.displayFinancialStatus ||
+          raw.financial_status,
+        processedAt:
+          src.processedAt ||
+          src.createdAt ||
+          raw.createdAt ||
+          raw.processed_at ||
+          null,
+        orderNumber:
+          src.orderNumber || src.name || raw.name || raw.order_number || id,
+        totalPrice: {
+          amount:
+            src.totalPriceSet?.shopMoney?.amount ||
+            raw.totalPriceSet?.shopMoney?.amount ||
+            src.totalPrice?.amount ||
+            raw.total_price ||
+            raw.current_total_price ||
+            null,
+          currencyCode:
+            src.totalPriceSet?.shopMoney?.currencyCode ||
+            raw.totalPriceSet?.shopMoney?.currencyCode ||
+            src.totalPrice?.currencyCode ||
+            raw.currency ||
+            raw.presentment_currency ||
+            null,
+        },
+        shippingAddress:
+          src.shippingAddress ||
+          (raw.shipping_address
+            ? {
+                name:
+                  raw.shipping_address.name ||
+                  raw.shipping_address.full_name ||
+                  "",
+                company: raw.shipping_address.company || "",
+                address1: raw.shipping_address.address1 || "",
+                address2: raw.shipping_address.address2 || "",
+                city:
+                  raw.shipping_address.city ||
+                  raw.shipping_address.province ||
+                  "",
+                zip: raw.shipping_address.zip || "",
+                country:
+                  raw.shipping_address.country ||
+                  raw.shipping_address.country_name ||
+                  "",
+              }
+            : null),
+        billingAddress:
+          src.billingAddress ||
+          (raw.billing_address
+            ? {
+                name:
+                  raw.billing_address.name ||
+                  raw.billing_address.full_name ||
+                  "",
+                company: raw.billing_address.company || "",
+                address1: raw.billing_address.address1 || "",
+                address2: raw.billing_address.address2 || "",
+                city:
+                  raw.billing_address.city ||
+                  raw.billing_address.province ||
+                  "",
+                zip: raw.billing_address.zip || "",
+                country:
+                  raw.billing_address.country ||
+                  raw.billing_address.country_name ||
+                  "",
+              }
+            : null),
+        lineItems: { edges: lineItemsEdges },
+        customer: src.customer || raw.customer || null,
+        shipping:
+          raw.totalShippingPriceSet?.shopMoney?.amount ||
+          raw.shipping_lines?.[0]?.price ||
+          0,
+        taxes: raw.totalTaxSet?.shopMoney?.amount || raw.total_tax || 0,
+      };
+    }
+
+    // DEBUG logs
+    console.log("=== 🧾 ORDER FULL OBJECT ===");
+    console.log(JSON.stringify(order, null, 2));
+    console.log("=== BILLING ADDRESS ===");
+    console.log(JSON.stringify(order?.billingAddress, null, 2));
+    console.log("=== SHIPPING ADDRESS ===");
+    console.log(JSON.stringify(order?.shippingAddress, null, 2));
+    console.log("=== CUSTOMER ===");
+    console.log(JSON.stringify(customer, null, 2));
+    console.log("=== END ORDER DEBUG ===");
+
+    if (!order) {
+      return new Response(
+        JSON.stringify({ ok: false, error: "Order not found or invalid" }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // ── Document setup ──────────────────────────────────────────────────────
@@ -458,6 +571,24 @@ export async function GET(req: Request) {
     ): string[] => {
       const lines: string[] = [];
 
+      // BILL TO sırası: Address → Customer
+      if (addr) {
+        const company = addr.company || "";
+        if (company) lines.push(company);
+
+        const city = addr.city || "";
+        if (city) lines.push(city);
+
+        const addr1 = addr.address1 || "[address1 boş]";
+        if (addr1) lines.push(addr1);
+
+        const addr2 = addr.address2 || "";
+        if (addr2) lines.push(addr2);
+
+        const country = addr.country || "";
+        if (country) lines.push(country);
+      }
+
       if (customer) {
         // Handle both snake_case (Shopify) and camelCase (MongoDB)
         const firstName = customer.first_name || customer.firstName || "";
@@ -467,32 +598,6 @@ export async function GET(req: Request) {
 
         const email = customer.email || "";
         if (email) lines.push(email);
-
-        const phone = customer.phone || "";
-        if (phone) lines.push(phone);
-
-        const companyName = customer.companyName || "";
-        if (companyName) lines.push(companyName);
-
-        const customerCode = customer.customerCode || "";
-        if (customerCode) lines.push(`Code: ${customerCode}`);
-      }
-
-      if (addr) {
-        const company = addr.company || "";
-        if (company) lines.push(company);
-
-        const addr1 = addr.address1 || "";
-        if (addr1) lines.push(addr1);
-
-        const addr2 = addr.address2 || "";
-        if (addr2) lines.push(addr2);
-
-        const cityZip = [addr.city, addr.zip].filter(Boolean).join(", ");
-        if (cityZip) lines.push(cityZip);
-
-        const country = addr.country || "";
-        if (country) lines.push(country);
       }
 
       return lines.length > 0 ? lines : ["-"];
@@ -681,44 +786,10 @@ export async function GET(req: Request) {
         rCell(title, COL.desc, { align: "left" });
         rCell(String(qty), COL.qty);
 
-        // UNIT PRICE cell with discount visualization
-        if (originalPrice > unitPrice) {
-          // Original price — strikethrough
-          const strikeTextY = rowTextY - 3;
-          doc
-            .font(FONT_REGULAR)
-            .fontSize(7)
-            .fillColor(TEXT_MUTED)
-            .text(formatMoney(originalPrice, currency), rx + 3, strikeTextY, {
-              width: COL.price - 6,
-              align: "right",
-            });
-          // Manual strikethrough line
-          const strikeLineY = strikeTextY + 3;
-          const strikeStartX = rx + 3;
-          doc
-            .moveTo(strikeStartX, strikeLineY)
-            .lineTo(rx + COL.price - 3, strikeLineY)
-            .strokeColor(TEXT_MUTED)
-            .lineWidth(0.5)
-            .stroke();
-          // Discounted price — green
-          doc
-            .font(FONT_BOLD)
-            .fontSize(8.5)
-            .fillColor("#16a34a")
-            .text(formatMoney(unitPrice, currency), rx + 3, rowTextY + 4, {
-              width: COL.price - 6,
-              align: "right",
-            });
-          // Manual rendering yapıldığı için rx artırmamız gerekiyor
-          rx += COL.price;
-        } else {
-          rCell(formatMoney(unitPrice, currency), COL.price, {
-            align: "right",
-          });
-          // rCell zaten rx artırıyor, ekstra artırma gerek yok
-        }
+        // Sadece ödenen fiyatı göster
+        rCell(formatMoney(unitPrice, currency), COL.price, {
+          align: "right",
+        });
 
         rCell(formatMoney(lineTotal, currency), COL.total, {
           bold: true,
@@ -880,13 +951,7 @@ export async function GET(req: Request) {
 
     const shipping = Number(order?.shipping || 0) || 0;
     const taxes = Number(order?.taxes || 0) || 0;
-    totRow("Subtotal", formatMoney(originalSubtotal, currency));
-    if (totalDiscountAmount > 0) {
-      totRow(
-        "Total Discount",
-        `-${formatMoney(totalDiscountAmount, currency)}`,
-      );
-    }
+    totRow("Subtotal", formatMoney(subtotal, currency));
     totRow("Sales Tax", formatMoney(taxes, currency));
     totRow("Shipping", formatMoney(shipping, currency));
     // Divider
@@ -1022,13 +1087,16 @@ export async function GET(req: Request) {
     });
 
     // ── FOOTER ───────────────────────────────────────────────────────────────
-    const footerY = doc.page.height - 30;
+    // Sabit footerY yerine curY kullan
+    curY += 15;
+
     doc
-      .moveTo(margin, footerY)
-      .lineTo(pageWidth - margin, footerY)
+      .moveTo(margin, curY)
+      .lineTo(pageWidth - margin, curY)
       .strokeColor(DIVIDER)
       .lineWidth(0.5)
       .stroke();
+
     doc
       .font(FONT_REGULAR)
       .fontSize(7.5)
@@ -1036,7 +1104,7 @@ export async function GET(req: Request) {
       .text(
         "ROTA North America, LLC  |  10 N Martingale Rd #400, Schaumburg, IL 60173, USA  |  Thank you for your business.",
         margin,
-        footerY + 6,
+        curY + 6,
         { width: contentWidth, align: "center" },
       );
 

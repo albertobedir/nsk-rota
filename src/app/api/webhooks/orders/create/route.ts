@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { connectDB } from "@/lib/mongoose/instance";
+import Order from "@/schemas/mongoose/order";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +28,9 @@ async function fetchOrderPaymentGateway(orderId: string) {
     query getOrder($id: ID!) {
       order(id: $id) {
         paymentGatewayNames
+        paymentCollectionDetails {
+          additionalPaymentCollectionUrl
+        }
         customer {
           id
           creditLimit: metafield(namespace: "custom", key: "credit_limit") {
@@ -260,10 +265,86 @@ export async function POST(req: NextRequest) {
 
     const orderData = JSON.parse(rawBody);
 
+    // Guard against fulfillment events being sent to orders/create
+    if (
+      orderData.admin_graphql_api_id?.includes("Fulfillment") ||
+      orderData.kind === "fulfillment"
+    ) {
+      console.log("⚠️ Fulfillment payload — skipping orders/create handler");
+      return NextResponse.json({ status: "ok", skipped: "fulfillment" });
+    }
+
     try {
       console.log("Parsed order JSON:", JSON.stringify(orderData, null, 2));
     } catch (jsonErr) {
       console.warn("Could not pretty-print parsed JSON:", jsonErr);
+    }
+
+    // Declare orderDetails outside try/catch so it's accessible throughout the handler
+    let orderDetails: any = null;
+
+    // 💾 MongoDB'ye kaydet
+    try {
+      await connectDB();
+
+      const shopifyId = orderData.admin_graphql_api_id
+        ? String(orderData.admin_graphql_api_id).split("?")[0]
+        : `gid://shopify/Order/${orderData.id}`;
+
+      const orderNumber = orderData.order_number
+        ? Number(orderData.order_number)
+        : orderData.name
+          ? Number(String(orderData.name).replace(/^#/, ""))
+          : undefined;
+
+      // null field'ları strip et
+      function stripNulls(obj: Record<string, any> | null | undefined) {
+        if (!obj) return undefined;
+        return Object.fromEntries(
+          Object.entries(obj).filter(([, v]) => v !== null && v !== undefined),
+        );
+      }
+
+      const billingAddress = stripNulls(orderData.billing_address);
+      const shippingAddress = stripNulls(orderData.shipping_address);
+
+      // raw içinden customer id'yi çıkar
+      const customerGid = orderData.customer?.id
+        ? `gid://shopify/Customer/${orderData.customer.id}`
+        : undefined;
+
+      // Payment gateway bilgisini GraphQL ile çek (MongoDB'ye kaydetmeden önce)
+      try {
+        orderDetails = await fetchOrderPaymentGateway(
+          orderData.admin_graphql_api_id,
+        );
+      } catch (fetchErr) {
+        console.error("Fetch order details error:", fetchErr);
+      }
+
+      await Order.findOneAndUpdate(
+        { shopifyId },
+        {
+          $set: {
+            shopifyId,
+            orderNumber,
+            name: orderData.name ?? undefined,
+            customerId: customerGid,
+            paymentCollectionUrl:
+              orderDetails?.paymentCollectionDetails
+                ?.additionalPaymentCollectionUrl ?? undefined,
+            ...(billingAddress && { billingAddress }),
+            ...(shippingAddress && { shippingAddress }),
+            raw: orderData,
+          },
+        },
+        { upsert: true, new: true },
+      );
+
+      console.log("✅ Order saved to MongoDB:", shopifyId);
+    } catch (dbErr) {
+      // DB hatası webhook'u bloklamamalı
+      console.error("❌ MongoDB upsert error:", dbErr);
     }
 
     console.log("Order ID:", orderData.id);
@@ -303,28 +384,22 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Payment gateway bilgisini GraphQL ile çek
-    let orderDetails = null;
-    try {
-      orderDetails = await fetchOrderPaymentGateway(
-        orderData.admin_graphql_api_id,
-      );
-      console.log("Payment Gateway Names:", orderDetails?.paymentGatewayNames);
+    // Log payment details (orderDetails already fetched before MongoDB save)
+    if (orderDetails) {
+      console.log("Payment Gateway Names:", orderDetails.paymentGatewayNames);
       console.log(
         "Customer Credit Limit:",
-        orderDetails?.customer?.creditLimit?.value,
+        orderDetails.customer?.creditLimit?.value,
       );
       console.log(
         "Customer Credit Remaining:",
-        orderDetails?.customer?.creditRemaining?.value,
+        orderDetails.customer?.creditRemaining?.value,
       );
       console.log(
         "Customer Credit Used:",
-        orderDetails?.customer?.creditUsed?.value,
+        orderDetails.customer?.creditUsed?.value,
       );
-      console.log("Transactions:", orderDetails?.transactions);
-    } catch (fetchErr) {
-      console.error("Fetch order details error:", fetchErr);
+      console.log("Transactions:", orderDetails.transactions);
     }
 
     // Manuel ödeme kontrolü
