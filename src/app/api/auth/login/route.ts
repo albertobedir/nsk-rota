@@ -1,0 +1,269 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use server";
+
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
+
+import prisma from "@/lib/prisma/instance";
+import { shopifyFetch } from "@/lib/shopify/instance";
+import { createCart, getCart } from "@/lib/shopify/cart";
+import { getShopifyCustomerIdByEmail } from "@/lib/shopify-customer";
+
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET!;
+
+export async function POST(request: NextRequest) {
+  try {
+    const { email, password } = await request.json();
+
+    if (!email || !password) {
+      return NextResponse.json(
+        { message: "Email ve şifre gereklidir." },
+        { status: 400 },
+      );
+    }
+
+    const loginQuery = `
+      mutation customerAccessTokenCreate($input: CustomerAccessTokenCreateInput!) {
+        customerAccessTokenCreate(input: $input) {
+          customerAccessToken {
+            accessToken
+            expiresAt
+          }
+          customerUserErrors {
+            code
+            field
+            message
+          }
+        }
+      }
+    `;
+    const variables = { input: { email, password } };
+    const response = await shopifyFetch({ query: loginQuery, variables });
+
+    const payload = response.data.customerAccessTokenCreate;
+    const shopifyToken = payload.customerAccessToken;
+
+    if (!shopifyToken) {
+      const err = payload.customerUserErrors[0] ?? { code: "UNKNOWN" };
+      let userMessage = "Invalid email or password. Please try again.";
+      if (err.code === "CUSTOMER_DISABLED") {
+        userMessage = "Your account has been disabled. Please contact support.";
+      } else if (err.code === "THROTTLED") {
+        userMessage =
+          "Too many login attempts. Please wait a moment and try again.";
+      }
+      return NextResponse.json({ message: userMessage }, { status: 401 });
+    }
+
+    // DEBUG: Token oluşturuldu, sahibini doğrula
+    console.log("🔑 Shopify token created for email:", email);
+    console.log(
+      "🔑 Token value:",
+      shopifyToken.accessToken.substring(0, 20) + "...",
+    );
+    console.log("🔑 Token expires at:", shopifyToken.expiresAt);
+
+    // Shopify customer bilgilerini al
+    const customerQuery = `
+      query getCustomer($customerAccessToken: String!) {
+        customer(customerAccessToken: $customerAccessToken) {
+          id
+          email
+          firstName
+          lastName
+          tags
+        }
+      }
+    `;
+    const customerResponse = await shopifyFetch({
+      query: customerQuery,
+      variables: { customerAccessToken: shopifyToken.accessToken },
+    });
+
+    const shopifyCustomer = customerResponse.data.customer;
+
+    // DEBUG: Token'ın hangi müşteriye ait olduğunu doğrula
+    console.log("👤 Token sahibi (Shopify customer):", {
+      id: shopifyCustomer?.id,
+      email: shopifyCustomer?.email,
+      firstName: shopifyCustomer?.firstName,
+      lastName: shopifyCustomer?.lastName,
+      tags: shopifyCustomer?.tags,
+    });
+
+    if (!shopifyCustomer) {
+      return NextResponse.json(
+        { message: "Customer found but data unavailable." },
+        { status: 404 },
+      );
+    }
+
+    let user = await prisma.user.findUnique({
+      where: { email: shopifyCustomer.email },
+    });
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: shopifyCustomer.email,
+          firstName: shopifyCustomer.firstName ?? "",
+          lastName: shopifyCustomer.lastName ?? "",
+          password: hashedPassword,
+          role: "user",
+        },
+      });
+    } else {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { password: hashedPassword },
+      });
+    }
+
+    // Fetch and store Shopify customer ID if not already present
+    if (!user.shopifyCustomerId) {
+      const shopifyCustomerId = await getShopifyCustomerIdByEmail(
+        shopifyCustomer.email,
+      );
+
+      if (shopifyCustomerId) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { shopifyCustomerId },
+        });
+      }
+    }
+
+    const accessToken = jwt.sign(
+      { id: user.id, email: user.email },
+      ACCESS_TOKEN_SECRET,
+      { expiresIn: "1h" },
+    );
+    const refreshToken = jwt.sign(
+      { id: user.id, email: user.email },
+      REFRESH_TOKEN_SECRET,
+      { expiresIn: "7d" },
+    );
+
+    // DEBUG: Session'a yazılacak user bilgisi
+    console.log("💾 Session/Cookie'ye yazılacak bilgiler:");
+    console.log("   - User ID (JWT):", user.id);
+    console.log("   - User Email (JWT):", user.email);
+    console.log(
+      "   - Shopify Access Token:",
+      shopifyToken.accessToken.substring(0, 20) + "...",
+    );
+    console.log("   - Shopify Customer ID:", shopifyCustomer.id);
+    console.log("   - Shopify Email:", shopifyCustomer.email);
+    console.log("   - Shopify Tags:", shopifyCustomer.tags);
+
+    const res = NextResponse.json({
+      message: "Login successful",
+      redirect: "/",
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        // include Shopify tags if available so client can populate zustand
+        tags: shopifyCustomer.tags ?? [],
+        tier:
+          Array.isArray(shopifyCustomer.tags) &&
+          shopifyCustomer.tags.includes("tier-3")
+            ? "tier-3"
+            : Array.isArray(shopifyCustomer.tags) &&
+                shopifyCustomer.tags.includes("tier-2")
+              ? "tier-2"
+              : null,
+      },
+    });
+    // res.headers.set("Access-Control-Allow-Origin", "https://www.rota-usa.com");
+    // res.headers.set("Access-Control-Allow-Credentials", "true");
+    // res.headers.set("Vary", "Origin");
+
+    res.cookies.set("access_token", accessToken, {
+      httpOnly: true,
+      secure: false,
+      path: "/",
+      maxAge: 60 * 60,
+      sameSite: "lax",
+    });
+
+    res.cookies.set("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: false,
+
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+      sameSite: "lax",
+    });
+
+    res.cookies.set("shopifyAccessToken", shopifyToken.accessToken, {
+      httpOnly: true,
+      secure: false,
+
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30, // örn: 30 gün
+      sameSite: "lax",
+    });
+
+    // Store Shopify customer GID so middleware/proxy can run user-scoped sync
+    res.cookies.set("customer_id", shopifyCustomer.id, {
+      httpOnly: true,
+      secure: false,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+      sameSite: "lax",
+    });
+
+    // Ensure the user has a Shopify cart: reuse existing or create a new one
+    try {
+      const existingCartCookie = request.cookies.get("shopifyCartId");
+      const existingCartId = existingCartCookie?.value;
+
+      let cartObj: any = null;
+
+      if (existingCartId) {
+        try {
+          cartObj = await getCart(existingCartId);
+        } catch (e) {
+          cartObj = null;
+        }
+      }
+
+      if (!cartObj) {
+        // createCart returns the GraphQL payload (cartCreate)
+        const created = await createCart();
+        // created.cart should contain the cart object
+        const newCart = created?.cart ?? null;
+        if (newCart?.id) {
+          res.cookies.set("shopifyCartId", newCart.id, {
+            httpOnly: true,
+            secure: false,
+            path: "/",
+            maxAge: 60 * 60 * 24 * 30,
+            sameSite: "lax",
+          });
+        }
+      }
+    } catch (e) {
+      // non-fatal: continue login even if cart check/create fails
+      console.warn("Cart check/create failed:", e);
+    }
+
+    return res;
+  } catch (err) {
+    console.error("Login Error:", err);
+    return NextResponse.json(
+      {
+        message: "Bir hata oluştu.",
+        details: err instanceof Error ? err.message : JSON.stringify(err),
+      },
+      { status: 500 },
+    );
+  }
+}
