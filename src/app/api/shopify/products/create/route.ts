@@ -102,7 +102,7 @@ async function updateVariant(
     },
   });
 
-  // 3. Stok ayarla
+  // 3. Stok ayarl
   const inventoryItemId = updateRes.variant?.inventory_item_id;
   if (inventoryItemId && locationId) {
     try {
