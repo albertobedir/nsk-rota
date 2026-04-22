@@ -140,15 +140,12 @@ export default function LoginForm() {
             </Link>
           </div>
           <div className="text-sm">
-            <a
-              href="https://nsk-rota.myshopify.com/account/login#recover
-"
+            <Link
+              href="/auth/forgot-password"
               className="text-secondary hover:underline"
-              target="_blank"
-              rel="noopener noreferrer"
             >
               Forgot password?
-            </a>
+            </Link>
           </div>
         </div>
       </CardContent>
