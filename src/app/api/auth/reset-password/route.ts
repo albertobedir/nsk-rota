@@ -153,19 +153,26 @@ export async function POST(request: NextRequest) {
             to: adminEmail,
             subject: "🔐 Customer Password Reset Notification",
             html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #333;">Password Reset Notification</h2>
-                <p>A customer has successfully reset their password:</p>
-                <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                  <p><strong>Email:</strong> ${shopifyCustomer.email}</p>
-                  <p><strong>New Password:</strong> <code style="background: #fff; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-weight: bold;">${password}</code></p>
-                  <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
-                </div>
-                <p style="color: #666; font-size: 12px;">
-                  This is an automated notification. If you suspect unauthorized access, please review this account.
-                </p>
-              </div>
-            `,
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2 style="color: #333;">Password Reset Notification</h2>
+    <p>A customer has successfully reset their password:</p>
+
+    <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+      <p><strong>Email:</strong> ${shopifyCustomer.email}</p>
+      <p>
+        <strong>New Password:</strong> 
+        <code style="background: #fff; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-weight: bold;">
+          ${password}
+        </code>
+      </p>
+      <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+    </div>
+
+    <p style="color: #666; font-size: 12px;">
+      This is an automated notification. If you suspect any unauthorized access, please review this account immediately.
+    </p>
+  </div>
+`,
             text: `Customer ${shopifyCustomer.email} has successfully reset their password to: ${password}\nDate: ${new Date().toLocaleString()}`,
           }),
         );

@@ -78,43 +78,43 @@ export async function POST(req: Request) {
           </div>
 
           <div style="padding:20px; color:#1f2937;">
-            <h2 style="color:#0a66c2; margin:0 0 8px; font-size:20px;">Yeni Üyelik Başvurusu</h2>
+            <h2 style="color:#0a66c2; margin:0 0 8px; font-size:20px;">New Membership Application</h2>
             <p style="margin:0 0 12px 0; line-height:1.4;">
-              Portale yeni bir üyelik başvurusu yapıldı. Aşağıdaki bilgilerle kullanıcı Shopify Dashboard üzerinden eklenmelidir.
+              A new membership application has been submitted to the portal. The user should be added to the Shopify Dashboard with the information below.
             </p>
 
             <table style="width:100%; border-collapse:collapse; margin-top:12px;">
               <tr>
-                <td style="padding:8px 0; font-weight:700; width:120px; color:#111827;">Ad</td>
+                <td style="padding:8px 0; font-weight:700; width:120px; color:#111827;">First Name</td>
                 <td style="color:#374151;">${firstName}</td>
               </tr>
               <tr>
-                <td style="padding:8px 0; font-weight:700; color:#111827;">Soyad</td>
+                <td style="padding:8px 0; font-weight:700; color:#111827;">Last Name</td>
                 <td style="color:#374151;">${lastName}</td>
               </tr>
               <tr>
-                <td style="padding:8px 0; font-weight:700; color:#111827;">E‑posta</td>
+                <td style="padding:8px 0; font-weight:700; color:#111827;">Email</td>
                 <td style="color:#374151;">${normalizedEmail}</td>
               </tr>
               <tr>
-                <td style="padding:8px 0; font-weight:700; color:#111827;">Firma</td>
+                <td style="padding:8px 0; font-weight:700; color:#111827;">Company</td>
                 <td style="color:#374151;">${companyName}</td>
               </tr>
               <tr>
-                <td style="padding:8px 0; font-weight:700; color:#111827;">Adres</td>
+                <td style="padding:8px 0; font-weight:700; color:#111827;">Address</td>
                 <td style="color:#374151;">${address1}</td>
               </tr>
               <tr>
-                <td style="padding:8px 0; font-weight:700; color:#111827;">Şehir</td>
+                <td style="padding:8px 0; font-weight:700; color:#111827;">City</td>
                 <td style="color:#374151;">${city}, ${state} ${zip}</td>
               </tr>
             </table>
 
             <p style="margin-top:20px;">
-              <a href="https://rota-usa.com/add-member?email=${encodeURIComponent(normalizedEmail)}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&companyName=${encodeURIComponent(companyName)}&address1=${encodeURIComponent(address1)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&zip=${encodeURIComponent(zip)}" style="display:inline-block; padding:12px 20px; background:#0a66c2; color:#fff; text-decoration:none; border-radius:8px; font-weight:700;">Kullanıcıyı Kaydet</a>
+              <a href="https://rota-usa.com/add-member?email=${encodeURIComponent(normalizedEmail)}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&companyName=${encodeURIComponent(companyName)}&address1=${encodeURIComponent(address1)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&zip=${encodeURIComponent(zip)}" style="display:inline-block; padding:12px 20px; background:#0a66c2; color:#fff; text-decoration:none; border-radius:8px; font-weight:700;">Save User</a>
             </p>
 
-            <p style="font-size:13px; color:#6b7280; margin-top:18px;">Bu e‑posta otomatik olarak gönderilmiştir. Destek için <a href="mailto:support@rota-usa.com" style="color:#0a66c2; text-decoration:none;">support@rota-usa.com</a> ile iletişime geçin.</p>
+            <p style="font-size:13px; color:#6b7280; margin-top:18px;">This email was sent automatically. For support, please contact <a href="mailto:support@rota-usa.com" style="color:#0a66c2; text-decoration:none;">support@rota-usa.com</a>.</p>
           </div>
 
           <div style="background:#f7fafc; padding:12px 18px; font-size:12px; color:#6b7280; text-align:center;">
