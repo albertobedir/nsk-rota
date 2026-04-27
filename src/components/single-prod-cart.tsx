@@ -1291,14 +1291,26 @@ export default function SingleProdCard({
                   const message = ta
                     ? ta.value
                     : `I'm looking for ${searchTerm ?? code}`;
+                  const requestBody = {
+                    query: searchTerm ?? code,
+                    message,
+                    customerName:
+                      `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim(),
+                    customerEmail: user?.email ?? "",
+                    customerPhone: user?.phone ?? "",
+                    customerId: user?.shopifyCustomerId ?? "",
+                  };
+                  console.log(
+                    "📤 [Product Card] Sending product request:",
+                    requestBody,
+                  );
                   const resp = await fetch(`/api/requests/product`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      query: searchTerm ?? code,
-                      message,
-                    }),
+                    body: JSON.stringify(requestBody),
                   });
+                  const respJson = await resp.json().catch(() => null);
+                  console.log("📥 [Product Card] Response from API:", respJson);
                   if (resp.ok) {
                     try {
                       const list: string[] = JSON.parse(

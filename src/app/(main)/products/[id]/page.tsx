@@ -1525,14 +1525,26 @@ export default function ProductDetailPage() {
                     "stock-request-message",
                   ) as HTMLTextAreaElement | null;
                   const message = ta ? ta.value : `I'm looking for ${rotaNo}`;
+                  const requestBody = {
+                    query: rotaNo,
+                    message,
+                    customerName:
+                      `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim(),
+                    customerEmail: user?.email ?? "",
+                    customerPhone: user?.phone ?? "",
+                    customerId: user?.shopifyCustomerId ?? "",
+                  };
+                  console.log(
+                    "📤 [Detail Page] Sending product request:",
+                    requestBody,
+                  );
                   const resp = await fetch(`/api/requests/product`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      query: rotaNo,
-                      message,
-                    }),
+                    body: JSON.stringify(requestBody),
                   });
+                  const respJson = await resp.json().catch(() => null);
+                  console.log("📥 [Detail Page] Response from API:", respJson);
                   if (resp.ok) {
                     try {
                       const list: string[] = JSON.parse(

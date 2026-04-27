@@ -20,8 +20,22 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null);
     const query = body?.query ?? "";
     const message = body?.message ?? "";
+    const customerName = body?.customerName ?? "";
+    const customerEmail = body?.customerEmail ?? "";
+    const customerPhone = body?.customerPhone ?? "";
+    const customerId = body?.customerId ?? "";
+
+    console.log("📥 [API] Received product request:", {
+      query,
+      message,
+      customerName,
+      customerEmail,
+      customerPhone,
+      customerId,
+    });
 
     if (!message || !query) {
+      console.error("❌ [API] Validation failed: Missing query or message");
       return NextResponse.json(
         { ok: false, error: "Missing query or message" },
         { status: 400 },
@@ -36,6 +50,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const storeSlug = process.env.SHOPIFY_STORE_SLUG ?? "nsk-rota";
     const siteDomain = process.env.NEXT_PUBLIC_SITE_DOMAIN;
     // Prefer explicit FROM_EMAIL; otherwise only use site domain if it's not example.com
     let fromEmail =
@@ -72,16 +87,24 @@ export async function POST(request: NextRequest) {
             from: fromEmail!,
             to: adminEmail,
             subject: `Product request: ${String(query)}`,
-            html: `<p><strong>Query:</strong> ${escapeHtml(
-              String(query),
-            )}</p><p>${escapeHtml(String(message)).replace(/\n/g, "<br />")}</p>`,
+            html: `
+              <p><strong>Query:</strong> ${escapeHtml(String(query))}</p>
+              <p>${escapeHtml(String(message)).replace(/\n/g, "<br />")}</p>
+              <hr />
+              <h3>Customer Info</h3>
+              <p><strong>Name:</strong> <a href="https://admin.shopify.com/store/${storeSlug}/customers/${escapeHtml(String(customerId))}">${escapeHtml(String(customerName))}</a></p>
+              <p><strong>Email:</strong> ${escapeHtml(String(customerEmail))}</p>
+              <p><strong>Phone:</strong> ${escapeHtml(String(customerPhone))}</p>
+            `,
           }),
         );
 
         const infos = await Promise.all(smtpPromises);
         results.smtp = { ok: true, info: infos.map((i) => i?.messageId ?? i) };
+        console.log("📧 [API] SMTP emails sent successfully:", results.smtp);
       } catch (e: any) {
         results.smtp = { ok: false, error: String(e?.message ?? e) };
+        console.error("📧 [API] SMTP error:", results.smtp);
       }
     } else {
       results.smtp = {
@@ -105,12 +128,15 @@ export async function POST(request: NextRequest) {
               from: fromEmail,
               to: adminEmail,
               subject: `Product request: ${String(query)}`,
-              html: `<p><strong>Query:</strong> ${escapeHtml(
-                String(query),
-              )}</p><p>${escapeHtml(String(message)).replace(
-                /\n/g,
-                "<br />",
-              )}</p>`,
+              html: `
+                <p><strong>Query:</strong> ${escapeHtml(String(query))}</p>
+                <p>${escapeHtml(String(message)).replace(/\n/g, "<br />")}</p>
+                <hr />
+                <h3>Customer Info </h3>
+                <p><strong>Name:</strong> <a href="https://admin.shopify.com/store/${storeSlug}/customers/${escapeHtml(String(customerId))}">${escapeHtml(String(customerName))}</a></p>
+                <p><strong>Email:</strong> ${escapeHtml(String(customerEmail))}</p>
+                <p><strong>Phone:</strong> ${escapeHtml(String(customerPhone))}</p>
+              `,
             }),
           }),
         );
@@ -129,8 +155,13 @@ export async function POST(request: NextRequest) {
         }
 
         results.resend = { ok: true, results: resendResults };
+        console.log(
+          "📬 [API] Resend emails sent successfully:",
+          results.resend,
+        );
       } catch (e: any) {
         results.resend = { ok: false, error: String(e?.message ?? e) };
+        console.error("📬 [API] Resend error:", results.resend);
       }
     } else {
       results.resend = {
@@ -139,8 +170,10 @@ export async function POST(request: NextRequest) {
       };
     }
 
+    console.log("✅ [API] Email sending results:", results);
     return NextResponse.json({ ok: true, results });
   } catch (e: any) {
+    console.error("❌ [API] Error during product request:", e);
     return NextResponse.json(
       { ok: false, error: String(e?.message ?? e) },
       { status: 500 },
