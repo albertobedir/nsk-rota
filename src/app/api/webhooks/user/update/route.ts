@@ -1,6 +1,7 @@
 ﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma/instance";
+import { computeTier } from "@/lib/utils/tier";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
@@ -176,29 +177,7 @@ export async function POST(req: NextRequest) {
     // Debug: log raw tags
     console.log("[webhook:user:update] customer tags raw:", tags);
 
-    // Compute tier based on tags (robust/normalized matching)
-    const computeTier = (tgs: string[] = []) => {
-      try {
-        if (!tgs || tgs.length === 0) return null;
-        const normalized = tgs
-          .map((s: any) =>
-            String(s ?? "")
-              .toLowerCase()
-              .trim(),
-          )
-          .map((s) => s.replace(/[_\s]+/g, "-"));
-
-        // match variants like 'tier-3', 'tier 3', 'tier3', 'Tier-3', etc.
-        if (normalized.some((s) => /tier[-]?3$/.test(s) || s === "tier3"))
-          return "tier-3";
-        if (normalized.some((s) => /tier[-]?2$/.test(s) || s === "tier2"))
-          return "tier-2";
-        return null;
-      } catch {
-        return null;
-      }
-    };
-
+    // Compute tier based on tags (now supports any tier number dynamically)
     const tierTag = computeTier(tags);
     console.log("[webhook:user:update] computed tier:", tierTag);
 

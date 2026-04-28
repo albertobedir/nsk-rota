@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import prisma from "@/lib/prisma/instance";
+import { computeTier } from "@/lib/utils/tier";
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET ?? "";
 
@@ -59,27 +60,6 @@ export async function GET(req: NextRequest) {
     };
 
     const tagsArray = normalizeTags(user.shopifyTags ?? null);
-
-    // compute tier similarly to webhook/session store
-    const computeTier = (tgs: string[] = []) => {
-      try {
-        if (!tgs || tgs.length === 0) return null;
-        const normalized = tgs
-          .map((s) =>
-            String(s ?? "")
-              .toLowerCase()
-              .trim(),
-          )
-          .map((s) => s.replace(/[\s_]+/g, "-"));
-        if (normalized.some((s) => /tier[-]?3$/.test(s) || s === "tier3"))
-          return "tier-3";
-        if (normalized.some((s) => /tier[-]?2$/.test(s) || s === "tier2"))
-          return "tier-2";
-        return null;
-      } catch {
-        return null;
-      }
-    };
 
     const inferredTier = computeTier(tagsArray);
 
