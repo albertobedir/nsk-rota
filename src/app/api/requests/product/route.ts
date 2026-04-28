@@ -19,6 +19,13 @@ function escapeHtml(s: string) {
     .replace(/'/g, "&#039;");
 }
 
+// Extract numeric ID from GID format (e.g., "gid://shopify/Customer/9931718623535" -> "9931718623535")
+function extractNumericId(gid: string): string {
+  if (!gid) return "";
+  const match = gid.match(/\/(\d+)$/);
+  return match ? match[1] : gid;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null);
@@ -116,13 +123,57 @@ export async function POST(request: NextRequest) {
             to: adminEmail,
             subject: `Product request: ${String(query)}`,
             html: `
-              <p><strong>Query:</strong> ${escapeHtml(String(query))}</p>
-              <p>${escapeHtml(String(message)).replace(/\n/g, "<br />")}</p>
-              <hr />
-              <h3>Customer Info</h3>
-              <p><strong>Name:</strong> <a href="https://admin.shopify.com/store/${storeSlug}/customers/${escapeHtml(String(customerId))}">${escapeHtml(String(customerName))}</a></p>
-              <p><strong>Email:</strong> ${escapeHtml(String(customerEmail))}</p>
-              <p><strong>Phone:</strong> ${escapeHtml(String(customerPhone))}</p>
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; padding: 20px;">
+                <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                  <div style="background: linear-gradient(135deg, #0a66c2 0%, #0066a1 100%); padding: 24px; color: #fff;">
+                    <h2 style="margin: 0; font-size: 20px; font-weight: 600;">📦 New Product Request</h2>
+                  </div>
+                  
+                  <div style="padding: 24px;">
+                    <div style="margin-bottom: 20px;">
+                      <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Product Query</p>
+                      <div style="background: #f1f5f9; border-left: 4px solid #0a66c2; padding: 12px 16px; border-radius: 4px;">
+                        <p style="margin: 0; color: #1e293b; font-weight: 600; font-size: 16px;">${escapeHtml(String(query))}</p>
+                      </div>
+                    </div>
+
+                    <div style="margin-bottom: 20px;">
+                      <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Message</p>
+                      <div style="background: #f1f5f9; padding: 12px 16px; border-radius: 4px; color: #334155; line-height: 1.6; white-space: pre-wrap;">
+                        ${escapeHtml(String(message)).replace(/\n/g, "<br />")}
+                      </div>
+                    </div>
+
+                    <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 20px;">
+                      <p style="margin: 0 0 16px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Customer Information</p>
+                      <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                          <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                            <span style="color: #64748b; font-size: 12px; font-weight: 600;">NAME</span><br>
+                            <a href="https://admin.shopify.com/store/${storeSlug}/customers/${extractNumericId(String(customerId))}" style="color: #0a66c2; text-decoration: none; font-weight: 600; font-size: 15px;">${escapeHtml(String(customerName))}</a>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                            <span style="color: #64748b; font-size: 12px; font-weight: 600;">EMAIL</span><br>
+                            <a href="mailto:${escapeHtml(String(customerEmail))}" style="color: #0a66c2; text-decoration: none; font-size: 14px;">${escapeHtml(String(customerEmail))}</a>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 10px 0;">
+                            <span style="color: #64748b; font-size: 12px; font-weight: 600;">PHONE</span><br>
+                            <span style="color: #334155; font-size: 14px;">${escapeHtml(String(customerPhone)) || "—"}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div style="background: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+                    <p style="margin: 0; color: #64748b; font-size: 12px;">This is an automated message from Rota USA Portal</p>
+                  </div>
+                </div>
+              </div>
             `,
           }),
         );
@@ -157,13 +208,57 @@ export async function POST(request: NextRequest) {
               to: adminEmail,
               subject: `Product request: ${String(query)}`,
               html: `
-                <p><strong>Query:</strong> ${escapeHtml(String(query))}</p>
-                <p>${escapeHtml(String(message)).replace(/\n/g, "<br />")}</p>
-                <hr />
-                <h3>Customer Info </h3>
-                <p><strong>Name:</strong> <a href="https://admin.shopify.com/store/${storeSlug}/customers/${escapeHtml(String(customerId))}">${escapeHtml(String(customerName))}</a></p>
-                <p><strong>Email:</strong> ${escapeHtml(String(customerEmail))}</p>
-                <p><strong>Phone:</strong> ${escapeHtml(String(customerPhone))}</p>
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="background: linear-gradient(135deg, #0a66c2 0%, #0066a1 100%); padding: 24px; color: #fff;">
+                      <h2 style="margin: 0; font-size: 20px; font-weight: 600;">📦 New Product Request</h2>
+                    </div>
+                    
+                    <div style="padding: 24px;">
+                      <div style="margin-bottom: 20px;">
+                        <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Product Query</p>
+                        <div style="background: #f1f5f9; border-left: 4px solid #0a66c2; padding: 12px 16px; border-radius: 4px;">
+                          <p style="margin: 0; color: #1e293b; font-weight: 600; font-size: 16px;">${escapeHtml(String(query))}</p>
+                        </div>
+                      </div>
+
+                      <div style="margin-bottom: 20px;">
+                        <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Message</p>
+                        <div style="background: #f1f5f9; padding: 12px 16px; border-radius: 4px; color: #334155; line-height: 1.6; white-space: pre-wrap;">
+                          ${escapeHtml(String(message)).replace(/\n/g, "<br />")}
+                        </div>
+                      </div>
+
+                      <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 20px;">
+                        <p style="margin: 0 0 16px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Customer Information</p>
+                        <table style="width: 100%; border-collapse: collapse;">
+                          <tr>
+                            <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                              <span style="color: #64748b; font-size: 12px; font-weight: 600;">NAME</span><br>
+                              <a href="https://admin.shopify.com/store/${storeSlug}/customers/${extractNumericId(String(customerId))}" style="color: #0a66c2; text-decoration: none; font-weight: 600; font-size: 15px;">${escapeHtml(String(customerName))}</a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                              <span style="color: #64748b; font-size: 12px; font-weight: 600;">EMAIL</span><br>
+                              <a href="mailto:${escapeHtml(String(customerEmail))}" style="color: #0a66c2; text-decoration: none; font-size: 14px;">${escapeHtml(String(customerEmail))}</a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 10px 0;">
+                              <span style="color: #64748b; font-size: 12px; font-weight: 600;">PHONE</span><br>
+                              <span style="color: #334155; font-size: 14px;">${escapeHtml(String(customerPhone)) || "—"}</span>
+                            </td>
+                          </tr>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div style="background: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+                      <p style="margin: 0; color: #64748b; font-size: 12px;">This is an automated message from Rota USA Portal</p>
+                    </div>
+                  </div>
+                </div>
               `,
             }),
           }),
