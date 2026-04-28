@@ -1,10 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import jwt from "jsonwebtoken";
+import prisma from "@/lib/prisma/instance";
 import { getValidAdminEmails } from "@/lib/email/admin-emails";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET ?? "";
 
 function escapeHtml(s: string) {
   return s
@@ -20,10 +24,33 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null);
     const query = body?.query ?? "";
     const message = body?.message ?? "";
-    const customerName = body?.customerName ?? "";
-    const customerEmail = body?.customerEmail ?? "";
-    const customerPhone = body?.customerPhone ?? "";
-    const customerId = body?.customerId ?? "";
+
+    // Extract user from session (via JWT token)
+    let authenticatedUser: any = null;
+    try {
+      const token = request.cookies.get("access_token")?.value;
+      if (token) {
+        const payload = jwt.verify(token, ACCESS_TOKEN_SECRET) as any;
+        const userId = payload?.id;
+        if (userId) {
+          authenticatedUser = await prisma.user.findUnique({
+            where: { id: String(userId) },
+          });
+        }
+      }
+    } catch (e) {
+      console.debug("[API] Failed to extract authenticated user:", e);
+    }
+
+    // Use authenticated user data if available, otherwise fall back to body data
+    const customerName =
+      authenticatedUser && authenticatedUser.firstName
+        ? `${authenticatedUser.firstName}${authenticatedUser.lastName ? ` ${authenticatedUser.lastName}` : ""}`.trim()
+        : (body?.customerName ?? "");
+    const customerEmail = authenticatedUser?.email ?? body?.customerEmail ?? "";
+    const customerPhone = authenticatedUser?.phone ?? body?.customerPhone ?? "";
+    const customerId =
+      authenticatedUser?.shopifyCustomerId ?? body?.customerId ?? "";
 
     console.log("📥 [API] Received product request:", {
       query,
@@ -32,6 +59,7 @@ export async function POST(request: NextRequest) {
       customerEmail,
       customerPhone,
       customerId,
+      fromAuthenticated: !!authenticatedUser,
     });
 
     if (!message || !query) {
