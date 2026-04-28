@@ -24,6 +24,61 @@ function verifyShopifyWebhook(req: NextRequest, rawBody: string): boolean {
 const generateRandomPassword = (length = 12): string =>
   crypto.randomBytes(length).toString("base64").slice(0, length);
 
+// Helper: Create nodemailer transporter with verified connection
+async function createVerifiedTransporter() {
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false, // false for port 587 (STARTTLS), true for 465 (SSL)
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS || "",
+    },
+    requireTLS: true,
+    tls: {
+      rejectUnauthorized: false,
+    },
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 20000,
+  });
+
+  // Log SMTP config for debugging
+  console.log("[🔗 SMTP Config]", {
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    user: process.env.SMTP_USER ? "***" : "NOT SET",
+    from: process.env.FROM_EMAIL,
+  });
+
+  // Test SMTP connection
+  try {
+    await transporter.verify();
+    console.log("[✅ SMTP Connection] Verified successfully");
+  } catch (err) {
+    console.error("[❌ SMTP Connection] Failed:", err);
+    // Continue anyway, might be temporary
+  }
+
+  return transporter;
+}
+
+// Helper: Send email with async/await
+async function sendEmailSafely(
+  transporter: nodemailer.Transporter,
+  mailOptions: nodemailer.SendMailOptions,
+) {
+  return new Promise<string>((resolve, reject) => {
+    transporter.sendMail(mailOptions, (err, info) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(info?.messageId || "unknown");
+      }
+    });
+  });
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -141,31 +196,26 @@ export async function POST(req: NextRequest) {
     console.log("[🔗 Customer Create Webhook] User saved to DB:", user.id);
 
     // ────────────────────────────────────────────────────────────────
-    // 5. Send welcome email
+    // 5. Return response EARLY (Shopify timeout: 5 sec)
     // ────────────────────────────────────────────────────────────────
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-
-      secure: false, // port 25 için doğru
-
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS || "",
+    const response = NextResponse.json(
+      {
+        status: "ok",
+        message: "User created, welcome email sent in background",
+        userId: user.id,
+        email: user.email,
       },
+      { status: 200 },
+    );
 
-      requireTLS: false, // 🔥 EKLE (çok önemli)
+    // ────────────────────────────────────────────────────────────────
+    // 6. Send emails in BACKGROUND (fire & forget with error logging)
+    // ────────────────────────────────────────────────────────────────
+    (async () => {
+      try {
+        const transporter = await createVerifiedTransporter();
 
-      tls: {
-        rejectUnauthorized: false,
-      },
-
-      connectionTimeout: 20000,
-      greetingTimeout: 20000,
-      socketTimeout: 20000,
-    });
-
-    const html = `
+        const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; padding: 20px;">
         <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <div style="background: linear-gradient(135deg, #0a66c2 0%, #0066a1 100%); padding: 24px; color: #fff;">
@@ -222,41 +272,28 @@ export async function POST(req: NextRequest) {
       </div>
     `;
 
-    await new Promise((resolve, reject) => {
-      transporter.sendMail(
-        {
-          from: process.env.FROM_EMAIL,
-          to: email,
-          subject: "Welcome to Rota USA — Your Account is Ready",
-          html,
-        },
-        (err, info) => {
-          if (err) {
-            console.error(
-              "[🔗 Customer Create Webhook] Welcome email error:",
-              err,
-            );
-            reject(err);
-          } else {
-            console.log(
-              "[🔗 Customer Create Webhook] Welcome email sent to:",
-              email,
-              "MessageID:",
-              info?.messageId,
-            );
-            resolve(info);
-          }
-        },
-      );
-    });
+        // Send welcome email to user
+        try {
+          const messageId = await sendEmailSafely(transporter, {
+            from: process.env.FROM_EMAIL,
+            to: email,
+            subject: "Welcome to Rota USA — Your Account is Ready",
+            html,
+          });
+          console.log(
+            "[✅ Welcome Email] Sent to:",
+            email,
+            "MessageID:",
+            messageId,
+          );
+        } catch (err) {
+          console.error("[❌ Welcome Email] Failed:", err);
+        }
 
-    // ────────────────────────────────────────────────────────────────
-    // 6. Send admin notification email
-    // ────────────────────────────────────────────────────────────────
-    const adminEmails = getValidAdminEmails();
-    if (adminEmails && adminEmails.length > 0) {
-      try {
-        const adminHtml = `
+        // Send admin notification emails
+        const adminEmails = getValidAdminEmails();
+        if (adminEmails && adminEmails.length > 0) {
+          const adminHtml = `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; padding: 20px;">
             <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
               <div style="background: linear-gradient(135deg, #0a66c2 0%, #0066a1 100%); padding: 24px; color: #fff;">
@@ -312,60 +349,39 @@ export async function POST(req: NextRequest) {
           </div>
         `;
 
-        const adminPromises = adminEmails.map(
-          (adminEmail) =>
-            new Promise((resolve, reject) => {
-              transporter.sendMail(
-                {
-                  from: process.env.FROM_EMAIL,
-                  to: adminEmail,
-                  subject: `New User Created: ${escapeHtml(`${first_name || ""} ${last_name || ""}`.trim())}`,
-                  html: adminHtml,
-                },
-                (err, info) => {
-                  if (err) {
-                    console.error(
-                      `[🔗 Customer Create Webhook] Failed to send admin email to ${adminEmail}:`,
-                      err,
-                    );
-                    reject(err);
-                  } else {
-                    console.log(
-                      `[🔗 Customer Create Webhook] Admin email sent to ${adminEmail}:`,
-                      info?.messageId,
-                    );
-                    resolve(info);
-                  }
-                },
+          const adminPromises = adminEmails.map(async (adminEmail) => {
+            try {
+              const messageId = await sendEmailSafely(transporter, {
+                from: process.env.FROM_EMAIL,
+                to: adminEmail,
+                subject: `New User Created: ${escapeHtml(`${first_name || ""} ${last_name || ""}`.trim())}`,
+                html: adminHtml,
+              });
+              console.log(
+                "[✅ Admin Email] Sent to:",
+                adminEmail,
+                "MessageID:",
+                messageId,
               );
-            }),
-        );
+            } catch (err) {
+              console.error(
+                `[❌ Admin Email] Failed to send to ${adminEmail}:`,
+                err,
+              );
+            }
+          });
 
-        await Promise.all(adminPromises);
-        console.log(
-          "[🔗 Customer Create Webhook] All admin notification emails sent successfully",
-        );
-      } catch (adminErr) {
-        console.error(
-          "[🔗 Customer Create Webhook] Failed to send admin emails:",
-          adminErr,
-        );
-        // Non-blocking — don't fail the entire flow if admin email fails
+          await Promise.all(adminPromises);
+        }
+      } catch (err) {
+        console.error("[❌ Background Email] Critical error:", err);
       }
-    }
+    })();
 
-    return NextResponse.json(
-      {
-        status: "ok",
-        message: "User created and welcome email sent",
-        userId: user.id,
-        email: user.email,
-      },
-      { status: 200 },
-    );
+    return response;
   } catch (err) {
     console.error(
-      "[🔗 Customer Create Webhook] Unexpected error:",
+      "[🔗 Customer Create Webhook] Critical error:",
       err instanceof Error ? err.message : String(err),
     );
     return NextResponse.json(
