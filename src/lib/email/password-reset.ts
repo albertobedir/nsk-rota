@@ -6,17 +6,15 @@ const secure = port === 465; // Only 465 uses TLS, others use STARTTLS
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port,
-  secure,
+  port: Number(process.env.SMTP_PORT),
+  secure: false, // port 25 için false
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS || "",
   },
   tls: {
-    rejectUnauthorized: false, // For self-signed certificates
+    rejectUnauthorized: false, // self-signed sertifika için
   },
-  logger: true, // Enable logs for debugging
-  debug: process.env.NODE_ENV === "development", // Debug in development
 });
 
 export async function sendPasswordResetEmail({
