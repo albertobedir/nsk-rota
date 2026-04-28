@@ -33,6 +33,13 @@ export interface SessionUser {
   shopifyCustomerId?: string | null;
   tags?: string[] | null;
   tier?: string | null;
+  // Company information
+  companyName?: string | null;
+  shopifyCompanyId?: string | null;
+  companyAddress1?: string | null;
+  companyCity?: string | null;
+  companyState?: string | null;
+  companyZip?: string | null;
 }
 
 export interface CartItem {

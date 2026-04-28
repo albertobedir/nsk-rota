@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma/instance";
 import crypto from "crypto";
@@ -204,6 +204,10 @@ export async function POST(req: NextRequest) {
 
     const defaultAddress = customer.default_address ?? null;
 
+    // Extract company information from metafields
+    const companyName = getField("company_name");
+    const shopifyCompanyId = customer.company_id ?? null; // May come from payload directly
+
     // helper to produce a Decimal-compatible string for Prisma Decimal fields
     const toDecimalString = (v: unknown) => {
       const n = Number(String(v ?? "").trim());
@@ -246,6 +250,8 @@ export async function POST(req: NextRequest) {
         creditRemaining: toDecimalString(creditRemainingNum),
         shopifyTags: tags,
         tier: tierTag ?? null,
+        companyName: companyName ?? null,
+        shopifyCompanyId: shopifyCompanyId ?? null,
       },
       create: {
         email,
@@ -271,6 +277,8 @@ export async function POST(req: NextRequest) {
         creditRemaining: toDecimalString(creditRemainingNum),
         shopifyTags: tags,
         tier: tierTag ?? null,
+        companyName: companyName ?? null,
+        shopifyCompanyId: shopifyCompanyId ?? null,
       },
     });
 

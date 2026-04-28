@@ -8,6 +8,7 @@ import { Resend } from "resend";
 import bcrypt from "bcrypt";
 import { shopifyFetch } from "@/lib/shopify/instance";
 import nodemailer from "nodemailer";
+import { getValidAdminEmails } from "@/lib/email/admin-emails";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -24,6 +25,15 @@ type CreateUserBody = {
 
 const generateRandomPassword = (length: number = 12) =>
   crypto.randomBytes(length).toString("base64").slice(0, length);
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 export async function POST(req: Request) {
   try {
@@ -322,46 +332,59 @@ export async function POST(req: Request) {
     // -------------------------------
     // Mail gönderimi
     // -------------------------------
-    console.log("Step 6: Sending email via Resend");
+    console.log("Step 6: Sending email via SMTP");
     const html = `
-      <div style="font-family:Arial, sans-serif; background:#f4f6f8; padding:28px;">
-        <div style="max-width:600px; margin:0 auto; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 6px 18px rgba(15,23,42,0.06);">
-          <div style="display:flex; align-items:center; gap:12px; padding:16px 18px; background:linear-gradient(90deg,#0a66c2,#0066a1);">
-            <!-- Inline logo -->
-            <svg viewBox="0 0 160 60" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="48" height="18" aria-hidden>
-              <!-- SVG SAME -->
-            </svg>
-            <div style="color:#fff; font-weight:700; font-size:16px;">Rota USA</div>
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; padding: 20px;">
+        <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <div style="background: linear-gradient(135deg, #0a66c2 0%, #0066a1 100%); padding: 24px; color: #fff;">
+            <h2 style="margin: 0; font-size: 20px; font-weight: 600;">👋 Welcome to Rota USA</h2>
           </div>
-
-          <div style="padding:20px; color:#1f2937;">
-            <h2 style="color:#0a66c2; margin:0 0 8px; font-size:20px;">Your Account Has Been Created</h2>
-            <p style="margin:0 0 8px;">Hello ${user.firstName},</p>
-            <p style="margin:0 0 12px; line-height:1.4;">Your portal account has been successfully created. You can find your login details below.</p>
-
-            <table style="width:100%; border-collapse:collapse; margin-top:8px;">
-              <tr>
-                <td style="padding:8px 0; font-weight:700; width:120px; color:#111827;">Email</td>
-                <td style="color:#374151;">${email}</td>
-              </tr>
-              <tr>
-                <td style="padding:8px 0; font-weight:700; color:#111827;">Password</td>
-                <td style="color:#374151;">${password}</td>
-              </tr>
-            </table>
-
-            <p style="margin-top:20px;">
-              <a href="https://rota-usa.com/auth/login" style="display:inline-block; padding:12px 20px; background:#0a66c2; color:#fff; text-decoration:none; border-radius:8px; font-weight:700;">Log In</a>
+          
+          <div style="padding: 24px;">
+            <p style="margin: 0 0 16px 0; color: #334155; font-size: 14px; line-height: 1.6;">
+              Hello <strong>${firstName || "there"}</strong>,
             </p>
 
-            <p style="margin-top:18px; font-size:13px; color:#6b7280;">
-              This email was sent automatically. Please store your password securely. For support, contact 
-              <a href="mailto:support@rota-usa.com" style="color:#0a66c2; text-decoration:none;">support@rota-usa.com</a>.
+            <p style="margin: 0 0 20px 0; color: #334155; font-size: 14px; line-height: 1.6;">
+              Your portal account has been created and is ready to use. You can log in with the credentials below.
+            </p>
+
+            <div style="margin-bottom: 20px;">
+              <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Login Credentials</p>
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b; font-size: 12px; font-weight: 600;">EMAIL</span><br>
+                    <span style="color: #334155; font-size: 14px;">${email}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 0;">
+                    <span style="color: #64748b; font-size: 12px; font-weight: 600;">PASSWORD</span><br>
+                    <span style="color: #1e293b; font-size: 14px; font-family: 'Courier New', monospace; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; display: inline-block;">${password}</span>
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin-bottom: 20px;">
+              <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
+                <strong>⚠️ Security Notice:</strong> Please save your password securely. We recommend changing it on your first login.
+              </p>
+            </div>
+
+            <p style="text-align: center; margin-bottom: 20px;">
+              <a href="https://rota-usa.com/auth/login" style="display: inline-block; padding: 12px 28px; background: #0a66c2; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">Log In Now</a>
+            </p>
+
+            <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.6;">
+              If you have any questions or need assistance, please contact our support team at 
+              <a href="mailto:support@rota-usa.com" style="color: #0a66c2; text-decoration: none; font-weight: 600;">support@rota-usa.com</a>.
             </p>
           </div>
 
-          <div style="background:#f7fafc; padding:12px 18px; font-size:12px; color:#6b7280; text-align:center;">
-            Rota USA • <a href="https://rota-usa.com" style="color:#0a66c2; text-decoration:none;">rota-usa.com</a>
+          <div style="background: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+            <p style="margin: 0; color: #64748b; font-size: 12px;">Rota USA Portal • <a href="https://rota-usa.com" style="color: #0a66c2; text-decoration: none;">rota-usa.com</a></p>
           </div>
         </div>
       </div>
@@ -382,7 +405,91 @@ export async function POST(req: Request) {
       html,
     });
 
-    console.log("Step 7: All steps completed successfully");
+    console.log("Step 7: User email sent successfully");
+
+    // ────────────────────────────────────────────────────────────────
+    // Send admin notification
+    // ────────────────────────────────────────────────────────────────
+    const adminEmails = getValidAdminEmails();
+    if (adminEmails && adminEmails.length > 0) {
+      try {
+        const adminHtml = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <div style="background: linear-gradient(135deg, #0a66c2 0%, #0066a1 100%); padding: 24px; color: #fff;">
+                <h2 style="margin: 0; font-size: 20px; font-weight: 600;">👤 New User Created</h2>
+              </div>
+              
+              <div style="padding: 24px;">
+                <p style="margin: 0 0 16px 0; color: #334155; font-size: 14px; line-height: 1.6;">
+                  A new user account has been created in the Rota USA system.
+                </p>
+
+                <div style="margin-bottom: 20px;">
+                  <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">User Information</p>
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                        <span style="color: #64748b; font-size: 12px; font-weight: 600;">NAME</span><br>
+                        <span style="color: #1e293b; font-weight: 600; font-size: 15px;">${escapeHtml(`${firstName || ""} ${lastName || ""}`.trim())}</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                        <span style="color: #64748b; font-size: 12px; font-weight: 600;">EMAIL</span><br>
+                        <span style="color: #334155; font-size: 14px;">${escapeHtml(email)}</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                        <span style="color: #64748b; font-size: 12px; font-weight: 600;">COMPANY</span><br>
+                        <span style="color: #334155; font-size: 14px;">${escapeHtml(companyName || "—")}</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 0;">
+                        <span style="color: #64748b; font-size: 12px; font-weight: 600;">LOGIN CREDENTIALS</span><br>
+                        <span style="color: #1e293b; font-size: 14px; font-family: 'Courier New', monospace; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; display: inline-block;">${escapeHtml(password)}</span>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+
+                <div style="background: #f0f9ff; border-left: 4px solid #0a66c2; padding: 12px 16px; border-radius: 4px;">
+                  <p style="margin: 0; color: #0369a1; font-size: 13px; line-height: 1.5;">
+                    <strong>ℹ️ Note:</strong> The user's password has been securely generated. They will be prompted to set a new password on first login.
+                  </p>
+                </div>
+              </div>
+
+              <div style="background: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+                <p style="margin: 0; color: #64748b; font-size: 12px;">Rota USA Admin • <a href="https://rota-usa.com/admin" style="color: #0a66c2; text-decoration: none;">admin.rota-usa.com</a></p>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const adminPromises = adminEmails.map((adminEmail) =>
+          transporter.sendMail({
+            from: process.env.FROM_EMAIL,
+            to: adminEmail,
+            subject: `New User Created: ${escapeHtml(`${firstName || ""} ${lastName || ""}`.trim())}`,
+            html: adminHtml,
+          }),
+        );
+
+        await Promise.all(adminPromises);
+        console.log(
+          "Step 7.5: Admin notification emails sent to:",
+          adminEmails,
+        );
+      } catch (adminErr) {
+        console.error("Step 7.5 Error: Failed to send admin emails:", adminErr);
+        // Non-blocking — don't fail the entire flow if admin email fails
+      }
+    }
+
+    console.log("Step 8: All steps completed successfully");
 
     return NextResponse.json(
       { message: "User created & email sent", user },

@@ -59,6 +59,13 @@ export async function POST(request: NextRequest) {
     const customerId =
       authenticatedUser?.shopifyCustomerId ?? body?.customerId ?? "";
 
+    // Extract company information from authenticated user
+    const companyName = authenticatedUser?.companyName ?? null;
+    const companyAddress = authenticatedUser?.companyAddress1 ?? null;
+    const companyCity = authenticatedUser?.companyCity ?? null;
+    const companyState = authenticatedUser?.companyState ?? null;
+    const companyZip = authenticatedUser?.companyZip ?? null;
+
     console.log("📥 [API] Received product request:", {
       query,
       message,
@@ -66,6 +73,8 @@ export async function POST(request: NextRequest) {
       customerEmail,
       customerPhone,
       customerId,
+      companyName,
+      companyCity,
       fromAuthenticated: !!authenticatedUser,
     });
 
@@ -167,6 +176,36 @@ export async function POST(request: NextRequest) {
                         </tr>
                       </table>
                     </div>
+
+                    ${
+                      companyName
+                        ? `
+                    <div style="margin-top: 20px;">
+                      <p style="margin: 0 0 16px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Company Information</p>
+                      <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                          <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                            <span style="color: #64748b; font-size: 12px; font-weight: 600;">COMPANY NAME</span><br>
+                            <span style="color: #1e293b; font-weight: 600; font-size: 15px;">${escapeHtml(String(companyName))}</span>
+                          </td>
+                        </tr>
+                        ${
+                          companyAddress
+                            ? `
+                        <tr>
+                          <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                            <span style="color: #64748b; font-size: 12px; font-weight: 600;">ADDRESS</span><br>
+                            <span style="color: #334155; font-size: 14px;">${escapeHtml(String(companyAddress))}${companyCity ? `, ${escapeHtml(String(companyCity))}` : ""}${companyState ? ` ${escapeHtml(String(companyState))}` : ""}${companyZip ? ` ${escapeHtml(String(companyZip))}` : ""}</span>
+                          </td>
+                        </tr>
+                        `
+                            : ""
+                        }
+                      </table>
+                    </div>
+                    `
+                        : ""
+                    }
                   </div>
 
                   <div style="background: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
@@ -252,6 +291,36 @@ export async function POST(request: NextRequest) {
                           </tr>
                         </table>
                       </div>
+
+                      ${
+                        companyName
+                          ? `
+                      <div style="margin-top: 20px;">
+                        <p style="margin: 0 0 16px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Company Information</p>
+                        <table style="width: 100%; border-collapse: collapse;">
+                          <tr>
+                            <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                              <span style="color: #64748b; font-size: 12px; font-weight: 600;">COMPANY NAME</span><br>
+                              <span style="color: #1e293b; font-weight: 600; font-size: 15px;">${escapeHtml(String(companyName))}</span>
+                            </td>
+                          </tr>
+                          ${
+                            companyAddress
+                              ? `
+                          <tr>
+                            <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                              <span style="color: #64748b; font-size: 12px; font-weight: 600;">ADDRESS</span><br>
+                              <span style="color: #334155; font-size: 14px;">${escapeHtml(String(companyAddress))}${companyCity ? `, ${escapeHtml(String(companyCity))}` : ""}${companyState ? ` ${escapeHtml(String(companyState))}` : ""}${companyZip ? ` ${escapeHtml(String(companyZip))}` : ""}</span>
+                            </td>
+                          </tr>
+                          `
+                              : ""
+                          }
+                        </table>
+                      </div>
+                      `
+                          : ""
+                      }
                     </div>
 
                     <div style="background: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">

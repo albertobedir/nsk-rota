@@ -134,10 +134,17 @@ export async function GET(req: NextRequest) {
       creditLimit: safeNumber(user.creditLimit),
       creditUsed: safeNumber(user.creditUsed),
       creditRemaining: safeNumber(user.creditRemaining),
-      // include shopify customer ID + tags + inferred tier for client
+      // Shopify customer ID + tags + inferred tier for client
       shopifyCustomerId: shopifyCustomerId ?? null,
       tags: tagsArray,
       tier: user.tier ?? inferredTier ?? null,
+      // Company information
+      companyName: user.companyName ?? null,
+      shopifyCompanyId: user.shopifyCompanyId ?? null,
+      companyAddress1: user.companyAddress1 ?? null,
+      companyCity: user.companyCity ?? null,
+      companyState: user.companyState ?? null,
+      companyZip: user.companyZip ?? null,
     };
 
     return NextResponse.json({ user: sessionUser });
