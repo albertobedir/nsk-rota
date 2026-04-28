@@ -222,14 +222,33 @@ export async function POST(req: NextRequest) {
       </div>
     `;
 
-    await transporter.sendMail({
-      from: process.env.FROM_EMAIL,
-      to: email,
-      subject: "Welcome to Rota USA — Your Account is Ready",
-      html,
+    await new Promise((resolve, reject) => {
+      transporter.sendMail(
+        {
+          from: process.env.FROM_EMAIL,
+          to: email,
+          subject: "Welcome to Rota USA — Your Account is Ready",
+          html,
+        },
+        (err, info) => {
+          if (err) {
+            console.error(
+              "[🔗 Customer Create Webhook] Welcome email error:",
+              err,
+            );
+            reject(err);
+          } else {
+            console.log(
+              "[🔗 Customer Create Webhook] Welcome email sent to:",
+              email,
+              "MessageID:",
+              info?.messageId,
+            );
+            resolve(info);
+          }
+        },
+      );
     });
-
-    console.log("[🔗 Customer Create Webhook] Welcome email sent to:", email);
 
     // ────────────────────────────────────────────────────────────────
     // 6. Send admin notification email
@@ -293,19 +312,38 @@ export async function POST(req: NextRequest) {
           </div>
         `;
 
-        const adminPromises = adminEmails.map((adminEmail) =>
-          transporter.sendMail({
-            from: process.env.FROM_EMAIL,
-            to: adminEmail,
-            subject: `New User Created: ${escapeHtml(`${first_name || ""} ${last_name || ""}`.trim())}`,
-            html: adminHtml,
-          }),
+        const adminPromises = adminEmails.map(
+          (adminEmail) =>
+            new Promise((resolve, reject) => {
+              transporter.sendMail(
+                {
+                  from: process.env.FROM_EMAIL,
+                  to: adminEmail,
+                  subject: `New User Created: ${escapeHtml(`${first_name || ""} ${last_name || ""}`.trim())}`,
+                  html: adminHtml,
+                },
+                (err, info) => {
+                  if (err) {
+                    console.error(
+                      `[🔗 Customer Create Webhook] Failed to send admin email to ${adminEmail}:`,
+                      err,
+                    );
+                    reject(err);
+                  } else {
+                    console.log(
+                      `[🔗 Customer Create Webhook] Admin email sent to ${adminEmail}:`,
+                      info?.messageId,
+                    );
+                    resolve(info);
+                  }
+                },
+              );
+            }),
         );
 
         await Promise.all(adminPromises);
         console.log(
-          "[🔗 Customer Create Webhook] Admin notification emails sent to:",
-          adminEmails,
+          "[🔗 Customer Create Webhook] All admin notification emails sent successfully",
         );
       } catch (adminErr) {
         console.error(
