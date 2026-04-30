@@ -130,10 +130,11 @@ export async function POST(req: NextRequest) {
     console.log("[🔗 Customer Create Webhook] Password generated");
 
     // ────────────────────────────────────────────────────────────────
-    // 3. Set tax exempt via Admin API
+    // 3. Set tax exempt + password + ACTIVATE via Admin API
     // ────────────────────────────────────────────────────────────────
     try {
-      const taxRes = await fetch(
+      // 3a. Password + taxExempt set et
+      const updateRes = await fetch(
         `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-01/graphql.json`,
         {
           method: "POST",
@@ -149,23 +150,61 @@ export async function POST(req: NextRequest) {
               }
             }`,
             variables: {
-              input: { id: admin_graphql_api_id, taxExempt: true },
+              input: {
+                id: admin_graphql_api_id,
+                taxExempt: true,
+                password: plainPassword,
+                passwordConfirmation: plainPassword,
+              },
             },
           }),
         },
       );
-      const taxData = await taxRes.json();
-      if (taxData?.data?.customerUpdate?.userErrors?.length > 0) {
+      const updateData = await updateRes.json();
+      if (updateData?.data?.customerUpdate?.userErrors?.length > 0) {
         console.warn(
-          "[🔗 Customer Create Webhook] Tax exempt errors:",
-          taxData.data.customerUpdate.userErrors,
+          "[🔗 Webhook] Update errors:",
+          updateData.data.customerUpdate.userErrors,
         );
       } else {
-        console.log("[🔗 Customer Create Webhook] Tax exempt set successfully");
+        console.log("[🔗 Webhook] Password + taxExempt set successfully");
+      }
+
+      // 3b. Activation URL generate et ve fetch ile aktif et
+      const activateRes = await fetch(
+        `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-01/graphql.json`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!,
+          },
+          body: JSON.stringify({
+            query: `mutation customerGenerateAccountActivationUrl($customerId: ID!) {
+              customerGenerateAccountActivationUrl(customerId: $customerId) {
+                accountActivationUrl
+                userErrors { field message }
+              }
+            }`,
+            variables: { customerId: admin_graphql_api_id },
+          }),
+        },
+      );
+      const activateData = await activateRes.json();
+      const activationUrl =
+        activateData?.data?.customerGenerateAccountActivationUrl
+          ?.accountActivationUrl;
+
+      if (activationUrl) {
+        // URL'yi fetch ederek customer'ı aktif et
+        await fetch(activationUrl);
+        console.log("[🔗 Webhook] Account activated successfully ✅");
+      } else {
+        console.warn("[🔗 Webhook] No activation URL returned:", activateData);
       }
     } catch (err) {
-      console.error("[🔗 Customer Create Webhook] Tax exempt error:", err);
-      // non-blocking — continue even if tax exempt fails
+      console.error("[🔗 Webhook] Customer update/activate error:", err);
+      // non-blocking — devam et
     }
 
     // ────────────────────────────────────────────────────────────────
