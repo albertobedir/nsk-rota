@@ -19,36 +19,57 @@ function verifyShopifyWebhook(req: NextRequest, rawBody: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  console.log("[🗑️ Customer Delete Webhook] ─── REQUEST RECEIVED ───");
+  console.log("[🗑️ Customer Delete Webhook] Headers:", {
+    hmac: req.headers.get("X-Shopify-Hmac-Sha256") ? "present" : "MISSING",
+    topic: req.headers.get("X-Shopify-Topic"),
+    shop: req.headers.get("X-Shopify-Shop-Domain"),
+  });
+
   try {
     const rawBody = await req.text();
+    console.log(
+      "[🗑️ Customer Delete Webhook] Raw body length:",
+      rawBody.length,
+    );
+    console.log("[🗑️ Customer Delete Webhook] Raw body:", rawBody);
 
     // ────────────────────────────────────────────────────────────────
     // 1. HMAC verify
     // ────────────────────────────────────────────────────────────────
     if (!verifyShopifyWebhook(req, rawBody)) {
-      console.warn("[🗑️ Customer Delete Webhook] Invalid HMAC signature");
+      console.warn("[🗑️ Customer Delete Webhook] ❌ Invalid HMAC signature");
       return NextResponse.json({ error: "Invalid HMAC" }, { status: 401 });
     }
+    console.log("[🗑️ Customer Delete Webhook] ✅ HMAC verified");
 
     const customer = JSON.parse(rawBody);
     const { email, admin_graphql_api_id } = customer;
-    console.log("[🗑️ Customer Delete Webhook] Received:", email);
+    console.log("[🗑️ Customer Delete Webhook] Parsed customer:", {
+      email,
+      admin_graphql_api_id,
+    });
 
     // ────────────────────────────────────────────────────────────────
     // 2. DB'den sil
     // ────────────────────────────────────────────────────────────────
+    console.log("[🗑️ Customer Delete Webhook] Looking up user in DB...");
     const dbUser = await prisma.user.findFirst({
       where: { shopifyCustomerId: admin_graphql_api_id },
     });
 
     if (!dbUser) {
-      console.warn("[🗑️ Customer Delete Webhook] User not found in DB:", email);
+      console.warn(
+        "[🗑️ Customer Delete Webhook] ⚠️ User not found in DB:",
+        email,
+      );
       return NextResponse.json(
         { status: "not_found", message: "User not in database" },
         { status: 200 },
       );
     }
 
+    console.log("[🗑️ Customer Delete Webhook] Found user in DB:", dbUser.id);
     await prisma.user.delete({ where: { id: dbUser.id } });
     console.log(
       "[✅ Customer Delete Webhook] User deleted from DB:",
