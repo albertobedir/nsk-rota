@@ -37,7 +37,9 @@ const categories: Category[] = [
   },
   {
     name: "Products",
-    items: [{ name: "Product Search", href: "/products" }],
+    items: [
+      { name: "Product Search", href: "/products?isFromSearchComp=false" },
+    ],
   },
 ];
 

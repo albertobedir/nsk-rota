@@ -277,8 +277,16 @@ export default function ProductsPage() {
     // Returns an object with restored filters/page when available so caller
     // can use them immediately for the first products fetch.
     const fetchOptions = async () => {
-      // Check if coming from search bar
+      // Check if coming from search bar or from navbar menu
       try {
+        const params = new URLSearchParams(window.location.search);
+        const isFromSearchCompParam = params.get("isFromSearchComp");
+
+        // Only set localStorage if the query parameter exists
+        if (isFromSearchCompParam !== null) {
+          localStorage.setItem("isFromSearchComp", isFromSearchCompParam);
+        }
+
         const isFromSearch = localStorage.getItem("isFromSearchComp");
         setShowFilters(isFromSearch === "false");
       } catch (e) {
