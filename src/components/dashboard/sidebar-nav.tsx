@@ -15,7 +15,11 @@ const nav = [
 ];
 
 const bottom = [
-  { label: "Product Search", href: "/products", icon: ShoppingBag },
+  {
+    label: "Product Search",
+    href: "/products?isFromSearchComp=false",
+    icon: ShoppingBag,
+  },
 ];
 
 export default function SidebarNav({ onNavigate }: Props) {
@@ -74,10 +78,7 @@ export default function SidebarNav({ onNavigate }: Props) {
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => {
-                localStorage.setItem("isFromSearchComp", "false");
-                onNavigate?.();
-              }}
+              onClick={onNavigate}
               className={cn(
                 "group flex items-center justify-between rounded-xl px-3 py-2 text-sm transition",
                 active

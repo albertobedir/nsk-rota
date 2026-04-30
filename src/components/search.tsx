@@ -75,7 +75,7 @@ export default function Search() {
         setValue("");
         console.log("search bardan geldi");
         localStorage.setItem("isFromSearchComp", "true");
-        router.push(`/products`);
+        router.push(`/products?isFromSearchComp=true`);
       } finally {
         setIsSearching(false);
       }
@@ -93,7 +93,7 @@ export default function Search() {
       try {
         console.log("search bardan geldi");
         localStorage.setItem("isFromSearchComp", "true");
-        router.push(`/products`);
+        router.push(`/products?isFromSearchComp=true`);
         await searchProducts(query);
       } finally {
         setIsSearching(false);
