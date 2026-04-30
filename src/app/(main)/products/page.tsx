@@ -4,6 +4,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import SingleProdCard from "@/components/single-prod-cart";
 import { useProductsStore } from "@/store/products-store";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const perPage = 16;
   const [showFilters, setShowFilters] = useState(false);
+  const searchParams = useSearchParams();
 
   const {
     products,
@@ -373,7 +375,7 @@ export default function ProductsPage() {
     })();
 
     // Only re-run when page or searchTerm changes — filters won't auto-trigger searches
-  }, [page, searchTerm, fetchProducts, searchProducts]);
+  }, [page, searchTerm, fetchProducts, searchProducts, searchParams]);
 
   // Handler to manage cascading selection and clearing children
   const handleSelectChange = (key: string, value: string) => {
