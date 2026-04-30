@@ -35,6 +35,7 @@ import responseJson from "@/static/response.json";
 export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const perPage = 16;
+  const [showFilters, setShowFilters] = useState(false);
 
   const {
     products,
@@ -276,6 +277,14 @@ export default function ProductsPage() {
     // Returns an object with restored filters/page when available so caller
     // can use them immediately for the first products fetch.
     const fetchOptions = async () => {
+      // Check if coming from search bar
+      try {
+        const isFromSearch = localStorage.getItem("isFromSearchComp");
+        setShowFilters(isFromSearch === "false");
+      } catch (e) {
+        /* ignore */
+      }
+
       try {
         const res = await fetch("/api/products/options");
         const json = await res.json();
@@ -501,78 +510,85 @@ export default function ProductsPage() {
       {/* No modal — step-by-step cascading selects below */}
 
       {/* FILTER SECTION */}
-      <div className="mx-auto w-full sm:w-[50%] max-w-[1540px] px-6 mt-20 mb-12 flex flex-col gap-8">
-        {/* FILTER SELECTS */}
-        <div
-          className="flex sm:flex-row flex-col items-center justify-center"
-          //   className="
-          //   grid grid-cols-1
-          //   sm:grid-cols-2
-          //   md:grid-cols-3
-          //   lg:grid-cols-5
-          //   gap-4 w-full
-          // "
-        >
-          <BrandModelTypeCombos
-            filters={{
-              brand: filters.brand,
-              model: filters.model,
-              type: filters.type,
-              desc: filters.desc,
-            }}
-            setFilters={setFilters}
-          />
-
-          {/* STOCK SWITCH (no card) */}
-          <div className="flex sm:ml-5 items-center bg justify-start gap-3">
-            <span className="hidden sm:inline text-[15px] text-[#6f6f6f] font-medium scale-120">
-              Stock
-            </span>
-            <Switch
-              checked={filters.stock === "IN"}
-              onCheckedChange={(checked) =>
-                setFilters((prev) => ({ ...prev, stock: checked ? "IN" : "" }))
-              }
-              className="data-[state=checked]:bg-green-600"
+      {showFilters && (
+        <div className="mx-auto w-full sm:w-[50%] max-w-[1540px] px-6 mt-20 mb-12 flex flex-col gap-8">
+          {/* FILTER SELECTS */}
+          <div
+            className="flex sm:flex-row flex-col items-center justify-center"
+            //   className="
+            //   grid grid-cols-1
+            //   sm:grid-cols-2
+            //   md:grid-cols-3
+            //   lg:grid-cols-5
+            //   gap-4 w-full
+            // "
+          >
+            <BrandModelTypeCombos
+              filters={{
+                brand: filters.brand,
+                model: filters.model,
+                type: filters.type,
+                desc: filters.desc,
+              }}
+              setFilters={setFilters}
             />
+
+            {/* STOCK SWITCH (no card) */}
+            <div className="flex sm:ml-5 items-center bg justify-start gap-3">
+              <span className="hidden sm:inline text-[15px] text-[#6f6f6f] font-medium scale-120">
+                Stock
+              </span>
+              <Switch
+                checked={filters.stock === "IN"}
+                onCheckedChange={(checked) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    stock: checked ? "IN" : "",
+                  }))
+                }
+                className="data-[state=checked]:bg-green-600"
+              />
+            </div>
+          </div>
+
+          {/* BUTTONS */}
+          <div
+            className="
+            grid 
+            grid-cols-1 
+            sm:grid-cols-2 
+            md:grid-cols-3 
+            gap-4 
+            w-full
+          "
+          >
+            <Button
+              className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center"
+              onClick={() => applyFilters(1)}
+            >
+              Find Product <Search size={18} />
+            </Button>
+
+            <Button
+              className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center"
+              onClick={() => {
+                clearAllFilters();
+              }}
+            >
+              Clear Selections <X size={18} />
+            </Button>
+
+            <Button
+              className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center"
+              onClick={() =>
+                navigator.clipboard.writeText(window.location.href)
+              }
+            >
+              Copy link to share <Share2 size={18} />
+            </Button>
           </div>
         </div>
-
-        {/* BUTTONS */}
-        <div
-          className="
-          grid 
-          grid-cols-1 
-          sm:grid-cols-2 
-          md:grid-cols-3 
-          gap-4 
-          w-full
-        "
-        >
-          <Button
-            className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center"
-            onClick={() => applyFilters(1)}
-          >
-            Find Product <Search size={18} />
-          </Button>
-
-          <Button
-            className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center"
-            onClick={() => {
-              clearAllFilters();
-            }}
-          >
-            Clear Selections <X size={18} />
-          </Button>
-
-          <Button
-            className="bg-secondary text-white font-semibold h-[52px] text-[16px] flex gap-2 justify-center"
-            onClick={() => navigator.clipboard.writeText(window.location.href)}
-          >
-            Copy link to share <Share2 size={18} />
-          </Button>
-        </div>
-      </div>
+      )}
       <div className="flex justify-center items-start w-full">
         {searchTerm ? null : Object.values(filters).some((f) => f) ? (
           (() => {

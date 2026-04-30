@@ -73,6 +73,8 @@ export default function Search() {
       try {
         await searchProducts(val);
         setValue("");
+        console.log("search bardan geldi");
+        localStorage.setItem("isFromSearchComp", "true");
         router.push(`/products`);
       } finally {
         setIsSearching(false);
@@ -89,6 +91,8 @@ export default function Search() {
       setIsSearching(true);
 
       try {
+        console.log("search bardan geldi");
+        localStorage.setItem("isFromSearchComp", "true");
         router.push(`/products`);
         await searchProducts(query);
       } finally {
@@ -116,7 +120,7 @@ export default function Search() {
           }
 
           const parts = value
-            .split(/[\s,]+/)
+            .split(/[\s,_*#-]+/)
             .map((v) => v.trim())
             .filter(Boolean);
 
@@ -290,7 +294,7 @@ export default function Search() {
 
                   const pasted = e.clipboardData.getData("text");
                   const parts = pasted
-                    .split(/[\s,]+/)
+                    .split(/[\s,_*#-]+/)
                     .map((v) => v.trim())
                     .filter(Boolean);
                   if (parts.length === 0) return;

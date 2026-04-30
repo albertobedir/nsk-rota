@@ -81,7 +81,10 @@ export default function NavbarModal({ open, setOpen }: Props) {
                         <Link
                           className="hover:text-secondary transition-colors"
                           href={item.href}
-                          onClick={() => setOpen(false)}
+                          onClick={() => {
+                            localStorage.setItem("isFromSearchComp", "false");
+                            setOpen(false);
+                          }}
                         >
                           {item.name}
                         </Link>
@@ -185,7 +188,9 @@ export default function NavbarModal({ open, setOpen }: Props) {
                                 "text-red-600 font-semibold hover:text-red-700",
                             )}
                             href={item.href}
-                            // burada setOpen(false) YOK
+                            onClick={() => {
+                              localStorage.setItem("isFromSearchComp", "false");
+                            }}
                           >
                             {item.name}
                           </Link>

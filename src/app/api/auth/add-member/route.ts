@@ -359,7 +359,7 @@ export async function POST(req: Request) {
             </p>
 
             <div style="margin-bottom: 20px;">
-              <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Login Credentials</p>
+              <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Password</p>
               <table style="width: 100%; border-collapse: collapse;">
                 <tr>
                   <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
@@ -458,7 +458,7 @@ export async function POST(req: Request) {
                   </tr>
                   <tr>
                     <td style="padding: 10px 0;">
-                      <span style="color: #64748b; font-size: 12px; font-weight: 600;">LOGIN CREDENTIALS</span><br>
+                      <span style="color: #64748b; font-size: 12px; font-weight: 600;">PASSWORD</span><br>
                       <span style="color: #1e293b; font-size: 14px; font-family: 'Courier New', monospace; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; display: inline-block;">${escapeHtml(password)}</span>
                     </td>
                   </tr>

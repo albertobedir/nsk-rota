@@ -74,7 +74,10 @@ export default function SidebarNav({ onNavigate }: Props) {
             <Link
               key={item.href}
               href={item.href}
-              onClick={onNavigate}
+              onClick={() => {
+                localStorage.setItem("isFromSearchComp", "false");
+                onNavigate?.();
+              }}
               className={cn(
                 "group flex items-center justify-between rounded-xl px-3 py-2 text-sm transition",
                 active

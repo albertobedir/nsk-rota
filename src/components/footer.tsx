@@ -111,6 +111,12 @@ export default function Footer() {
 
                   const isExternal = href.startsWith("http");
 
+                  const handleFooterClick = () => {
+                    if (href === "/products" || href.includes("/products")) {
+                      localStorage.setItem("isFromSearchComp", "false");
+                    }
+                  };
+
                   return (
                     <li
                       key={item.name}
@@ -122,6 +128,7 @@ export default function Footer() {
                           href={href}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={handleFooterClick}
                         >
                           {item.name}
                         </a>
@@ -129,6 +136,7 @@ export default function Footer() {
                         <Link
                           className="hover:text-secondary transition-colors"
                           href={href}
+                          onClick={handleFooterClick}
                         >
                           {item.name}
                         </Link>
