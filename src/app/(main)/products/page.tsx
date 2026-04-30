@@ -37,7 +37,6 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const perPage = 16;
   const [showFilters, setShowFilters] = useState(false);
-  const searchParams = useSearchParams();
 
   const {
     products,
@@ -375,7 +374,7 @@ export default function ProductsPage() {
     })();
 
     // Only re-run when page or searchTerm changes — filters won't auto-trigger searches
-  }, [page, searchTerm, fetchProducts, searchProducts, searchParams]);
+  }, [page, searchTerm, fetchProducts, searchProducts]);
 
   // Handler to manage cascading selection and clearing children
   const handleSelectChange = (key: string, value: string) => {
