@@ -168,42 +168,88 @@ export async function POST(req: NextRequest) {
       }
     } catch (err) {
       console.error("[🔗 Webhook] customerUpdate error:", err);
-      // non-blocking
     }
 
     // ────────────────────────────────────────────────────────────────
-    // 4. Activate account (state: ENABLED)
+    // 4. Activate account via Storefront API customerActivateByUrl
     // ────────────────────────────────────────────────────────────────
     try {
-      const activateData = await shopifyAdminFetch(
-        `mutation customerUpdate($input: CustomerInput!) {
-          customerUpdate(input: $input) {
-            customer { id state }
+      // 4a. Aktivasyon URL'ini Admin API'den al
+      const activateUrlData = await shopifyAdminFetch(
+        `mutation customerGenerateAccountActivationUrl($customerId: ID!) {
+          customerGenerateAccountActivationUrl(customerId: $customerId) {
+            accountActivationUrl
             userErrors { field message }
           }
         }`,
-        {
-          input: {
-            id: admin_graphql_api_id,
-            state: "ENABLED",
-          },
-        },
+        { customerId: admin_graphql_api_id },
       );
 
-      const state = activateData?.data?.customerUpdate?.customer?.state;
-      const errors = activateData?.data?.customerUpdate?.userErrors;
+      const activationUrl =
+        activateUrlData?.data?.customerGenerateAccountActivationUrl
+          ?.accountActivationUrl;
 
-      if (errors?.length > 0) {
-        console.warn("[🔗 Webhook] Activation errors:", errors);
-      } else {
-        console.log(
-          "[🔗 Webhook] Account activated successfully ✅ State:",
-          state,
+      if (!activationUrl) {
+        console.warn(
+          "[🔗 Webhook] No activation URL returned:",
+          activateUrlData?.data?.customerGenerateAccountActivationUrl
+            ?.userErrors,
         );
+      } else {
+        console.log("[🔗 Webhook] Activation URL obtained ✅");
+
+        // 4b. Storefront API ile aktive et
+        const storefrontRes = await fetch(
+          `https://${process.env.SHOPIFY_STORE_DOMAIN}/api/2025-01/graphql.json`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Shopify-Storefront-Access-Token":
+                process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN!,
+            },
+            body: JSON.stringify({
+              query: `mutation customerActivateByUrl($activationUrl: URL!, $password: String!) {
+                customerActivateByUrl(activationUrl: $activationUrl, password: $password) {
+                  customer { 
+                    id 
+                    displayName
+                  }
+                  customerAccessToken { 
+                    accessToken 
+                  }
+                  customerUserErrors { 
+                    code 
+                    field 
+                    message 
+                  }
+                }
+              }`,
+              variables: {
+                activationUrl,
+                password: plainPassword,
+              },
+            }),
+          },
+        );
+
+        const storefrontData = await storefrontRes.json();
+        const activatedCustomer =
+          storefrontData?.data?.customerActivateByUrl?.customer;
+        const activationErrors =
+          storefrontData?.data?.customerActivateByUrl?.customerUserErrors;
+
+        if (activationErrors?.length > 0) {
+          console.warn("[🔗 Webhook] Activation errors:", activationErrors);
+        } else {
+          console.log(
+            "[🔗 Webhook] Account activated successfully ✅ Customer:",
+            activatedCustomer?.displayName,
+          );
+        }
       }
     } catch (err) {
       console.error("[🔗 Webhook] Activation error:", err);
-      // non-blocking
     }
 
     // ────────────────────────────────────────────────────────────────
