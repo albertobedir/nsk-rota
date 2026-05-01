@@ -74,7 +74,7 @@ export default function Search() {
         await searchProducts(val);
         setValue("");
         console.log("search bardan geldi");
-        window.location.href = `/products?isFromSearchComp=true`;
+        router.push(`/products`);
       } finally {
         setIsSearching(false);
       }
@@ -91,7 +91,7 @@ export default function Search() {
 
       try {
         console.log("search bardan geldi");
-        window.location.href = `/products?isFromSearchComp=true`;
+        router.push(`/products`);
         await searchProducts(query);
       } finally {
         setIsSearching(false);
