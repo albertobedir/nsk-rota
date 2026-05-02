@@ -11,6 +11,31 @@ import { getValidAdminEmails } from "@/lib/email/admin-emails";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
+// 🔥 GLOBAL TRANSPORTER - pool ile connection reuse
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
+  secure: false, // port 25 için doğru
+
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS || "",
+  },
+
+  pool: true, // 🔥 KRİTİK - connection reuse
+  maxConnections: 2, // 🔥 KRİTİK - concurrent limit
+  maxMessages: 50,
+
+  requireTLS: false,
+  tls: {
+    rejectUnauthorized: false,
+  },
+
+  connectionTimeout: 20000,
+  greetingTimeout: 20000,
+  socketTimeout: 20000,
+});
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -131,39 +156,18 @@ export async function POST(req: Request) {
     //   html,
     // });
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-
-      secure: false, // port 25 için doğru
-
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS || "",
-      },
-
-      requireTLS: false, // 🔥 EKLE (çok önemli)
-
-      tls: {
-        rejectUnauthorized: false,
-      },
-
-      connectionTimeout: 20000,
-      greetingTimeout: 20000,
-      socketTimeout: 20000,
-    });
-
-    // Tüm admin emaillerine gönder
-    const emailPromises = adminEmails.map((adminEmail) =>
-      transporter.sendMail({
+    // 🔥 Sequential send - concurrent limit aşmamak için
+    for (const adminEmail of adminEmails) {
+      await transporter.sendMail({
         from: process.env.FROM_EMAIL,
         to: adminEmail,
         subject: "Yeni Üyelik Başvurusu",
         html,
-      }),
-    );
+      });
 
-    await Promise.all(emailPromises);
+      // 200ms delay - SMTP stability
+      await new Promise((r) => setTimeout(r, 200));
+    }
 
     return NextResponse.json(
       { message: "Üyelik isteğiniz başarıyla iletildi." },
