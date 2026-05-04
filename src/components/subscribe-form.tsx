@@ -144,34 +144,24 @@ export default function Page() {
         {isSuccess ? (
           <div className="flex flex-col gap-6 justify-center h-full w-full">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 Account Creation Successful!
               </h2>
-              <p className="text-gray-600">
-                Your account creation request has been submitted successfully.
+              <p className="text-gray-800 font-medium mb-3">
+                Welcome to ROTA North America LLC!
               </p>
+              <p className="text-gray-700 mb-4">
+                Your account creation request is currently under review. Once
+                the process is completed, your account details will be sent to
+                you via email.
+              </p>
+              <p className="text-gray-700">Thank you for your patience.</p>
             </div>
 
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <p className="text-green-800 font-medium">
-                Welcome to our community! We will review your account and send
-                you a confirmation email shortly.
-              </p>
-              <p className="text-green-700 text-sm mt-2">
-                Check your email for further instructions.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <Button
-                onClick={() => setIsSuccess(false)}
-                className="rounded-lg cursor-pointer py-6 font-medium text-base"
-              >
-                Submit Another Request
-              </Button>
+            <div className="flex flex-col gap-3 mt-4">
               <Link
                 href="/auth/login"
-                className="text-center text-secondary hover:underline font-medium"
+                className="text-center bg-secondary text-white rounded-lg py-3 font-medium hover:bg-secondary/90 transition"
               >
                 Return to Login
               </Link>
