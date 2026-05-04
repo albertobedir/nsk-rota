@@ -33,6 +33,9 @@ async function createVerifiedTransporter() {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS || "",
     },
+    pool: true, // 🔥 KRİTİK - connection reuse
+    maxConnections: 2, // 🔥 KRİTİK - concurrent limit
+    maxMessages: 50,
     requireTLS: true,
     tls: { rejectUnauthorized: false },
     connectionTimeout: 20000,
@@ -400,29 +403,31 @@ export async function POST(req: NextRequest) {
             </div>
           `;
 
-          await Promise.all(
-            adminEmails.map(async (adminEmail) => {
-              try {
-                const messageId = await sendEmailSafely(transporter, {
-                  from: process.env.FROM_EMAIL,
-                  to: adminEmail,
-                  subject: `New User Created: ${escapeHtml(`${first_name || ""} ${last_name || ""}`.trim())}`,
-                  html: adminHtml,
-                });
-                console.log(
-                  "[✅ Admin Email] Sent to:",
-                  adminEmail,
-                  "MessageID:",
-                  messageId,
-                );
-              } catch (err) {
-                console.error(
-                  `[❌ Admin Email] Failed to send to ${adminEmail}:`,
-                  err,
-                );
-              }
-            }),
-          );
+          // 🔥 Sequential send - concurrent limit aşmamak için
+          for (const adminEmail of adminEmails) {
+            try {
+              const messageId = await sendEmailSafely(transporter, {
+                from: process.env.FROM_EMAIL,
+                to: adminEmail,
+                subject: `New User Created: ${escapeHtml(`${first_name || ""} ${last_name || ""}`.trim())}`,
+                html: adminHtml,
+              });
+              console.log(
+                "[✅ Admin Email] Sent to:",
+                adminEmail,
+                "MessageID:",
+                messageId,
+              );
+            } catch (err) {
+              console.error(
+                `[❌ Admin Email] Failed to send to ${adminEmail}:`,
+                err,
+              );
+            }
+
+            // 200ms delay - SMTP stability
+            await new Promise((r) => setTimeout(r, 200));
+          }
         }
       } catch (err) {
         console.error("[❌ Background Email] Critical error:", err);
