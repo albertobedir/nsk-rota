@@ -139,7 +139,7 @@ export async function POST(req: Request) {
               <a href="https://rota-usa.com/add-member?email=${encodeURIComponent(normalizedEmail)}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&companyName=${encodeURIComponent(companyName)}&address1=${encodeURIComponent(address1)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&zip=${encodeURIComponent(zip)}" style="display:inline-block; padding:12px 20px; background:#0a66c2; color:#fff; text-decoration:none; border-radius:8px; font-weight:700;">Save User</a>
             </p>
 
-            <p style="font-size:13px; color:#6b7280; margin-top:18px;">This email was sent automatically. For support, please contact <a href="mailto:support@rota-usa.com" style="color:#0a66c2; text-decoration:none;">support@rota-usa.com</a>.</p>
+            <p style="font-size:13px; color:#6b7280; margin-top:18px;">This email was sent automatically. For support, please contact <a href="mailto:y.cankaya@nskgroup.com.tr" style="color:#0a66c2; text-decoration:none;">y.cankaya@nskgroup.com.tr</a>.</p>
           </div>
 
           <div style="background:#f7fafc; padding:12px 18px; font-size:12px; color:#6b7280; text-align:center;">

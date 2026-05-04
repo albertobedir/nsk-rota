@@ -160,7 +160,7 @@ export default function BasketPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerEmail: sessionUser?.email,
-          customerId: sessionUser?.id,
+          customerId: sessionUser?.shopifyCustomerId ?? sessionUser?.id,
           userTier: sessionUser?.tier,
           discountPercentage,
           discountCode: discountApplied?.code ?? null,
@@ -195,7 +195,10 @@ export default function BasketPage() {
       clearCartStore();
 
       // ✅ Invoice URL'e logged_in_customer_id ekle
-      const numericId = sessionUser?.id?.split("/").pop();
+      // Extract numeric ID from Shopify GID (gid://shopify/Customer/123456) or use Prisma ID
+      const numericId = (sessionUser?.shopifyCustomerId ?? sessionUser?.id)
+        ?.split("/")
+        .pop();
       const finalUrl = numericId
         ? `${invoiceUrl}?logged_in_customer_id=${numericId}`
         : invoiceUrl;

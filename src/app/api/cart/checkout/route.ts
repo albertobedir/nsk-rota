@@ -56,6 +56,30 @@ export async function POST(request: NextRequest) {
       firstItem: lineItems[0],
     });
 
+    // ===== STEP 0: Resolve customerId if it's a Prisma ID =====
+    let shopifyCustomerId = customerId;
+    if (customerId && !customerId.startsWith("gid://")) {
+      try {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: customerId },
+          select: { shopifyCustomerId: true },
+        });
+        if (dbUser?.shopifyCustomerId) {
+          shopifyCustomerId = dbUser.shopifyCustomerId;
+          console.log(
+            `[CUSTOMER ID RESOLVED] Prisma ID ${customerId} → Shopify GID ${shopifyCustomerId}`,
+          );
+        } else {
+          console.warn(
+            `[CUSTOMER ID] No shopifyCustomerId found for Prisma ID ${customerId}`,
+          );
+          shopifyCustomerId = undefined;
+        }
+      } catch (e) {
+        console.warn(`[CUSTOMER ID RESOLUTION] Failed:`, e);
+      }
+    }
+
     // ===== STEP 1: Validate discount code FIRST =====
     let resolvedDiscount = Number(discountPercentage ?? 0); // Start with tier discount
     let validatedDiscount: any = null; // Store validated discount info for later use
@@ -237,7 +261,7 @@ export async function POST(request: NextRequest) {
 
     // ===== customerId is already in Shopify GID format from frontend =====
     // Format: gid://shopify/Customer/123456 or undefined
-    console.log(`[SHOPIFY GID] Using customerId: ${customerId}`);
+    console.log(`[SHOPIFY GID] Using shopifyCustomerId: ${shopifyCustomerId}`);
 
     // Determine if discount is FIXED_AMOUNT type
     const tierOnly = Number(discountPercentage ?? 0); // sadece tier %
@@ -373,14 +397,14 @@ export async function POST(request: NextRequest) {
         : undefined;
 
     const input = {
-      customerId: customerId ?? undefined, // Already in GID format: gid://shopify/Customer/123
+      customerId: shopifyCustomerId ?? undefined, // Shopify GID: gid://shopify/Customer/123
       email: email ?? undefined,
       phone: phone ?? undefined,
       lineItems: items,
       shippingAddress: shippingAddress ?? undefined,
       tags: ["b2b", "custom-pricing"],
-      note: customerId
-        ? `B2B Order - Custom pricing for ${customerId}`
+      note: shopifyCustomerId
+        ? `B2B Order - Custom pricing for ${shopifyCustomerId}`
         : undefined,
       appliedDiscount: orderDiscount,
       shippingLine: shippingLine,
@@ -404,6 +428,7 @@ export async function POST(request: NextRequest) {
         ? customerAccessToken.substring(0, 20) + "..."
         : "NONE PROVIDED",
       customerId: customerId,
+      shopifyCustomerId: shopifyCustomerId,
       invoiceUrl: created?.draftOrder?.invoiceUrl,
     });
 

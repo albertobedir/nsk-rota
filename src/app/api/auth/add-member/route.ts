@@ -391,7 +391,7 @@ export async function POST(req: Request) {
 
             <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.6;">
               If you have any questions or need assistance, please contact our support team at 
-              <a href="mailto:support@rota-usa.com" style="color: #0a66c2; text-decoration: none; font-weight: 600;">support@rota-usa.com</a>.
+              <a href="mailto:y.cankaya@nskgroup.com.tr" style="color: #0a66c2; text-decoration: none; font-weight: 600;">y.cankaya@nskgroup.com.tr</a>.
             </p>
           </div>
 
@@ -406,14 +406,14 @@ export async function POST(req: Request) {
     //   from: "Acme <onboarding@resend.dev>",
     //   // to: user.email,
     //   to: "phontemalberto@gmail.com",
-    //   subject: "Yeni Hesap Bilgileriniz",
+    //   subject: "Your Account Information",
     //   html,
     // });
 
     await transporter.sendMail({
       from: process.env.FROM_EMAIL,
       to: user.email,
-      subject: "Yeni Hesap Bilgileriniz",
+      subject: "Your Account Information",
       html,
     });
 

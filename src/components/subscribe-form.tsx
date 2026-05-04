@@ -19,6 +19,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import z from "zod";
+import { useState } from "react";
 
 interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   register: keyof z.infer<typeof subscribeSchema>;
@@ -93,6 +94,7 @@ const formFields: FormFieldProps[] = [
 ];
 
 export default function Page() {
+  const [isSuccess, setIsSuccess] = useState(false);
   const form = useForm<z.infer<typeof subscribeSchema>>({
     resolver: zodResolver(subscribeSchema),
     defaultValues: {
@@ -113,7 +115,7 @@ export default function Page() {
     },
     onSuccess: () => {
       form.reset();
-      toast("Your account creation request has been submitted");
+      setIsSuccess(true);
     },
     onError: (error: unknown) => {
       if (error instanceof Error) {
@@ -139,56 +141,96 @@ export default function Page() {
   return (
     <Card className=" border-none max-w-xl w-full px-12 py-24">
       <CardContent className="h-full w-full flex flex-col p-0">
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(
-              (values: z.infer<typeof subscribeSchema>) => {
-                mutate(values);
-              },
-            )}
-            className="flex flex-col gap-6 justify-center h-full w-full p-0"
-          >
-            {formFields.map((field) => (
-              <FormField
-                key={field.register}
-                control={form.control}
-                name={field.register}
-                render={({ field: innerField }) => (
-                  <FormItem className="gap-0.5">
-                    <FormLabel className="font-bold text-[0.95rem] mb-1">
-                      {field.label}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type={field.type || "text"}
-                        className="w-full rounded-lg border border-muted-foreground/30"
-                        {...innerField}
-                        placeholder={field.placeholder}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+        {isSuccess ? (
+          <div className="flex flex-col gap-6 justify-center h-full w-full">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                Account Creation Successful!
+              </h2>
+              <p className="text-gray-600">
+                Your account creation request has been submitted successfully.
+              </p>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-green-800 font-medium">
+                Welcome to our community! We will review your account and send
+                you a confirmation email shortly.
+              </p>
+              <p className="text-green-700 text-sm mt-2">
+                Check your email for further instructions.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Button
+                onClick={() => setIsSuccess(false)}
+                className="rounded-lg cursor-pointer py-6 font-medium text-base"
+              >
+                Submit Another Request
+              </Button>
+              <Link
+                href="/auth/login"
+                className="text-center text-secondary hover:underline font-medium"
+              >
+                Return to Login
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <>
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(
+                  (values: z.infer<typeof subscribeSchema>) => {
+                    mutate(values);
+                  },
                 )}
-              />
-            ))}
+                className="flex flex-col gap-6 justify-center h-full w-full p-0"
+              >
+                {formFields.map((field) => (
+                  <FormField
+                    key={field.register}
+                    control={form.control}
+                    name={field.register}
+                    render={({ field: innerField }) => (
+                      <FormItem className="gap-0.5">
+                        <FormLabel className="font-bold text-[0.95rem] mb-1">
+                          {field.label}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type={field.type || "text"}
+                            className="w-full rounded-lg border border-muted-foreground/30"
+                            {...innerField}
+                            placeholder={field.placeholder}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
 
-            <Button
-              type="submit"
-              disabled={isPending}
-              size={"lg"}
-              className="rounded-lg cursor-pointer py-6 font-medium text-base"
-            >
-              {isPending ? <Spinner /> : "Send"}
-            </Button>
-          </form>
-        </Form>
+                <Button
+                  type="submit"
+                  disabled={isPending}
+                  size={"lg"}
+                  className="rounded-lg cursor-pointer py-6 font-medium text-base"
+                >
+                  {isPending ? <Spinner /> : "Send"}
+                </Button>
+              </form>
+            </Form>
 
-        <span className="text-center w-full mt-10 text-xl">
-          Already have an Account?{" "}
-          <Link href={"/auth/login"} className="text-secondary">
-            Login now
-          </Link>
-        </span>
+            <span className="text-center w-full mt-10 text-xl">
+              Already have an Account?{" "}
+              <Link href={"/auth/login"} className="text-secondary">
+                Login now
+              </Link>
+            </span>
+          </>
+        )}
       </CardContent>
     </Card>
   );
