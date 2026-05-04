@@ -253,10 +253,21 @@ export async function POST(req: NextRequest) {
     }
 
     // ────────────────────────────────────────────────────────────────
-    // 5. Save to DB
+    // 5. Save to DB (upsert to handle webhook duplicate triggers)
     // ────────────────────────────────────────────────────────────────
-    const user = await prisma.user.create({
-      data: {
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: {
+        firstName: first_name || "",
+        lastName: last_name || "",
+        phone: phone || null,
+        shopifyCustomerId: admin_graphql_api_id,
+        addressLine1: defaultAddress?.address1 || null,
+        city: defaultAddress?.city || null,
+        state: defaultAddress?.province_code || null,
+        zip: defaultAddress?.zip || null,
+      },
+      create: {
         email,
         firstName: first_name || "",
         lastName: last_name || "",

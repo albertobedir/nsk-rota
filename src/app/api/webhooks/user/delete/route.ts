@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import prisma from "@/lib/prisma/instance";
+import { email } from "zod";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,25 +45,26 @@ export async function POST(req: NextRequest) {
     console.log("[🗑️ Customer Delete Webhook] ✅ HMAC verified");
 
     const customer = JSON.parse(rawBody);
-    const { email, admin_graphql_api_id } = customer;
+    // Note: Shopify does NOT send email in delete webhook (privacy), so we lookup by shopifyCustomerId
+    const shopifyId = customer.admin_graphql_api_id || String(customer.id);
     console.log("[🗑️ Customer Delete Webhook] Parsed customer:", {
-      email,
-      admin_graphql_api_id,
+      shopifyId,
     });
 
     // ────────────────────────────────────────────────────────────────
-    // 2. DB'den sil
+    // 2. DB'den sil (lookup by shopifyCustomerId)
     // ────────────────────────────────────────────────────────────────
     console.log("[🗑️ Customer Delete Webhook] Looking up user in DB...");
     const dbUser = await prisma.user.findFirst({
-      where: { shopifyCustomerId: admin_graphql_api_id },
+      where: { shopifyCustomerId: shopifyId },
     });
 
     if (!dbUser) {
       console.warn(
         "[🗑️ Customer Delete Webhook] ⚠️ User not found in DB:",
-        email,
+        shopifyId,
       );
+      // Return 200 even if not found, so Shopify doesn't retry
       return NextResponse.json(
         { status: "not_found", message: "User not in database" },
         { status: 200 },
