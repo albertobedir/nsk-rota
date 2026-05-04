@@ -12,6 +12,31 @@ import { getValidAdminEmails } from "@/lib/email/admin-emails";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
+// 🔥 GLOBAL TRANSPORTER - pool ile connection reuse
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
+  secure: false, // port 25 için doğru
+
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS || "",
+  },
+
+  pool: true, // 🔥 KRİTİK - connection reuse
+  maxConnections: 2, // 🔥 KRİTİK - concurrent limit
+  maxMessages: 50,
+
+  requireTLS: false,
+  tls: {
+    rejectUnauthorized: false,
+  },
+
+  connectionTimeout: 20000,
+  greetingTimeout: 20000,
+  socketTimeout: 20000,
+});
+
 type CreateUserBody = {
   email: string;
   firstName: string;
@@ -316,28 +341,6 @@ export async function POST(req: Request) {
       },
     });
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-
-      secure: false, // port 25 için doğru
-
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS || "",
-      },
-
-      requireTLS: false, // 🔥 EKLE (çok önemli)
-
-      tls: {
-        rejectUnauthorized: false,
-      },
-
-      connectionTimeout: 20000,
-      greetingTimeout: 20000,
-      socketTimeout: 20000,
-    });
-
     // -------------------------------
     // Mail gönderimi
     // -------------------------------
@@ -479,18 +482,27 @@ export async function POST(req: Request) {
         </div>
       `;
 
-      // Send admin emails - all at once using Promise.all
-      const adminPromises = adminEmails.map((adminEmail) =>
-        transporter.sendMail({
-          from: process.env.FROM_EMAIL,
-          to: adminEmail,
-          subject: `New User Created: ${escapeHtml(`${firstName || ""} ${lastName || ""}`.trim())}`,
-          html: adminHtml,
-        }),
-      );
+      // 🔥 Sequential send - concurrent limit aşmamak için
+      for (const adminEmail of adminEmails) {
+        try {
+          await transporter.sendMail({
+            from: process.env.FROM_EMAIL,
+            to: adminEmail,
+            subject: `New User Created: ${escapeHtml(`${firstName || ""} ${lastName || ""}`.trim())}`,
+            html: adminHtml,
+          });
+          console.log("Step 8: Admin notification email sent to:", adminEmail);
 
-      await Promise.all(adminPromises);
-      console.log("Step 8: Admin notification emails sent to:", adminEmails);
+          // 200ms delay - SMTP stability
+          await new Promise((r) => setTimeout(r, 200));
+        } catch (err) {
+          console.error(`Step 8 Error: Failed to send to ${adminEmail}:`, err);
+        }
+      }
+      console.log(
+        "Step 8: All admin notification emails sent to:",
+        adminEmails,
+      );
     }
 
     console.log("Step 9: All steps completed successfully");
