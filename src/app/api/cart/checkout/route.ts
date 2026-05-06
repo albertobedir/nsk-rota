@@ -230,29 +230,11 @@ export async function POST(request: NextRequest) {
     }
     console.log("[CUSTOMER PRICING MAP]", customerPricingMap);
 
-    // ===== STEP 3: Credit check AFTER discount is resolved =====
-    if (customerId && creditRemaining != null) {
-      const remaining = Number(creditRemaining);
-
-      const computedTotal = lines.reduce((sum, li) => {
-        const qty = Number(li.quantity || 1);
-        const price = Number(li.originalUnitPrice ?? 0) || 0;
-        const discounted =
-          resolvedDiscount > 0 ? price * (1 - resolvedDiscount / 100) : price;
-        return sum + discounted * qty;
-      }, 0);
-
-      console.log(
-        `[CREDIT CHECK] computedTotal=${computedTotal.toFixed(2)}, creditRemaining=${remaining}`,
-      );
-
-      if (computedTotal > remaining) {
-        return NextResponse.json(
-          { message: "Insufficient credit" },
-          { status: 402 },
-        );
-      }
-    }
+    // ===== STEP 3: Skip credit check - handled in basket warning modal + webhook =====
+    // Credit sufficiency is now:
+    // 1. Warned on frontend (basket page) if creditRemaining < cartTotal
+    // 2. Validated in orders/create webhook BEFORE credit deduction
+    // 3. NOT blocking checkout here (user can pay with card instead)
 
     // Get user's tier and discount percentage from request
     console.log(
