@@ -113,31 +113,69 @@ async function sendInsufficientCreditEmail({
   const transporter = await createVerifiedTransporter();
 
   const html = `
-    <div style="font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #dc2626;">⚠️ Order Cancelled — Insufficient Credit</h2>
-      <p>Hello <strong>${escapeHtml(firstName || "there")}</strong>,</p>
-      <p>Your order <strong>${escapeHtml(orderName)}</strong> has been cancelled because your available credit is insufficient.</p>
-      <table style="width:100%; border-collapse:collapse; margin: 20px 0;">
-        <tr>
-          <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Order Total</td>
-          <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight:600;">$${orderAmount.toFixed(2)} ${currencyCode}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px; color: #64748b;">Available Credit</td>
-          <td style="padding: 8px; font-weight:600; color: #dc2626;">$${creditRemaining.toFixed(2)} ${currencyCode}</td>
-        </tr>
-      </table>
-      <p>To complete your purchase, please use a credit card or contact us to increase your credit limit.</p>
-      <p style="text-align:center;">
-        <a href="https://rota-usa.com/basket" style="display:inline-block; padding:12px 28px; background:#0a66c2; color:#fff; text-decoration:none; border-radius:6px; font-weight:600;">Return to Cart</a>
-      </p>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background:#f3f4f6; padding:20px;">
+      <div style="max-width:600px; margin:0 auto; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 6px 18px rgba(15,23,42,0.06);">
+        
+        <!-- Header with Rota USA branding -->
+        <div style="background:#0a66c2; padding:20px; display:flex; align-items:center; gap:12px;">
+          <svg style="width:40px; height:40px;" viewBox="0 0 40 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.332 4.9671C21.7482 4.88166 21.1501 4.81758 20.552 4.78909V3.15143H22.4531V1.61344C22.4541 1.51646 22.4242 1.42167 22.3676 1.34287C22.0272 0.916401 21.5933 0.573891 21.0995 0.341787C20.6057 0.109683 20.0651 -0.00579741 19.5195 0.00426459C18.9607 -0.0235572 18.4036 0.0850703 17.8962 0.320775C17.3888 0.556479 16.9465 0.912169 16.6073 1.35711C16.5583 1.43081 16.5335 1.51789 16.5361 1.60633V3.16566H18.5155V4.80333C17.9388 4.80333 17.3763 4.88878 16.8138 4.9671C12.0837 5.59777 7.75267 7.95193 4.65092 11.5784C1.54918 15.2048 -0.105092 19.8484 0.00517797 24.6191C0.115448 29.3899 1.9825 33.9521 5.24849 37.4313C8.51447 40.9106 12.9496 43.0621 17.7038 43.4736V41.9427C8.44747 41.0456 1.16342 33.3984 1.16342 24.142C1.16342 14.2804 9.38735 6.27723 19.5337 6.27723C29.018 6.27723 36.8147 13.2693 37.7973 22.2409H38.9935C38.5455 17.914 36.6613 13.8619 33.6414 10.731C30.6215 7.60007 26.6399 5.57086 22.332 4.9671Z" fill="white"/>
+          </svg>
+          <div style="color:#fff; font-weight:700; font-size:16px;">Rota USA</div>
+        </div>
+
+        <!-- Content -->
+        <div style="padding:24px; color:#1f2937;">
+          <h2 style="color:#dc2626; margin:0 0 12px; font-size:20px; font-weight:700;">Order Cancelled</h2>
+          
+          <p style="margin:0 0 16px 0; line-height:1.6; color:#374151;">
+            Hello <strong>${escapeHtml(firstName || "Valued Customer")}</strong>,
+          </p>
+
+          <p style="margin:0 0 16px 0; line-height:1.6; color:#374151;">
+            Your order <strong>${escapeHtml(orderName)}</strong> could not be completed because your available credit is insufficient.
+          </p>
+
+          <!-- Order Details Table -->
+          <table style="width:100%; border-collapse:collapse; margin:24px 0;">
+            <tr>
+              <td style="padding:12px 0; font-weight:600; color:#111827; border-bottom:1px solid #e5e7eb;">Order Total</td>
+              <td style="padding:12px 0; color:#374151; border-bottom:1px solid #e5e7eb; text-align:right;">$${orderAmount.toFixed(2)} ${currencyCode}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 0; font-weight:600; color:#111827; border-bottom:1px solid #e5e7eb;">Available Credit</td>
+              <td style="padding:12px 0; color:#dc2626; border-bottom:1px solid #e5e7eb; text-align:right; font-weight:600;">$${creditRemaining.toFixed(2)} ${currencyCode}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 0; font-weight:600; color:#111827;">Shortfall</td>
+              <td style="padding:12px 0; color:#dc2626; text-align:right; font-weight:600;">$${(orderAmount - creditRemaining).toFixed(2)} ${currencyCode}</td>
+            </tr>
+          </table>
+
+          <p style="margin:16px 0 0 0; line-height:1.6; color:#374151;">
+            To complete your purchase, you can:
+          </p>
+          <ul style="margin:12px 0 0 20px; color:#374151; line-height:1.8;">
+            <li>Use a credit card at checkout</li>
+            <li>Contact us to increase your credit limit</li>
+          </ul>
+
+          <!-- Footer text -->
+          <p style="font-size:13px; color:#6b7280; margin-top:24px;">This email was sent automatically. For questions, please contact our team.</p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background:#f7fafc; padding:12px 18px; font-size:12px; color:#6b7280; text-align:center; border-top:1px solid #e5e7eb;">
+          Rota USA • <a href="https://rota-usa.com" style="color:#0a66c2; text-decoration:none;">rota-usa.com</a>
+        </div>
+      </div>
     </div>
   `;
 
   await sendEmailSafely(transporter, {
     from: process.env.FROM_EMAIL,
     to: email,
-    subject: `Order ${orderName} Cancelled — Insufficient Credit`,
+    subject: `Order ${orderName} — Unable to Complete`,
     html,
   });
 
