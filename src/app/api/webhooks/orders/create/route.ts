@@ -63,8 +63,8 @@ async function cancelShopifyOrder(orderGid: string) {
   const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 
   const mutation = `
-    mutation orderCancel($orderId: ID!, $reason: OrderCancelReason!, $notifyCustomer: Boolean!) {
-      orderCancel(orderId: $orderId, reason: $reason, notifyCustomer: $notifyCustomer) {
+    mutation orderCancel($orderId: ID!, $reason: OrderCancelReason!, $restock: Boolean!, $notifyCustomer: Boolean!) {
+      orderCancel(orderId: $orderId, reason: $reason, restock: $restock, notifyCustomer: $notifyCustomer) {
         orderCancelUserErrors { message }
       }
     }
@@ -83,6 +83,7 @@ async function cancelShopifyOrder(orderGid: string) {
         variables: {
           orderId: orderGid,
           reason: "OTHER",
+          restock: true,
           notifyCustomer: false,
         },
       }),
