@@ -11,7 +11,6 @@ export const GET_CUSTOMER_PRICING_METAOBJECTS = `
             reference {
               ... on Customer {
                 id
-                email
               }
               ... on Product {
                 id

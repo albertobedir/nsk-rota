@@ -16,11 +16,10 @@ export async function syncUserMetaobjects({
 
   try {
     const GQL = `
-      query GetCustomerPricingAndTiers($query: String!, $first: Int!) {
+      query GetCustomerPricingAndTiers($first: Int!) {
         customerPricing: metaobjects(
           type: "customer_pricing"
           first: $first
-          query: $query
         ) {
           edges {
             node {
@@ -31,7 +30,7 @@ export async function syncUserMetaobjects({
                 key
                 value
                 reference {
-                  ... on Customer { id email }
+                  ... on Customer { id }
                   ... on Product { id title }
                 }
               }
@@ -58,16 +57,21 @@ export async function syncUserMetaobjects({
       }
     `;
 
-    const queryString = `customer:${customerId}`;
-
     const response = await shopifyAdminFetch({
       query: GQL,
-      variables: { query: queryString, first: 50 },
+      variables: { first: 50 },
     });
 
+    // Filter customer pricing by customerId in app-side
     const customerPricingMetaobjects =
-      response?.data?.customerPricing?.edges?.map((edge: any) => edge.node) ||
-      [];
+      response?.data?.customerPricing?.edges
+        ?.map((edge: any) => edge.node)
+        .filter((node: any) => {
+          const customerField = node.fields.find(
+            (f: any) => f.key === "customer",
+          );
+          return customerField?.reference?.id === customerId;
+        }) || [];
 
     const pricingTierMetaobjects =
       response?.data?.pricingTiers?.edges?.map((edge: any) => edge.node) || [];
@@ -112,7 +116,7 @@ export async function syncUserMetaobjects({
       const tierNameField = fields.find((f) => f.key === "tier_name");
       const tierTagField = fields.find((f) => f.key === "tier_tag");
       const discountPercentageField = fields.find(
-        (f) => f.key === "discount_percentage"
+        (f) => f.key === "discount_percentage",
       );
 
       const tierName = tierNameField?.value ?? "";
