@@ -35,6 +35,11 @@ export default function BasketPage() {
   > | null>(null);
   const [discountLoading, setDiscountLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [showCreditWarning, setShowCreditWarning] = useState(false);
+  const [pendingCreditWarningData, setPendingCreditWarningData] = useState<{
+    cartTotal: number;
+    creditRemaining: number;
+  } | null>(null);
 
   // map of itemId -> available stock (number)
   const [stockMap, setStockMap] = useState<Record<string, number | undefined>>(
@@ -139,6 +144,32 @@ export default function BasketPage() {
   };
 
   const handleGetOffer = async () => {
+    if (checkoutLoading || cart.length === 0) return;
+
+    // Check if credit is sufficient
+    const cartTotal = cart.reduce((sum, item) => {
+      return sum + (item.price || 0) * (item.quantity || 1);
+    }, 0);
+
+    const remaining = Number(
+      sessionUser?.creditRemaining ?? Number.POSITIVE_INFINITY,
+    );
+
+    if (remaining < cartTotal) {
+      // Show warning modal instead of disabling checkout
+      setPendingCreditWarningData({
+        cartTotal,
+        creditRemaining: remaining,
+      });
+      setShowCreditWarning(true);
+      return;
+    }
+
+    // Credit is sufficient, proceed with normal checkout
+    await proceedToCheckout();
+  };
+
+  const proceedToCheckout = async () => {
     if (checkoutLoading || cart.length === 0) return;
     setCheckoutLoading(true);
 
@@ -884,39 +915,26 @@ export default function BasketPage() {
                   </div>
 
                   {(() => {
-                    const remaining = Number(
-                      sessionUser?.creditRemaining ?? Number.POSITIVE_INFINITY,
-                    );
-                    const disabledByCredit = finalTotal() > remaining;
-
                     return (
                       <button
                         onClick={handleGetOffer}
-                        disabled={
-                          disabledByCredit ||
-                          checkoutLoading ||
-                          cart.length === 0
-                        }
+                        disabled={checkoutLoading || cart.length === 0}
                         className={`mt-5 w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-extrabold text-white text-base ${
-                          disabledByCredit || cart.length === 0
+                          cart.length === 0
                             ? "bg-gray-300 text-gray-700 cursor-not-allowed"
                             : checkoutLoading
                               ? "bg-yellow-300 cursor-wait text-gray-800"
                               : "bg-[#f59e0b] hover:bg-[#e58f0a]"
                         }`}
                         title={
-                          disabledByCredit
-                            ? "Cart exceeds available credit"
-                            : checkoutLoading
-                              ? "Creating order..."
-                              : "Proceed to checkout"
+                          checkoutLoading
+                            ? "Creating order..."
+                            : "Proceed to checkout"
                         }
                       >
                         {checkoutLoading
                           ? "Creating order..."
-                          : disabledByCredit
-                            ? "Insufficient credit"
-                            : "Proceed to Checkout"}
+                          : "Proceed to Checkout"}
                       </button>
                     );
                   })()}
@@ -926,6 +944,64 @@ export default function BasketPage() {
           </div>
         </div>
       </div>
+
+      {/* Credit Warning Modal */}
+      {showCreditWarning && pendingCreditWarningData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowCreditWarning(false)}
+          />
+          <div className="relative bg-white rounded-lg shadow-lg w-[90%] max-w-md p-6 z-10">
+            <h3 className="text-lg font-bold text-red-600 mb-2">
+              ⚠️ Insufficient Credit
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Your available credit (
+              <span className="font-semibold">
+                $
+                {pendingCreditWarningData.creditRemaining.toLocaleString(
+                  "en-US",
+                  {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  },
+                )}
+              </span>
+              ) is not enough for this cart (
+              <span className="font-semibold">
+                $
+                {pendingCreditWarningData.cartTotal.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+              ).
+            </p>
+            <p className="text-sm text-gray-600 mb-6">
+              Would you like to pay with a credit card instead?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowCreditWarning(false)}
+                className="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setShowCreditWarning(false);
+                  setPendingCreditWarningData(null);
+                  await proceedToCheckout();
+                }}
+                className="px-4 py-2 rounded bg-[#f59e0b] hover:bg-[#e58f0a] text-white font-semibold"
+              >
+                Pay with Card
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Hydrate>
   );
 }

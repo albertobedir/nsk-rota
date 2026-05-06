@@ -3,9 +3,145 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongoose/instance";
 import Order from "@/schemas/mongoose/order";
+import nodemailer from "nodemailer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+async function createVerifiedTransporter() {
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS || "",
+    },
+    pool: true,
+    maxConnections: 2,
+    maxMessages: 50,
+    requireTLS: true,
+    tls: { rejectUnauthorized: false },
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 20000,
+  });
+
+  try {
+    await transporter.verify();
+    console.log("[✅ SMTP Connection] Verified successfully");
+  } catch (err) {
+    console.error("[❌ SMTP Connection] Failed:", err);
+  }
+
+  return transporter;
+}
+
+async function sendEmailSafely(
+  transporter: nodemailer.Transporter,
+  mailOptions: nodemailer.SendMailOptions,
+) {
+  return new Promise<string>((resolve, reject) => {
+    transporter.sendMail(mailOptions, (err, info) => {
+      if (err) reject(err);
+      else resolve(info?.messageId || "unknown");
+    });
+  });
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+async function cancelShopifyOrder(orderGid: string) {
+  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
+  const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+
+  const mutation = `
+    mutation orderCancel($orderId: ID!, $reason: OrderCancelReason!, $notifyCustomer: Boolean!) {
+      orderCancel(orderId: $orderId, reason: $reason, notifyCustomer: $notifyCustomer) {
+        orderCancelUserErrors { message }
+      }
+    }
+  `;
+
+  const response = await fetch(
+    `https://${shopifyDomain}/admin/api/2025-01/graphql.json`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": accessToken!,
+      },
+      body: JSON.stringify({
+        query: mutation,
+        variables: {
+          orderId: orderGid,
+          reason: "OTHER",
+          notifyCustomer: false,
+        },
+      }),
+    },
+  );
+
+  const data = await response.json();
+  console.log("Cancel order result:", JSON.stringify(data, null, 2));
+  return data;
+}
+
+async function sendInsufficientCreditEmail({
+  email,
+  firstName,
+  orderName,
+  orderAmount,
+  creditRemaining,
+  currencyCode,
+}: {
+  email: string;
+  firstName?: string;
+  orderName: string;
+  orderAmount: number;
+  creditRemaining: number;
+  currencyCode: string;
+}) {
+  const transporter = await createVerifiedTransporter();
+
+  const html = `
+    <div style="font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #dc2626;">⚠️ Order Cancelled — Insufficient Credit</h2>
+      <p>Hello <strong>${escapeHtml(firstName || "there")}</strong>,</p>
+      <p>Your order <strong>${escapeHtml(orderName)}</strong> has been cancelled because your available credit is insufficient.</p>
+      <table style="width:100%; border-collapse:collapse; margin: 20px 0;">
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Order Total</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight:600;">$${orderAmount.toFixed(2)} ${currencyCode}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; color: #64748b;">Available Credit</td>
+          <td style="padding: 8px; font-weight:600; color: #dc2626;">$${creditRemaining.toFixed(2)} ${currencyCode}</td>
+        </tr>
+      </table>
+      <p>To complete your purchase, please use a credit card or contact us to increase your credit limit.</p>
+      <p style="text-align:center;">
+        <a href="https://rota-usa.com/basket" style="display:inline-block; padding:12px 28px; background:#0a66c2; color:#fff; text-decoration:none; border-radius:6px; font-weight:600;">Return to Cart</a>
+      </p>
+    </div>
+  `;
+
+  await sendEmailSafely(transporter, {
+    from: process.env.FROM_EMAIL,
+    to: email,
+    subject: `Order ${orderName} Cancelled — Insufficient Credit`,
+    html,
+  });
+
+  console.log(`[✅ Insufficient Credit Email] Sent to: ${email}`);
+}
 
 function verifyShopifyWebhook(req: NextRequest, rawBody: string) {
   const hmacHeader = req.headers.get("X-Shopify-Hmac-Sha256");
@@ -423,6 +559,57 @@ export async function POST(req: NextRequest) {
       const customerGid = orderDetails?.customer?.id;
       const amount = Number.parseFloat(String(orderData.total_price ?? "0"));
       const currencyCode = String(orderData.currency || "USD");
+
+      // ✅ NEW: Kredi yeterlilik kontrolü
+      let currentRemaining = 0;
+      try {
+        const remainingData = JSON.parse(
+          orderDetails?.customer?.creditRemaining?.value || '{"amount":"0"}',
+        );
+        currentRemaining = Number.parseFloat(remainingData.amount || "0");
+      } catch (e) {
+        console.error("Error parsing credit_remaining for check:", e);
+      }
+
+      if (currentRemaining < amount) {
+        console.log(
+          "❌ Insufficient credit — cancelling order. Current:",
+          currentRemaining,
+          "Needed:",
+          amount,
+        );
+
+        // 1. Siparişi iptal et
+        try {
+          await cancelShopifyOrder(orderData.admin_graphql_api_id);
+        } catch (cancelErr) {
+          console.error("Error cancelling Shopify order:", cancelErr);
+        }
+
+        // 2. Mail at
+        try {
+          await sendInsufficientCreditEmail({
+            email: orderData.email,
+            firstName: orderData.customer?.first_name,
+            orderName: orderData.name,
+            orderAmount: amount,
+            creditRemaining: currentRemaining,
+            currencyCode,
+          });
+        } catch (emailErr) {
+          console.error("Error sending insufficient credit email:", emailErr);
+        }
+
+        return NextResponse.json({
+          status: "ok",
+          orderId: orderData.id,
+          orderNumber: orderData.order_number,
+          skipped: "insufficient_credit",
+          note: "Order cancelled due to insufficient credit",
+        });
+      }
+
+      // Kredi yeterliyse düş
       creditUpdateResult = await updateCustomerCredit(
         customerGid,
         amount,
