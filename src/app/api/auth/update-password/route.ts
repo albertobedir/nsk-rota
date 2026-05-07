@@ -1,14 +1,16 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import bcrypt from "bcrypt";
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import prisma from "@/lib/prisma/instance";
-import { shopifyFetch } from "@/lib/shopify/instance";
+import { shopifyAdminFetch } from "@/lib/shopify/instance";
 import nodemailer from "nodemailer";
 import { getValidAdminEmails } from "@/lib/email/admin-emails";
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET ?? "";
 
-// Email transporter
+// 🔥 GLOBAL TRANSPORTER - pool ile connection reuse
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
@@ -17,6 +19,9 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS || "",
   },
+  pool: true, // 🔥 KRİTİK - connection reuse
+  maxConnections: 1, // 🔥 KRİTİK - Outlook için düşük
+  maxMessages: 10,
   requireTLS: false,
   tls: {
     rejectUnauthorized: false,
@@ -99,7 +104,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Update password in Shopify using Storefront API
+    // Step 2: Update password in Shopify using Admin API
     console.log("📋 Step 2: Updating password in Shopify");
 
     const updateCustomerMutation = `
@@ -109,8 +114,7 @@ export async function POST(request: NextRequest) {
             id
             email
           }
-          customerUserErrors {
-            code
+          userErrors {
             field
             message
           }
@@ -118,7 +122,7 @@ export async function POST(request: NextRequest) {
       }
     `;
 
-    const shopifyUpdateRes = await shopifyFetch({
+    const shopifyUpdateRes = await shopifyAdminFetch({
       query: updateCustomerMutation,
       variables: {
         input: {
@@ -133,8 +137,18 @@ export async function POST(request: NextRequest) {
       JSON.stringify(shopifyUpdateRes, null, 2),
     );
 
-    const updateErrors =
-      shopifyUpdateRes?.data?.customerUpdate?.customerUserErrors;
+    // Check for top-level GraphQL errors
+    const topLevelErrors = shopifyUpdateRes?.errors;
+    if (topLevelErrors && topLevelErrors.length > 0) {
+      console.error("❌ Shopify GraphQL errors:", topLevelErrors);
+      return NextResponse.json(
+        { message: "Failed to update password in Shopify." },
+        { status: 400 },
+      );
+    }
+
+    // Check for mutation-level errors (Admin API)
+    const updateErrors = shopifyUpdateRes?.data?.customerUpdate?.userErrors;
     if (updateErrors && updateErrors.length > 0) {
       console.error("❌ Shopify update errors:", updateErrors);
       return NextResponse.json(
@@ -164,12 +178,14 @@ export async function POST(request: NextRequest) {
           "⚠️  ADMIN_EMAILS not configured, skipping admin notification",
         );
       } else {
-        const emailPromises = adminEmails.map((adminEmail) =>
-          transporter.sendMail({
-            from: process.env.SMTP_FROM || process.env.SMTP_USER,
-            to: adminEmail,
-            subject: "🔐 Customer Password Update Notification",
-            html: `
+        // 🔥 Sequential send - concurrent limit aşmamak için
+        for (const adminEmail of adminEmails) {
+          try {
+            await transporter.sendMail({
+              from: process.env.SMTP_FROM || process.env.SMTP_USER,
+              to: adminEmail,
+              subject: "🔐 Customer Password Update Notification",
+              html: `
   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
     <h2 style="color: #333;">Password Update Notification</h2>
     <p>A customer has successfully updated their password:</p>
@@ -184,14 +200,25 @@ export async function POST(request: NextRequest) {
     </p>
   </div>
 `,
-            text: `Customer ${userEmail} has successfully updated their password.\nDate: ${new Date().toLocaleString()}`,
-          }),
-        );
+              text: `Customer ${userEmail} has successfully updated their password.\nDate: ${new Date().toLocaleString()}`,
+            });
+            console.log(
+              "Step 4: Admin notification email sent to:",
+              adminEmail,
+            );
 
-        await Promise.all(emailPromises);
+            // 200ms delay - SMTP stability
+            await new Promise((r) => setTimeout(r, 200));
+          } catch (err) {
+            console.error(
+              `Step 4 Error: Failed to send to ${adminEmail}:`,
+              err,
+            );
+          }
+        }
         console.log(
-          "✅ Admin notification emails sent to:",
-          adminEmails.join(", "),
+          "Step 4: All admin notification emails sent to:",
+          adminEmails,
         );
       }
     } catch (emailError) {
