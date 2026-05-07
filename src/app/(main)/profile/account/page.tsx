@@ -1,12 +1,15 @@
 "use client";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import useSessionStore from "@/store/session-store";
 import { useRouter } from "next/navigation";
+import { ResetPasswordModal } from "@/components/ResetPasswordModal";
 
 export default function ProfilePage() {
   const user = useSessionStore((s) => s.user);
   const router = useRouter();
   const clearSession = useSessionStore((s) => s.clearSession);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -85,14 +88,12 @@ export default function ProfilePage() {
               Logout
             </button>
             <div>
-              <a
-                href="https://nsk-rota.myshopify.com/account/login#recover"
+              <button
+                onClick={() => setIsResetModalOpen(true)}
                 className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-                target="_blank"
-                rel="noopener noreferrer"
               >
                 Reset Password
-              </a>
+              </button>
             </div>
           </div>
         </Card>
@@ -129,6 +130,11 @@ export default function ProfilePage() {
           </div>
         </Card>
       </div>
+
+      <ResetPasswordModal
+        isOpen={isResetModalOpen}
+        onClose={() => setIsResetModalOpen(false)}
+      />
     </div>
   );
 }
