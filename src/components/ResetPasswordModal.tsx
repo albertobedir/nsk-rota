@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import useSessionStore from "@/store/session-store";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +10,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
@@ -23,63 +23,57 @@ export function ResetPasswordModal({
   isOpen,
   onClose,
 }: ResetPasswordModalProps) {
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const user = useSessionStore((s) => s.user);
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">(
+    "idle",
+  );
+  const [message, setMessage] = useState("");
 
   const handleReset = async () => {
-    // Validation
-    if (!newPassword || !confirmPassword) {
-      toast.error("Both password fields are required.");
+    if (!user?.email) {
+      toast.error("Unable to retrieve your email. Please try again.");
       return;
     }
 
-    if (newPassword.length < 5) {
-      toast.error("Password must be at least 5 characters.");
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match.");
-      return;
-    }
-
-    setIsLoading(true);
+    setStatus("loading");
 
     try {
-      const response = await fetch("/api/auth/update-password", {
+      const response = await fetch("/api/auth/forgot-password", {
         method: "POST",
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ newPassword }),
+        body: JSON.stringify({ email: user.email }),
       });
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to update password");
+      if (response.ok) {
+        setStatus("done");
+        setMessage(data.message);
+        toast.success("Check your email for reset instructions");
+        setTimeout(() => {
+          onClose();
+          setStatus("idle");
+          setMessage("");
+        }, 2000);
+      } else {
+        setStatus("error");
+        setMessage(data.message);
+        toast.error(data.message);
       }
-
-      toast.success("Password updated successfully!");
-      setNewPassword("");
-      setConfirmPassword("");
-      onClose();
     } catch (error) {
-      console.error("Password update error:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update password",
-      );
-    } finally {
-      setIsLoading(false);
+      setStatus("error");
+      setMessage("An error occurred. Please try again.");
+      toast.error("An error occurred. Please try again.");
+      console.error("Forgot password error:", error);
     }
   };
 
   const handleClose = () => {
-    if (!isLoading) {
-      setNewPassword("");
-      setConfirmPassword("");
+    if (status !== "loading") {
+      setStatus("idle");
+      setMessage("");
       onClose();
     }
   };
@@ -90,53 +84,53 @@ export function ResetPasswordModal({
         <DialogHeader>
           <DialogTitle>Reset Password</DialogTitle>
           <DialogDescription>
-            Enter your new password below. Make sure it's at least 5 characters.
+            We'll send you a reset link to your email address.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="new-password">New Password</Label>
-            <Input
-              id="new-password"
-              type="password"
-              placeholder="Enter new password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm Password</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              placeholder="Confirm new password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              disabled={isLoading}
-            />
+            <Label>Email</Label>
+            <div className="px-3 py-2 bg-slate-100 rounded-md text-sm text-slate-700 border border-slate-200">
+              {user?.email ?? "-"}
+            </div>
           </div>
         </div>
+
+        {status === "done" ? (
+          <div className="rounded-lg bg-green-50 p-4 border border-green-200">
+            <p className="text-sm font-medium text-green-800">{message}</p>
+            <p className="mt-2 text-xs text-green-700">
+              Check your email for a link to reset your password.
+            </p>
+          </div>
+        ) : status === "error" ? (
+          <div className="rounded-lg bg-red-50 p-4 border border-red-200">
+            <p className="text-sm text-red-700">{message}</p>
+          </div>
+        ) : null}
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button
             type="button"
             variant="outline"
             onClick={handleClose}
-            disabled={isLoading}
+            disabled={status === "loading"}
           >
             Cancel
           </Button>
           <Button
             type="button"
             onClick={handleReset}
-            disabled={isLoading}
+            disabled={status === "loading"}
             className="gap-2"
           >
-            {isLoading && <Spinner className="h-4 w-4" />}
-            {isLoading ? "Updating..." : "Update Password"}
+            {status === "loading" && <Spinner className="h-4 w-4" />}
+            {status === "loading"
+              ? "Sending..."
+              : status === "done"
+                ? "Sent"
+                : "Send Reset Link"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -56,6 +56,15 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Password reset routes (public - no session required)
+  const password_reset_routes = [
+    "/auth/reset-password",
+    "/auth/forgot-password",
+  ];
+  if (password_reset_routes.includes(pathname)) {
+    return NextResponse.next();
+  }
+
   // App Router route'ları tam path olarak tanımlanmalı
   const auth_routes = ["/auth/login", "/auth/subscribe", "/auth/logout"];
   const protected_routes = [
