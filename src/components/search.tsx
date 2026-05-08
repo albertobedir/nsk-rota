@@ -61,7 +61,7 @@ export default function Search() {
     }
 
     if (type === "single") {
-      const val = value.trim().replace(/[\s,_*#-]+/g, "");
+      const val = value.trim().replace(/[\s,_*#.\-]+/g, "");
       if (val.length < 4) return; // require min 4 chars
 
       // Prevent duplicate searches for same query
@@ -119,7 +119,7 @@ export default function Search() {
 
           const parts = value
             .split(/[\s,]+/)
-            .map((v) => v.trim().replace(/[_*#-]+/g, ""))
+            .map((v) => v.trim().replace(/[_*#.\-]+/g, ""))
             .filter(Boolean);
 
           // Get existing tag values for duplicate check
@@ -293,7 +293,7 @@ export default function Search() {
                   const pasted = e.clipboardData.getData("text");
                   const parts = pasted
                     .split(/[\s,]+/)
-                    .map((v) => v.trim().replace(/[_*#-]+/g, ""))
+                    .map((v) => v.trim().replace(/[_*#.\-]+/g, ""))
                     .filter(Boolean);
                   if (parts.length === 0) return;
 
