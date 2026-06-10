@@ -1,0 +1,99 @@
+import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
+import prisma from "@/lib/prisma/instance";
+import { email } from "zod";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function verifyShopifyWebhook(req: NextRequest, rawBody: string): boolean {
+  const hmacHeader = req.headers.get("X-Shopify-Hmac-Sha256");
+  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+  if (!hmacHeader || !secret) return false;
+
+  const hash = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody, "utf8")
+    .digest("base64");
+
+  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(hmacHeader));
+}
+
+export async function POST(req: NextRequest) {
+  console.log("[🗑️ Customer Delete Webhook] ─── REQUEST RECEIVED ───");
+  console.log("[🗑️ Customer Delete Webhook] Headers:", {
+    hmac: req.headers.get("X-Shopify-Hmac-Sha256") ? "present" : "MISSING",
+    topic: req.headers.get("X-Shopify-Topic"),
+    shop: req.headers.get("X-Shopify-Shop-Domain"),
+  });
+
+  try {
+    const rawBody = await req.text();
+    console.log(
+      "[🗑️ Customer Delete Webhook] Raw body length:",
+      rawBody.length,
+    );
+    console.log("[🗑️ Customer Delete Webhook] Raw body:", rawBody);
+
+    // ────────────────────────────────────────────────────────────────
+    // 1. HMAC verify
+    // ────────────────────────────────────────────────────────────────
+    if (!verifyShopifyWebhook(req, rawBody)) {
+      console.warn("[🗑️ Customer Delete Webhook] ❌ Invalid HMAC signature");
+      return NextResponse.json({ error: "Invalid HMAC" }, { status: 401 });
+    }
+    console.log("[🗑️ Customer Delete Webhook] ✅ HMAC verified");
+
+    const customer = JSON.parse(rawBody);
+    // Note: Shopify does NOT send email in delete webhook (privacy), so we lookup by shopifyCustomerId
+    const shopifyId = customer.admin_graphql_api_id || String(customer.id);
+    console.log("[🗑️ Customer Delete Webhook] Parsed customer:", {
+      shopifyId,
+    });
+
+    // ────────────────────────────────────────────────────────────────
+    // 2. DB'den sil (lookup by shopifyCustomerId)
+    // ────────────────────────────────────────────────────────────────
+    console.log("[🗑️ Customer Delete Webhook] Looking up user in DB...");
+    const dbUser = await prisma.user.findFirst({
+      where: { shopifyCustomerId: shopifyId },
+    });
+
+    if (!dbUser) {
+      console.warn(
+        "[🗑️ Customer Delete Webhook] ⚠️ User not found in DB:",
+        shopifyId,
+      );
+      // Return 200 even if not found, so Shopify doesn't retry
+      return NextResponse.json(
+        { status: "not_found", message: "User not in database" },
+        { status: 200 },
+      );
+    }
+
+    console.log("[🗑️ Customer Delete Webhook] Found user in DB:", dbUser.id);
+    await prisma.user.delete({ where: { id: dbUser.id } });
+    console.log(
+      "[✅ Customer Delete Webhook] User deleted from DB:",
+      dbUser.id,
+      email,
+    );
+
+    return NextResponse.json(
+      { status: "ok", message: "User deleted from DB" },
+      { status: 200 },
+    );
+  } catch (err) {
+    console.error(
+      "[🗑️ Customer Delete Webhook] Critical error:",
+      err instanceof Error ? err.message : String(err),
+    );
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: err instanceof Error ? err.message : "Unknown error",
+      },
+      { status: 500 },
+    );
+  }
+}
