@@ -26,78 +26,78 @@ const transporter = nodemailer.createTransport({
   pool: true, // 🔥 KRİTİK - connection reuse
   maxConnections: 2, // 🔥 KRİTİK - concurrent limit
   maxMessages: 50,
+              country
+              countryCodeV2
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+    const variables = {
+      input: {
+        email,
+        firstName,
+        lastName,
+        addresses: [
+          {
+            address1,
+            city,
+            countryCode: country,
+            provinceCode: state,
+            zip,
+          },
+        ],
+      },
+    };
 
-  requireTLS: false,
-  tls: {
-    rejectUnauthorized: false,
-  },
+    console.log("Step 3: Sending request to Shopify Admin API");
+    const response = await shopifyAdminFetch({ query: mutation, variables });
+    console.log("Step 4: Shopify response", JSON.stringify(response));
 
-  connectionTimeout: 20000,
-  greetingTimeout: 20000,
-  socketTimeout: 20000,
-});
-
-type CreateUserBody = {
-  email: string;
-  country?: "US" | "CA";
-  firstName: string;
-  lastName: string;
-  companyName: string;
-  address1: string;
-  city: string;
-  state: string;
-  zip: string;
-};
-
-const generateRandomPassword = (length: number = 12) =>
-  crypto.randomBytes(length).toString("base64").slice(0, length);
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-export async function POST(req: Request) {
-  try {
-    console.log("Step 1: Reading request body");
-    const body: CreateUserBody = await req.json();
-    const {
-      email,
-      country = "US",
-      firstName,
-      lastName,
-      companyName,
-      address1,
-      city,
-      state,
-      zip,
-    } = body;
-
-    if (
-      !email ||
-      !country ||
-      !firstName ||
-      !lastName ||
-      !companyName ||
-      !address1 ||
-      !city ||
-      !state ||
-      !zip
-    ) {
-      console.error("Step 1 Error: Missing required fields", body);
+    const payload = response.data?.customerCreate;
+    if (!payload) {
+      console.error("Step 4 Error: Shopify customerCreate payload missing", response);
       return NextResponse.json(
-        { message: "Missing required fields", received: body },
+        { message: "Failed to create customer in Shopify", errors: response.errors ?? [] },
         { status: 400 },
       );
     }
 
-    const password = generateRandomPassword();
-    const hashedPassword = await bcrypt.hash(password, 10);
-    console.log("Step 2: Generated and hashed password");
+    const shopifyCustomer = payload.customer;
+    const errors = payload.userErrors;
+
+    if (!shopifyCustomer || (errors && errors.length > 0)) {
+      console.error("Step 4 Error: Shopify customer creation failed", errors);
+      return NextResponse.json(
+        { message: "Failed to create customer in Shopify", errors },
+        { status: 400 },
+      );
+    }
+
+    // -------------------------------
+    // Step 4.5: Set Tax Exempt via Admin API
+    // -------------------------------
+    console.log("Step 4.5: Setting tax exempt for customer");
+    const shopifyCustomerId = shopifyCustomer.id; // gid://shopify/Customer/...
+
+    const adminMutation = `
+      mutation customerUpdate($input: CustomerInput!) {
+        customerUpdate(input: $input) {
+          customer {
+            id
+            taxExempt
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
 
     // -------------------------------
     // Shopify Admin API çağrısı
