@@ -6,6 +6,7 @@ export const subscribeSchema = z.object({
     .string()
     .min(1, { message: "First name cannot be empty" })
     .max(50, { message: "First name cannot exceed 50 characters" }),
+  country: z.enum(["US", "CA"]),
   lastName: z
     .string()
     .min(1, { message: "Last name cannot be empty" })

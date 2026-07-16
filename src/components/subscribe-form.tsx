@@ -10,6 +10,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { auth } from "@/lib/axios";
 import { subscribeSchema } from "@/schemas/subscribe.schema";
@@ -60,6 +67,10 @@ const formFields: FormFieldProps[] = [
     label: "Company Name",
   },
   {
+    register: "country",
+    label: "Country",
+  },
+  {
     register: "address1",
     type: "text",
     placeholder: "Street Address",
@@ -99,6 +110,7 @@ export default function Page() {
     resolver: zodResolver(subscribeSchema),
     defaultValues: {
       email: "",
+      country: "US",
       firstName: "",
       lastName: "",
       companyName: "",
@@ -189,12 +201,30 @@ export default function Page() {
                           {field.label}
                         </FormLabel>
                         <FormControl>
-                          <Input
-                            type={field.type || "text"}
-                            className="w-full rounded-lg border border-muted-foreground/30"
-                            {...innerField}
-                            placeholder={field.placeholder}
-                          />
+                          {field.register === "country" ? (
+                            <Select
+                              onValueChange={innerField.onChange}
+                              defaultValue={innerField.value}
+                              value={innerField.value}
+                            >
+                              <SelectTrigger className="w-full rounded-lg border border-muted-foreground/30">
+                                <SelectValue placeholder="Select country" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="US">
+                                  United States
+                                </SelectItem>
+                                <SelectItem value="CA">Canada</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              type={field.type || "text"}
+                              className="w-full rounded-lg border border-muted-foreground/30"
+                              {...innerField}
+                              placeholder={field.placeholder}
+                            />
+                          )}
                         </FormControl>
                         <FormMessage />
                       </FormItem>

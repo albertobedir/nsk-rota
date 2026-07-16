@@ -53,6 +53,7 @@ export async function POST(req: Request) {
 
     const {
       email,
+      country,
       firstName,
       lastName,
       companyName,
@@ -126,6 +127,10 @@ export async function POST(req: Request) {
                 <td style="color:#374151;">${companyName}</td>
               </tr>
               <tr>
+                <td style="padding:8px 0; font-weight:700; color:#111827;">Country</td>
+                <td style="color:#374151;">${country === "CA" ? "Canada" : "United States"}</td>
+              </tr>
+              <tr>
                 <td style="padding:8px 0; font-weight:700; color:#111827;">Address</td>
                 <td style="color:#374151;">${address1}</td>
               </tr>
@@ -136,7 +141,7 @@ export async function POST(req: Request) {
             </table>
 
             <p style="margin-top:20px;">
-              <a href="https://rota-usa.com/add-member?email=${encodeURIComponent(normalizedEmail)}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&companyName=${encodeURIComponent(companyName)}&address1=${encodeURIComponent(address1)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&zip=${encodeURIComponent(zip)}" style="display:inline-block; padding:12px 20px; background:#0a66c2; color:#fff; text-decoration:none; border-radius:8px; font-weight:700;">Save User</a>
+              <a href="https://rota-usa.com/add-member?email=${encodeURIComponent(normalizedEmail)}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&companyName=${encodeURIComponent(companyName)}&country=${encodeURIComponent(country)}&address1=${encodeURIComponent(address1)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&zip=${encodeURIComponent(zip)}" style="display:inline-block; padding:12px 20px; background:#0a66c2; color:#fff; text-decoration:none; border-radius:8px; font-weight:700;">Save User</a>
             </p>
 
             <p style="font-size:13px; color:#6b7280; margin-top:18px;">This email was sent automatically. For support, please contact <a href="mailto:y.cankaya@nskgroup.com.tr" style="color:#0a66c2; text-decoration:none;">y.cankaya@nskgroup.com.tr</a>.</p>

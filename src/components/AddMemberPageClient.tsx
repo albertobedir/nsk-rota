@@ -17,6 +17,7 @@ export default function AddMemberPageClient() {
   const [success, setSuccess] = useState<boolean | null>(null);
   const [email, setEmail] = useState<string>("");
   const [firstName, setFirstName] = useState<string>("");
+  const [country, setCountry] = useState<string>("US");
   const [lastName, setLastName] = useState<string>("");
   const [companyName, setCompanyName] = useState<string>("");
   const [address1, setAddress1] = useState<string>("");
@@ -28,6 +29,7 @@ export default function AddMemberPageClient() {
   useEffect(() => {
     function initFromParams() {
       const e = searchParams.get("email") || "";
+      const co = searchParams.get("country") || "US";
       const f = searchParams.get("firstName") || "";
       const l = searchParams.get("lastName") || "";
       const c = searchParams.get("companyName") || "";
@@ -36,6 +38,7 @@ export default function AddMemberPageClient() {
       const st = searchParams.get("state") || "";
       const z = searchParams.get("zip") || "";
       setEmail(e);
+      setCountry(co);
       setFirstName(f);
       setLastName(l);
       setCompanyName(c);
@@ -76,6 +79,7 @@ export default function AddMemberPageClient() {
         },
         body: JSON.stringify({
           email,
+          country,
           firstName,
           lastName,
           companyName,
@@ -95,7 +99,7 @@ export default function AddMemberPageClient() {
         setMessage(data.message || "Member created successfully");
         setSuccess(true);
       }
-    } catch (e) {
+    } catch {
       setMessage("A server error occurred");
       setSuccess(false);
     } finally {
@@ -180,6 +184,10 @@ export default function AddMemberPageClient() {
                       </div>
                       <div>
                         <strong>Email:</strong> {email}
+                      </div>
+                      <div>
+                        <strong>Country:</strong>{" "}
+                        {country === "CA" ? "Canada" : "United States"}
                       </div>
                       <div>
                         <strong>Company:</strong> {companyName}

@@ -6,7 +6,7 @@ import crypto from "crypto";
 import prisma from "@/lib/prisma/instance";
 import { Resend } from "resend";
 import bcrypt from "bcrypt";
-import { shopifyFetch } from "@/lib/shopify/instance";
+import { shopifyAdminFetch } from "@/lib/shopify/instance";
 import nodemailer from "nodemailer";
 import { getValidAdminEmails } from "@/lib/email/admin-emails";
 
@@ -39,6 +39,7 @@ const transporter = nodemailer.createTransport({
 
 type CreateUserBody = {
   email: string;
+  country?: "US" | "CA";
   firstName: string;
   lastName: string;
   companyName: string;
@@ -66,6 +67,7 @@ export async function POST(req: Request) {
     const body: CreateUserBody = await req.json();
     const {
       email,
+      country = "US",
       firstName,
       lastName,
       companyName,
@@ -77,6 +79,7 @@ export async function POST(req: Request) {
 
     if (
       !email ||
+      !country ||
       !firstName ||
       !lastName ||
       !companyName ||
@@ -97,34 +100,48 @@ export async function POST(req: Request) {
     console.log("Step 2: Generated and hashed password");
 
     // -------------------------------
-    // Shopify Storefront API çağrısı
+    // Shopify Admin API çağrısı
     // -------------------------------
     const mutation = `
-      mutation customerCreate($input: CustomerCreateInput!) {
+      mutation customerCreate($input: CustomerInput!) {
         customerCreate(input: $input) {
           customer {
             id
             email
-            firstName
-            lastName
+            defaultAddress {
+              country
+              countryCodeV2
+            }
           }
-          customerUserErrors {
-            code
+          userErrors {
             field
             message
           }
         }
       }
     `;
-    const variables = { input: { email, firstName, lastName, password } };
+    const variables = {
+      input: {
+        email,
+        firstName,
+        lastName,
+        defaultAddress: {
+          address1,
+          city,
+          countryCode: country,
+          provinceCode: state,
+          zip,
+        },
+      },
+    };
 
-    console.log("Step 3: Sending request to Shopify Storefront API");
-    const response = await shopifyFetch({ query: mutation, variables });
+    console.log("Step 3: Sending request to Shopify Admin API");
+    const response = await shopifyAdminFetch({ query: mutation, variables });
     console.log("Step 4: Shopify response", JSON.stringify(response));
 
     const payload = response.data.customerCreate;
     const shopifyCustomer = payload.customer;
-    const errors = payload.customerUserErrors;
+    const errors = payload.userErrors;
 
     if (!shopifyCustomer || (errors && errors.length > 0)) {
       console.error("Step 4 Error: Shopify customer creation failed", errors);
@@ -229,7 +246,7 @@ export async function POST(req: Request) {
                   shippingAddress: {
                     address1: address1,
                     city: city,
-                    countryCode: "US",
+                    countryCode: country,
                     zoneCode: state,
                     zip: zip,
                   },
@@ -338,6 +355,20 @@ export async function POST(req: Request) {
         city: city,
         state: state,
         zip: zip,
+        billingAddress: {
+          address1,
+          city,
+          state,
+          zip,
+          country,
+        },
+        shippingAddress: {
+          address1,
+          city,
+          state,
+          zip,
+          country,
+        },
       },
     });
 
