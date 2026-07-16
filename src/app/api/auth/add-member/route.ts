@@ -108,9 +108,13 @@ export async function POST(req: Request) {
           customer {
             id
             email
-            defaultAddress {
-              country
-              countryCodeV2
+            addresses(first: 1) {
+              edges {
+                node {
+                  country
+                  countryCodeV2
+                }
+              }
             }
           }
           userErrors {
@@ -125,13 +129,15 @@ export async function POST(req: Request) {
         email,
         firstName,
         lastName,
-        defaultAddress: {
-          address1,
-          city,
-          countryCode: country,
-          provinceCode: state,
-          zip,
-        },
+        addresses: [
+          {
+            address1,
+            city,
+            countryCode: country,
+            provinceCode: state,
+            zip,
+          },
+        ],
       },
     };
 
