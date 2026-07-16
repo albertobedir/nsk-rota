@@ -12,20 +12,97 @@ import { getValidAdminEmails } from "@/lib/email/admin-emails";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
-// 🔥 GLOBAL TRANSPORTER - pool ile connection reuse
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
-  secure: false, // port 25 için doğru
-
+  secure: false,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS || "",
   },
-
-  pool: true, // 🔥 KRİTİK - connection reuse
-  maxConnections: 2, // 🔥 KRİTİK - concurrent limit
+  pool: true,
+  maxConnections: 2,
   maxMessages: 50,
+  requireTLS: false,
+  tls: {
+    rejectUnauthorized: false,
+  },
+  connectionTimeout: 20000,
+  greetingTimeout: 20000,
+  socketTimeout: 20000,
+});
+
+type CreateUserBody = {
+  email: string;
+  country?: "US" | "CA";
+  firstName: string;
+  lastName: string;
+  companyName: string;
+  address1: string;
+  city: string;
+  state: string;
+  zip: string;
+};
+
+const generateRandomPassword = (length: number = 12) =>
+  crypto.randomBytes(length).toString("base64").slice(0, length);
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+export async function POST(req: Request) {
+  try {
+    console.log("Step 1: Reading request body");
+    const body: CreateUserBody = await req.json();
+    const {
+      email,
+      country = "US",
+      firstName,
+      lastName,
+      companyName,
+      address1,
+      city,
+      state,
+      zip,
+    } = body;
+
+    if (
+      !email ||
+      !country ||
+      !firstName ||
+      !lastName ||
+      !companyName ||
+      !address1 ||
+      !city ||
+      !state ||
+      !zip
+    ) {
+      console.error("Step 1 Error: Missing required fields", body);
+      return NextResponse.json(
+        { message: "Missing required fields", received: body },
+        { status: 400 },
+      );
+    }
+
+    const password = generateRandomPassword();
+    const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("Step 2: Generated and hashed password");
+
+    const mutation = `
+      mutation customerCreate($input: CustomerInput!) {
+        customerCreate(input: $input) {
+          customer {
+            id
+            email
+            firstName
+            lastName
+            addresses(first: 1) {
               country
               countryCodeV2
             }
@@ -37,6 +114,7 @@ const transporter = nodemailer.createTransport({
         }
       }
     `;
+
     const variables = {
       input: {
         email,
@@ -60,9 +138,15 @@ const transporter = nodemailer.createTransport({
 
     const payload = response.data?.customerCreate;
     if (!payload) {
-      console.error("Step 4 Error: Shopify customerCreate payload missing", response);
+      console.error(
+        "Step 4 Error: Shopify customerCreate payload missing",
+        response,
+      );
       return NextResponse.json(
-        { message: "Failed to create customer in Shopify", errors: response.errors ?? [] },
+        {
+          message: "Failed to create customer in Shopify",
+          errors: response.errors ?? [],
+        },
         { status: 400 },
       );
     }
@@ -78,90 +162,8 @@ const transporter = nodemailer.createTransport({
       );
     }
 
-    // -------------------------------
-    // Step 4.5: Set Tax Exempt via Admin API
-    // -------------------------------
     console.log("Step 4.5: Setting tax exempt for customer");
-    const shopifyCustomerId = shopifyCustomer.id; // gid://shopify/Customer/...
-
-    const adminMutation = `
-      mutation customerUpdate($input: CustomerInput!) {
-        customerUpdate(input: $input) {
-          customer {
-            id
-            taxExempt
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `;
-
-    // -------------------------------
-    // Shopify Admin API çağrısı
-    // -------------------------------
-    const mutation = `
-      mutation customerCreate($input: CustomerInput!) {
-        customerCreate(input: $input) {
-          customer {
-            id
-            email
-            addresses(first: 1) {
-              edges {
-                node {
-                  country
-                  countryCodeV2
-                }
-              }
-            }
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `;
-    const variables = {
-      input: {
-        email,
-        firstName,
-        lastName,
-        addresses: [
-          {
-            address1,
-            city,
-            countryCode: country,
-            provinceCode: state,
-            zip,
-          },
-        ],
-      },
-    };
-
-    console.log("Step 3: Sending request to Shopify Admin API");
-    const response = await shopifyAdminFetch({ query: mutation, variables });
-    console.log("Step 4: Shopify response", JSON.stringify(response));
-
-    const payload = response.data.customerCreate;
-    const shopifyCustomer = payload.customer;
-    const errors = payload.userErrors;
-
-    if (!shopifyCustomer || (errors && errors.length > 0)) {
-      console.error("Step 4 Error: Shopify customer creation failed", errors);
-      return NextResponse.json(
-        { message: "Failed to create customer in Shopify", errors },
-        { status: 400 },
-      );
-    }
-
-    // -------------------------------
-    // Step 4.5: Set Tax Exempt via Admin API
-    // -------------------------------
-    console.log("Step 4.5: Setting tax exempt for customer");
-    const shopifyCustomerId = shopifyCustomer.id; // gid://shopify/Customer/...
+    const shopifyCustomerId = shopifyCustomer.id;
 
     const adminMutation = `
       mutation customerUpdate($input: CustomerInput!) {
@@ -192,7 +194,7 @@ const transporter = nodemailer.createTransport({
             variables: {
               input: {
                 id: shopifyCustomerId,
-                taxExempt: true, // ✅ Vergi tahsil etme
+                taxExempt: true,
               },
             },
           }),
@@ -215,12 +217,8 @@ const transporter = nodemailer.createTransport({
       }
     } catch (taxErr) {
       console.error("Step 4.5 Error: Failed to set tax exempt", taxErr);
-      // Continue anyway - don't fail the entire flow
     }
 
-    // -------------------------------
-    // Step 4.6: Create Company in Shopify
-    // -------------------------------
     console.log("Step 4.6: Creating company for customer");
     let shopifyCompanyId: string | null = null;
     try {
@@ -235,8 +233,8 @@ const transporter = nodemailer.createTransport({
           body: JSON.stringify({
             query: `mutation companyCreate($input: CompanyCreateInput!) {
               companyCreate(input: $input) {
-                company { 
-                  id 
+                company {
+                  id
                   name
                   locations(first: 1) { edges { node { id } } }
                 }
@@ -250,11 +248,11 @@ const transporter = nodemailer.createTransport({
                   name: "Main Location",
                   billingSameAsShipping: true,
                   shippingAddress: {
-                    address1: address1,
-                    city: city,
+                    address1,
+                    city,
                     countryCode: country,
                     zoneCode: state,
-                    zip: zip,
+                    zip,
                   },
                 },
               },
@@ -262,6 +260,7 @@ const transporter = nodemailer.createTransport({
           }),
         },
       );
+
       const companyData = await companyRes.json();
       const company = companyData?.data?.companyCreate?.company;
       console.log("Step 4.6: Company created", company);
@@ -275,8 +274,6 @@ const transporter = nodemailer.createTransport({
         shopifyCompanyId = company?.id || null;
       }
 
-      // Step 4.7: Assign Customer as Contact
-      // -----------------------------------
       if (company?.id) {
         console.log("Step 4.7: Assigning customer as company contact");
         try {
@@ -307,6 +304,7 @@ const transporter = nodemailer.createTransport({
               }),
             },
           );
+
           const contactData = await contactRes.json();
           console.log(
             "Step 4.7: Contact assigned",
@@ -326,17 +324,12 @@ const transporter = nodemailer.createTransport({
           }
         } catch (contactErr) {
           console.error("Step 4.7 Error: Failed to assign contact", contactErr);
-          // Continue anyway - don't fail the entire flow
         }
       }
     } catch (companyErr) {
       console.error("Step 4.6 Error: Failed to create company", companyErr);
-      // Continue anyway - don't fail the entire flow
     }
 
-    // -------------------------------
-    // DB kaydı
-    // -------------------------------
     console.log("Step 5: Saving user to DB");
     const user = await prisma.user.create({
       data: {
@@ -347,20 +340,16 @@ const transporter = nodemailer.createTransport({
         role: "user",
         password: hashedPassword,
         shopifyCustomerId: shopifyCustomer.id,
-        companyName: companyName,
-        shopifyCompanyId: shopifyCompanyId,
-
-        // Company address
+        companyName,
+        shopifyCompanyId,
         companyAddress1: address1,
         companyCity: city,
         companyState: state,
         companyZip: zip,
-
-        // User address (şirket adresi ile aynı)
         addressLine1: address1,
-        city: city,
-        state: state,
-        zip: zip,
+        city,
+        state,
+        zip,
         billingAddress: {
           address1,
           city,
@@ -378,9 +367,6 @@ const transporter = nodemailer.createTransport({
       },
     });
 
-    // -------------------------------
-    // Mail gönderimi
-    // -------------------------------
     console.log("Step 6: Sending email via SMTP");
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; padding: 20px;">
@@ -388,7 +374,7 @@ const transporter = nodemailer.createTransport({
           <div style="background: linear-gradient(135deg, #0a66c2 0%, #0066a1 100%); padding: 24px; color: #fff;">
             <h2 style="margin: 0; font-size: 20px; font-weight: 600;">👋 Welcome to Rota USA</h2>
           </div>
-          
+
           <div style="padding: 24px;">
             <p style="margin: 0 0 16px 0; color: #334155; font-size: 14px; line-height: 1.6;">
               Hello <strong>${firstName || "there"}</strong>,
@@ -427,7 +413,7 @@ const transporter = nodemailer.createTransport({
             </p>
 
             <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.6;">
-              If you have any questions or need assistance, please contact our support team at 
+              If you have any questions or need assistance, please contact our support team at
               <a href="mailto:y.cankaya@nskgroup.com.tr" style="color: #0a66c2; text-decoration: none; font-weight: 600;">y.cankaya@nskgroup.com.tr</a>.
             </p>
           </div>
@@ -439,14 +425,6 @@ const transporter = nodemailer.createTransport({
       </div>
     `;
 
-    // await resend.emails.send({
-    //   from: "Acme <onboarding@resend.dev>",
-    //   // to: user.email,
-    //   to: "phontemalberto@gmail.com",
-    //   subject: "Your Account Information",
-    //   html,
-    // });
-
     await transporter.sendMail({
       from: process.env.FROM_EMAIL,
       to: user.email,
@@ -456,9 +434,6 @@ const transporter = nodemailer.createTransport({
 
     console.log("Step 7: User email sent successfully");
 
-    // ────────────────────────────────────────────────────────────────
-    // Step 8: Send admin notification
-    // ────────────────────────────────────────────────────────────────
     const adminEmails = getValidAdminEmails();
     if (!adminEmails || adminEmails.length === 0) {
       console.warn("Step 8 Warning: No admin emails configured");
@@ -469,7 +444,7 @@ const transporter = nodemailer.createTransport({
             <div style="background: linear-gradient(135deg, #0a66c2 0%, #0066a1 100%); padding: 24px; color: #fff;">
               <h2 style="margin: 0; font-size: 20px; font-weight: 600;">👤 New User Created</h2>
             </div>
-            
+
             <div style="padding: 24px;">
               <p style="margin: 0 0 16px 0; color: #334155; font-size: 14px; line-height: 1.6;">
                 A new user account has been created in the Rota USA system.
@@ -519,7 +494,6 @@ const transporter = nodemailer.createTransport({
         </div>
       `;
 
-      // 🔥 Sequential send - concurrent limit aşmamak için
       for (const adminEmail of adminEmails) {
         try {
           await transporter.sendMail({
@@ -529,13 +503,12 @@ const transporter = nodemailer.createTransport({
             html: adminHtml,
           });
           console.log("Step 8: Admin notification email sent to:", adminEmail);
-
-          // 200ms delay - SMTP stability
           await new Promise((r) => setTimeout(r, 200));
         } catch (err) {
           console.error(`Step 8 Error: Failed to send to ${adminEmail}:`, err);
         }
       }
+
       console.log(
         "Step 8: All admin notification emails sent to:",
         adminEmails,
