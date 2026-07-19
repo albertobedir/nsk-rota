@@ -75,7 +75,7 @@ async function sendAdminInvoiceEmail({
   // PDF endpoint'ini çağır
   const encodedOrderId = encodeURIComponent(orderId);
   const encodedCustomerId = customerId ? encodeURIComponent(customerId) : null;
-  const pdfUrl = `${baseUrl}/api/pdf?id=${encodedOrderId}${encodedCustomerId ? `&customerId=${encodedCustomerId}` : ""}`;
+  const pdfUrl = `${baseUrl}/pdf?id=${encodedOrderId}${encodedCustomerId ? `&customerId=${encodedCustomerId}` : ""}`;
 
   console.log("[📄 PDF Fetch] URL:", pdfUrl);
   console.log("[📄 PDF Fetch] BASE_URL:", baseUrl);
