@@ -59,7 +59,10 @@ export default function Search() {
     }
 
     if (type === "single") {
-      const val = value.trim().replace(/[\s,_*#.\-]+/g, "");
+      const val = value
+        .trim()
+        .replace(/[\s,_*#.\-]+/g, "")
+        .replace(/[a-zA-Z]+$/g, "");
       if (val.length < 4) return;
       if (lastSearchRef.current === val) return;
 

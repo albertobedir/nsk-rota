@@ -38,32 +38,24 @@ const formFields: FormFieldProps[] = [
     register: "firstName",
     type: "text",
     placeholder: "First Name",
-    autoComplete: "first-name",
-    required: true,
     label: "First Name",
   },
   {
     register: "lastName",
     type: "text",
     placeholder: "Last Name",
-    autoComplete: "last-name",
-    required: true,
     label: "Last Name",
   },
   {
     register: "email",
     type: "email",
     placeholder: "Email",
-    autoComplete: "email",
-    required: true,
     label: "Email",
   },
   {
     register: "companyName",
     type: "text",
     placeholder: "Company Name",
-    autoComplete: "organization",
-    required: true,
     label: "Company Name",
   },
   {
@@ -74,38 +66,31 @@ const formFields: FormFieldProps[] = [
     register: "address1",
     type: "text",
     placeholder: "Street Address",
-    autoComplete: "street-address",
-    required: true,
     label: "Address",
   },
   {
     register: "city",
     type: "text",
     placeholder: "City",
-    autoComplete: "address-level2",
-    required: true,
     label: "City",
   },
   {
     register: "state",
     type: "text",
     placeholder: "State (IL, NY, etc)",
-    autoComplete: "address-level1",
-    required: true,
     label: "State",
   },
   {
     register: "zip",
     type: "text",
     placeholder: "Zip Code",
-    autoComplete: "postal-code",
-    required: true,
     label: "Zip Code",
   },
 ];
 
 export default function Page() {
   const [isSuccess, setIsSuccess] = useState(false);
+
   const form = useForm<z.infer<typeof subscribeSchema>>({
     resolver: zodResolver(subscribeSchema),
     defaultValues: {
@@ -132,82 +117,48 @@ export default function Page() {
     onError: (error: unknown) => {
       if (error instanceof Error) {
         toast.error(error.message);
-      } else if (error && typeof error === "object" && "data" in error) {
-        const data = (error as { data?: { error?: string; message?: string } })
-          .data;
-        if (data?.error === "EMAIL_EXISTS") {
-          toast.error("This email address is already registered.");
-        } else if (data?.error === "VALIDATION_ERROR") {
-          toast.error("Please check your input and try again.");
-        } else {
-          toast.error(
-            data?.message || "Something went wrong. Please try again.",
-          );
-        }
       } else {
-        toast.error("Something went wrong. Please try again.");
+        toast.error("Something went wrong.");
       }
     },
   });
 
+  // 🔥 BURASI ÖNEMLİ: country en sona atılıyor
+  const sortedFields = [
+    ...formFields.filter((f) => f.register !== "country"),
+    formFields.find((f) => f.register === "country"),
+  ].filter(Boolean) as FormFieldProps[];
+
   return (
-    <Card className=" border-none max-w-xl w-full px-12 py-24">
+    <Card className="border-none max-w-xl w-full px-12 py-24">
       <CardContent className="h-full w-full flex flex-col p-0">
         {isSuccess ? (
           <div className="flex flex-col gap-6 justify-center h-full w-full">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                Account Creation Successful!
-              </h2>
-              <p className="text-gray-800 font-medium mb-3">
-                Welcome to ROTA North America LLC!
-              </p>
-              <p className="text-gray-700 mb-4">
-                Your account creation request is currently under review. Once
-                the process is completed, your account details will be sent to
-                you via email.
-              </p>
-              <p className="text-gray-700">Thank you for your patience.</p>
-            </div>
-
-            <div className="flex flex-col gap-3 mt-4">
-              <Link
-                href="/auth/login"
-                className="text-center bg-secondary text-white rounded-lg py-3 font-medium hover:bg-secondary/90 transition"
-              >
-                Return to Login
-              </Link>
-            </div>
+            <h2 className="text-2xl font-bold">Account Creation Successful!</h2>
+            <Link href="/auth/login">Return to Login</Link>
           </div>
         ) : (
           <>
             <Form {...form}>
               <form
-                onSubmit={form.handleSubmit(
-                  (values: z.infer<typeof subscribeSchema>) => {
-                    mutate(values);
-                  },
-                )}
-                className="flex flex-col gap-6 justify-center h-full w-full p-0"
+                onSubmit={form.handleSubmit((values) => mutate(values))}
+                className="flex flex-col gap-6"
               >
-                {formFields.map((field) => (
+                {sortedFields.map((field) => (
                   <FormField
                     key={field.register}
                     control={form.control}
                     name={field.register}
                     render={({ field: innerField }) => (
-                      <FormItem className="gap-0.5">
-                        <FormLabel className="font-bold text-[0.95rem] mb-1">
-                          {field.label}
-                        </FormLabel>
+                      <FormItem>
+                        <FormLabel>{field.label}</FormLabel>
                         <FormControl>
                           {field.register === "country" ? (
                             <Select
                               onValueChange={innerField.onChange}
-                              defaultValue={innerField.value}
                               value={innerField.value}
                             >
-                              <SelectTrigger className="w-full rounded-lg border border-muted-foreground/30">
+                              <SelectTrigger>
                                 <SelectValue placeholder="Select country" />
                               </SelectTrigger>
                               <SelectContent>
@@ -219,9 +170,8 @@ export default function Page() {
                             </Select>
                           ) : (
                             <Input
-                              type={field.type || "text"}
-                              className="w-full rounded-lg border border-muted-foreground/30"
                               {...innerField}
+                              type={field.type || "text"}
                               placeholder={field.placeholder}
                             />
                           )}
@@ -232,22 +182,14 @@ export default function Page() {
                   />
                 ))}
 
-                <Button
-                  type="submit"
-                  disabled={isPending}
-                  size={"lg"}
-                  className="rounded-lg cursor-pointer py-6 font-medium text-base"
-                >
+                <Button type="submit" disabled={isPending}>
                   {isPending ? <Spinner /> : "Send"}
                 </Button>
               </form>
             </Form>
 
-            <span className="text-center w-full mt-10 text-xl">
-              Already have an Account?{" "}
-              <Link href={"/auth/login"} className="text-secondary">
-                Login now
-              </Link>
+            <span className="text-center mt-6">
+              Already have an account? <Link href="/auth/login">Login</Link>
             </span>
           </>
         )}
