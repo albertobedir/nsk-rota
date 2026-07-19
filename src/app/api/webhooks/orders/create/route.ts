@@ -77,15 +77,30 @@ async function sendAdminInvoiceEmail({
   const encodedCustomerId = customerId ? encodeURIComponent(customerId) : null;
   const pdfUrl = `${baseUrl}/api/pdf?id=${encodedOrderId}${encodedCustomerId ? `&customerId=${encodedCustomerId}` : ""}`;
 
+  console.log("[📄 PDF Fetch] URL:", pdfUrl);
+  console.log("[📄 PDF Fetch] BASE_URL:", baseUrl);
+  console.log("[📄 PDF Fetch] orderId:", orderId);
+  console.log("[📄 PDF Fetch] customerId:", customerId);
+
   let pdfBuffer: Buffer | null = null;
   try {
     const pdfRes = await fetch(pdfUrl);
-    if (pdfRes.ok) {
+    console.log("[📄 PDF Fetch] Status:", pdfRes.status);
+    console.log(
+      "[📄 PDF Fetch] Content-Type:",
+      pdfRes.headers.get("content-type"),
+    );
+
+    if (!pdfRes.ok) {
+      const errorText = await pdfRes.text();
+      console.error(
+        `[❌ PDF Fetch Failed] Status: ${pdfRes.status}, Body:`,
+        errorText,
+      );
+    } else {
       const arrayBuffer = await pdfRes.arrayBuffer();
       pdfBuffer = Buffer.from(arrayBuffer);
       console.log(`[✅ PDF Generated] Size: ${pdfBuffer.length} bytes`);
-    } else {
-      console.error(`[❌ PDF Fetch Failed] Status: ${pdfRes.status}`);
     }
   } catch (pdfErr) {
     console.error("[❌ PDF Fetch Error]", pdfErr);
