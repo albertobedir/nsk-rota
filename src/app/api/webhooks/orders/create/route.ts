@@ -49,6 +49,87 @@ async function sendEmailSafely(
   });
 }
 
+async function sendAdminInvoiceEmail({
+  orderId,
+  orderName,
+  customerId,
+  customerEmail,
+  orderAmount,
+  currencyCode,
+}: {
+  orderId: string;
+  orderName: string;
+  customerId?: string;
+  customerEmail?: string;
+  orderAmount: number;
+  currencyCode: string;
+}) {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const adminEmail = process.env.ADMIN_EMAILS; // .env'e ekleyeceksin
+
+  if (!baseUrl || !adminEmail) {
+    console.warn("[⚠️ Admin Invoice Email] Missing BASE_URL or ADMIN_EMAIL");
+    return;
+  }
+
+  // PDF endpoint'ini çağır
+  const pdfUrl = `${baseUrl}/invoice?id=${orderId}${customerId ? `&customerId=${customerId}` : ""}`;
+
+  let pdfBuffer: Buffer | null = null;
+  try {
+    const pdfRes = await fetch(pdfUrl);
+    if (pdfRes.ok) {
+      const arrayBuffer = await pdfRes.arrayBuffer();
+      pdfBuffer = Buffer.from(arrayBuffer);
+      console.log(`[✅ PDF Generated] Size: ${pdfBuffer.length} bytes`);
+    } else {
+      console.error(`[❌ PDF Fetch Failed] Status: ${pdfRes.status}`);
+    }
+  } catch (pdfErr) {
+    console.error("[❌ PDF Fetch Error]", pdfErr);
+  }
+
+  const transporter = await createVerifiedTransporter();
+
+  const mailOptions: nodemailer.SendMailOptions = {
+    from: process.env.FROM_EMAIL,
+    to: adminEmail,
+    subject: `[New Order] ${orderName} — $${orderAmount.toFixed(2)} ${currencyCode}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="color: #1a3b6e;">New Order Processed</h2>
+        <table style="border-collapse: collapse; width: 100%;">
+          <tr>
+            <td style="padding: 8px; font-weight: bold;">Order:</td>
+            <td style="padding: 8px;">${escapeHtml(orderName)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px; font-weight: bold;">Customer Email:</td>
+            <td style="padding: 8px;">${escapeHtml(customerEmail || "-")}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px; font-weight: bold;">Amount:</td>
+            <td style="padding: 8px;">$${orderAmount.toFixed(2)} ${currencyCode}</td>
+          </tr>
+        </table>
+        ${pdfBuffer ? "<p>Invoice PDF is attached.</p>" : "<p style='color:red;'>⚠️ PDF could not be generated.</p>"}
+      </div>
+    `,
+    ...(pdfBuffer && {
+      attachments: [
+        {
+          filename: `invoice-${orderName.replace("#", "")}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    }),
+  };
+
+  await sendEmailSafely(transporter, mailOptions);
+  console.log(`[✅ Admin Invoice Email] Sent to: ${adminEmail}`);
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -655,6 +736,21 @@ export async function POST(req: NextRequest) {
         currencyCode,
       );
       console.log("Credit update result:", creditUpdateResult);
+
+      if (creditUpdateResult?.success) {
+        try {
+          await sendAdminInvoiceEmail({
+            orderId: orderData.admin_graphql_api_id,
+            orderName: orderData.name,
+            customerId: customerGid,
+            customerEmail: orderData.email,
+            orderAmount: amount,
+            currencyCode,
+          });
+        } catch (adminMailErr) {
+          console.error("[❌ Admin Invoice Email Error]", adminMailErr);
+        }
+      }
     } else {
       console.log("✅ Other payment method - No credit decrease needed");
     }
