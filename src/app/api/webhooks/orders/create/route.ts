@@ -73,7 +73,9 @@ async function sendAdminInvoiceEmail({
   }
 
   // PDF endpoint'ini çağır
-  const pdfUrl = `${baseUrl}/invoice?id=${orderId}${customerId ? `&customerId=${customerId}` : ""}`;
+  const encodedOrderId = encodeURIComponent(orderId);
+  const encodedCustomerId = customerId ? encodeURIComponent(customerId) : null;
+  const pdfUrl = `${baseUrl}/api/pdf?id=${encodedOrderId}${encodedCustomerId ? `&customerId=${encodedCustomerId}` : ""}`;
 
   let pdfBuffer: Buffer | null = null;
   try {

@@ -41,8 +41,9 @@ export default function OrderHistoryPage() {
         return;
       }
 
+      const shopifyId = user.shopifyCustomerId || user.id;
       const res = await fetch(
-        `/api/orders?customerId=${encodeURIComponent(user.id)}`,
+        `/api/orders?customerId=${encodeURIComponent(shopifyId)}`,
       );
       if (res.status === 401) {
         setOrders([]);
