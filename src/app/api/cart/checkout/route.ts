@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       discountCode,
       creditRemaining,
       customerAccessToken,
+      poNumber,
     } = body;
 
     if (!Array.isArray(lineItems) || lineItems.length === 0) {
@@ -378,6 +379,8 @@ export async function POST(request: NextRequest) {
           }
         : undefined;
 
+    const trimmedPo = typeof poNumber === "string" ? poNumber.trim() : "";
+
     const input = {
       customerId: shopifyCustomerId ?? undefined, // Shopify GID: gid://shopify/Customer/123
       email: email ?? undefined,
@@ -390,6 +393,7 @@ export async function POST(request: NextRequest) {
         : undefined,
       appliedDiscount: orderDiscount,
       shippingLine: shippingLine,
+      ...(trimmedPo ? { poNumber: trimmedPo } : {}),
     };
 
     // ✅ LOG 2: Shopify'a gönderilen tam input

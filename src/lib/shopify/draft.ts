@@ -48,6 +48,7 @@ export interface DraftOrderInput {
     phone?: string;
   };
   note?: string;
+  poNumber?: string;
   tags?: string[];
   taxExempt?: boolean;
   appliedDiscount?: {
@@ -76,6 +77,7 @@ export async function createDraftOrder(input: DraftOrderInput) {
         draftOrder {
           id
           name
+          poNumber
           status
           invoiceUrl
           invoiceSentAt
@@ -321,6 +323,7 @@ export async function getDraftOrder(id: string) {
       draftOrder(id: $id) {
         id
         name
+        poNumber
         status
         invoiceUrl
         totalPrice

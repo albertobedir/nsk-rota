@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongoose/instance";
 import Order from "@/schemas/mongoose/order";
 import nodemailer from "nodemailer";
+import { resolveOrderPoNumber } from "@/lib/shopify/order-webhook";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,7 +76,7 @@ async function sendAdminInvoiceEmail({
   // PDF endpoint'ini çağır
   const encodedOrderId = encodeURIComponent(orderId);
   const encodedCustomerId = customerId ? encodeURIComponent(customerId) : null;
-  const pdfUrl = `${baseUrl}/pdf?id=${encodedOrderId}${encodedCustomerId ? `&customerId=${encodedCustomerId}` : ""}`;
+  const pdfUrl = `${baseUrl}/api/pdf?id=${encodedOrderId}${encodedCustomerId ? `&customerId=${encodedCustomerId}` : ""}`;
 
   console.log("[📄 PDF Fetch] URL:", pdfUrl);
   console.log("[📄 PDF Fetch] BASE_URL:", baseUrl);
@@ -608,6 +609,13 @@ export async function POST(req: NextRequest) {
                 ?.additionalPaymentCollectionUrl ?? undefined,
             ...(billingAddress && { billingAddress }),
             ...(shippingAddress && { shippingAddress }),
+            financialStatus: orderData.financial_status ?? undefined,
+            fulfillmentStatus: orderData.fulfillment_status ?? undefined,
+            cancelledAt: orderData.cancelled_at
+              ? new Date(orderData.cancelled_at)
+              : null,
+            cancelReason: orderData.cancel_reason ?? null,
+            poNumber: resolveOrderPoNumber(orderData),
             raw: orderData,
           },
         },

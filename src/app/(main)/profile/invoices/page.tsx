@@ -7,6 +7,7 @@ import Link from "next/link";
 type Order = {
   orderNo: string;
   id?: string;
+  poNumber?: string | null;
   orderDate: string;
   total: string;
   tracking?: string;
@@ -64,7 +65,9 @@ export default function OrderHistoryPage() {
         return;
       }
 
-      const mapped: Order[] = (data.orders || []).map((o: any) => {
+      const mapped: Order[] = (data.orders || [])
+        .filter((o: any) => !o.cancelled)
+        .map((o: any) => {
         const orderNo = o.name || o.order_number || o.id || "";
         // Extract numeric ID from full GID (e.g., "gid://shopify/Order/6614677946439" → "6614677946439")
         const fullId = o.shopifyId || o.id || "";
@@ -103,6 +106,7 @@ export default function OrderHistoryPage() {
         return {
           id,
           orderNo,
+          poNumber: o.poNumber || o.raw?.po_number || null,
           orderDate: orderDate?.slice?.(0, 10) || orderDate,
           total,
           tracking: (o.tracking || trackingNumbers || "") as string,
@@ -188,6 +192,9 @@ export default function OrderHistoryPage() {
                   Order No
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
+                  PO Number
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold">
                   Order Date
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
@@ -218,6 +225,9 @@ export default function OrderHistoryPage() {
                     ) : (
                       r.orderNo
                     )}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-700">
+                    {r.poNumber || "—"}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">
                     {r.orderDate}

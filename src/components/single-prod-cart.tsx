@@ -55,6 +55,10 @@ import { Check, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { calculateProductPrice } from "@/lib/pricing";
 import {
+  partNumberContains,
+  partNumbersEqual,
+} from "@/lib/utils/part-number";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -258,15 +262,12 @@ export default function SingleProdCard({
       const terms = String(searchTerm ?? "")
         .split(",")
         .map((s) => s.trim())
-        .filter(Boolean)
-        .map((s) => s.toLowerCase());
+        .filter(Boolean);
       if (terms.length === 0) return false;
       if (!Array.isArray(oems)) return false;
       return oems.some((e) => {
-        const val = String(extractOemNo(e) ?? "")
-          .trim()
-          .toLowerCase();
-        return terms.some((t) => val === t);
+        const val = String(extractOemNo(e) ?? "").trim();
+        return terms.some((t) => partNumbersEqual(val, t));
       });
     } catch {
       return false;
@@ -278,15 +279,14 @@ export default function SingleProdCard({
       const terms = String(searchTerm ?? "")
         .split(",")
         .map((s) => s.trim())
-        .filter(Boolean)
-        .map((s) => s.toLowerCase());
+        .filter(Boolean);
       if (terms.length === 0) return false;
       if (!Array.isArray(oems)) return false;
       return oems.some((e) => {
-        const val = String(extractOemNo(e) ?? "")
-          .trim()
-          .toLowerCase();
-        return terms.some((t) => val.includes(t) && val !== t);
+        const val = String(extractOemNo(e) ?? "").trim();
+        return terms.some(
+          (t) => partNumberContains(val, t) && !partNumbersEqual(val, t),
+        );
       });
     } catch {
       return false;
@@ -295,21 +295,25 @@ export default function SingleProdCard({
   // Extract competitor ReferansView values from productRaw metafields
   const competitorRefs = React.useMemo(() => {
     try {
-      const metafields: any[] =
-        productRaw?.metafields ?? productRaw?.raw?.metafields ?? [];
-      const entry = metafields.find(
-        (m: any) => m?.namespace === "custom" && m?.key === "competitor_info",
-      );
-      if (!entry) return [];
-      const parsed =
-        typeof entry.value === "string" ? JSON.parse(entry.value) : entry.value;
+      const rawAny = productRaw as any;
+      let parsed: any[] = [];
+      if (Array.isArray(rawAny?.Competiters) && rawAny.Competiters.length > 0) {
+        parsed = rawAny.Competiters;
+      } else {
+        const metafields: any[] =
+          rawAny?.metafields ?? rawAny?.raw?.metafields ?? [];
+        const entry = metafields.find(
+          (m: any) => m?.namespace === "custom" && m?.key === "competitor_info",
+        );
+        if (!entry) return [];
+        parsed =
+          typeof entry.value === "string"
+            ? JSON.parse(entry.value)
+            : entry.value;
+      }
       if (!Array.isArray(parsed)) return [];
       return parsed
-        .map((c: any) =>
-          String(c?.ReferansView ?? "")
-            .trim()
-            .toLowerCase(),
-        )
+        .map((c: any) => String(c?.ReferansView ?? "").trim())
         .filter(Boolean);
     } catch {
       return [];
@@ -320,19 +324,21 @@ export default function SingleProdCard({
     if (competitorRefs.length === 0) return false;
     const terms = String(searchTerm ?? "")
       .split(",")
-      .map((s) => s.trim().toLowerCase())
+      .map((s) => s.trim())
       .filter(Boolean);
-    return terms.some((t) => competitorRefs.includes(t));
+    return terms.some((t) => competitorRefs.some((r) => partNumbersEqual(r, t)));
   }, [competitorRefs, searchTerm]);
 
   const competitorPartialMatch = React.useMemo(() => {
     if (competitorRefs.length === 0) return false;
     const terms = String(searchTerm ?? "")
       .split(",")
-      .map((s) => s.trim().toLowerCase())
+      .map((s) => s.trim())
       .filter(Boolean);
     return terms.some((t) =>
-      competitorRefs.some((r) => r.includes(t) && r !== t),
+      competitorRefs.some(
+        (r) => partNumberContains(r, t) && !partNumbersEqual(r, t),
+      ),
     );
   }, [competitorRefs, searchTerm]);
 
@@ -341,17 +347,17 @@ export default function SingleProdCard({
       String(searchTerm ?? "")
         .split(",")
         .map((s) => s.trim())
-        .filter(Boolean)
-        .map((s) => s.toLowerCase()),
+        .filter(Boolean),
     [searchTerm],
   );
 
   const isCodeExactMatch =
-    searchTerms.length > 0 && searchTerms.includes(String(code).toLowerCase());
+    searchTerms.length > 0 &&
+    searchTerms.some((t) => partNumbersEqual(String(code), t));
   const isCodePartialMatch =
     searchTerms.length > 0 &&
     !isCodeExactMatch &&
-    searchTerms.some((t) => String(code).toLowerCase().includes(t));
+    searchTerms.some((t) => partNumberContains(String(code), t));
 
   const isExactBadge =
     matchType === "exact" ||
@@ -365,6 +371,19 @@ export default function SingleProdCard({
     (!isExactBadge && competitorPartialMatch);
   const isExactTitle = matchType === "exact" || isCodeExactMatch;
   const isPartial = matchType === "partial";
+
+  const highlightPartNumber = (text: string) => {
+    if (!text || searchTerms.length === 0) return <span>{text}</span>;
+    const exact = searchTerms.some((t) => partNumbersEqual(text, t));
+    const partial =
+      !exact && searchTerms.some((t) => partNumberContains(text, t));
+    if (exact)
+      return <span className="bg-green-200 px-1 rounded">{text}</span>;
+    if (partial)
+      return <span className="bg-yellow-200 px-1 rounded">{text}</span>;
+    return <span>{text}</span>;
+  };
+
   const tierTag = useSessionStore((s) => s.tierTag);
   const getDiscountForTier = useSessionStore((s) => s.getDiscountForTier);
   const discountPercentage = getDiscountForTier();
@@ -718,7 +737,11 @@ export default function SingleProdCard({
         <div className="flex flex-col bg-white gap-2 p-3 flex-1 overflow-hidden">
           {/* Product Title */}
           <Link
-            href={`/products/${encodeURIComponent(String(productLinkId))}`}
+            href={`/products/${encodeURIComponent(String(productLinkId))}${
+              searchTerm
+                ? `?q=${encodeURIComponent(String(searchTerm))}`
+                : ""
+            }`}
             className="hover:underline"
           >
             <div>
@@ -896,52 +919,16 @@ export default function SingleProdCard({
                 };
 
                 // Highlight matching OEM number
-                const hlOem = (text: string) => {
-                  const terms = String(searchTerm ?? "")
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean)
-                    .map((s) => s.toLowerCase());
-                  if (terms.length === 0) return <span>{text}</span>;
-                  try {
-                    const esc = terms
-                      .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-                      .join("|");
-                    const parts = text.split(new RegExp(`(${esc})`, "gi"));
-                    const oemLower = text.trim().toLowerCase();
-                    const isExact = terms.includes(oemLower);
-                    return (
-                      <>
-                        {parts.map((part, idx) =>
-                          terms.includes(part.toLowerCase()) ? (
-                            <span
-                              key={idx}
-                              className={
-                                isExact
-                                  ? "bg-green-200 px-1 rounded"
-                                  : "bg-yellow-200 px-1 rounded"
-                              }
-                            >
-                              {part}
-                            </span>
-                          ) : (
-                            <span key={idx}>{part}</span>
-                          ),
-                        )}
-                      </>
-                    );
-                  } catch {
-                    return <span>{text}</span>;
-                  }
-                };
+                const hlOem = (text: string) => highlightPartNumber(text);
 
-                // Group by brand
+                // Group by brand (skip duplicate OEM numbers per brand)
                 const groups = new Map<string, string[]>();
                 displayedOems.forEach((entry: any) => {
                   const { brand, oemno } = parseEntry(entry);
                   const key = brand;
                   if (!groups.has(key)) groups.set(key, []);
-                  if (oemno) groups.get(key)!.push(oemno);
+                  const list = groups.get(key)!;
+                  if (oemno && !list.includes(oemno)) list.push(oemno);
                 });
 
                 return Array.from(groups.entries()).map(
@@ -996,80 +983,63 @@ export default function SingleProdCard({
                         .trim()
                         .toLowerCase() === "view",
                   );
-                  if (viewComps.length === 0) return null;
-                  const compGroups = new Map<string, string[]>();
-                  for (const c of viewComps) {
-                    const name = String(c.CompetitorName ?? "")
+                  const matchingUnview = rawComps.filter((c: any) => {
+                    const type = String(c?.Type ?? "")
                       .trim()
-                      .toUpperCase();
-                    const ref = String(c.ReferansView ?? "").trim();
-                    if (!name || !ref) continue;
-                    if (!compGroups.has(name)) compGroups.set(name, []);
-                    compGroups.get(name)!.push(ref);
-                  }
-                  if (compGroups.size === 0) return null;
-                  const hlRef = (text: string) => {
-                    const terms = String(searchTerm ?? "")
-                      .split(",")
-                      .map((s) => s.trim())
-                      .filter(Boolean)
-                      .map((s) => s.toLowerCase());
-                    if (terms.length === 0) return <span>{text}</span>;
-                    try {
-                      const esc = terms
-                        .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-                        .join("|");
-                      const parts = text.split(new RegExp(`(${esc})`, "gi"));
-                      const refLower = text.trim().toLowerCase();
-                      const isExact = terms.includes(refLower);
-                      return (
-                        <>
-                          {parts.map((part, idx) =>
-                            terms.includes(part.toLowerCase()) ? (
-                              <span
-                                key={idx}
-                                className={
-                                  isExact
-                                    ? "bg-green-200 px-1 rounded"
-                                    : "bg-yellow-200 px-1 rounded"
-                                }
-                              >
-                                {part}
-                              </span>
-                            ) : (
-                              <span key={idx}>{part}</span>
-                            ),
-                          )}
-                        </>
-                      );
-                    } catch {
-                      return <span>{text}</span>;
+                      .toLowerCase();
+                    if (type === "view") return false;
+                    const ref = String(c?.ReferansView ?? "").trim();
+                    if (!ref) return false;
+                    return searchTerms.some((t) => partNumberContains(ref, t));
+                  });
+                  if (viewComps.length === 0 && matchingUnview.length === 0)
+                    return null;
+                  const groupComps = (list: any[]) => {
+                    const groups = new Map<string, string[]>();
+                    for (const c of list) {
+                      const name = String(c.CompetitorName ?? "")
+                        .trim()
+                        .toUpperCase();
+                      const ref = String(c.ReferansView ?? "").trim();
+                      if (!name || !ref) continue;
+                      if (!groups.has(name)) groups.set(name, []);
+                      const refs = groups.get(name)!;
+                      if (!refs.includes(ref)) refs.push(ref);
                     }
+                    return groups;
                   };
+                  const compGroups = groupComps(viewComps);
+                  const unviewGroups = groupComps(matchingUnview);
+                  if (compGroups.size === 0 && unviewGroups.size === 0)
+                    return null;
+                  const renderGroups = (
+                    groups: Map<string, string[]>,
+                    keyPrefix: string,
+                  ) =>
+                    Array.from(groups.entries()).map(([name, refs], gi) => (
+                      <div
+                        key={`${keyPrefix}-${gi}`}
+                        className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 font-semibold text-sm mb-4"
+                      >
+                        <span className="font-semibold uppercase shrink-0">
+                          {name} :
+                        </span>
+                        {refs.map((ref, ri) => (
+                          <React.Fragment key={ri}>
+                            {ri > 0 && (
+                              <span className="text-gray-300">·</span>
+                            )}
+                            <span className="font-medium">
+                              {highlightPartNumber(ref)}
+                            </span>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    ));
                   return (
                     <>
-                      {Array.from(compGroups.entries()).map(
-                        ([name, refs], gi) => (
-                          <div
-                            key={`comp-${gi}`}
-                            className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 font-semibold text-sm mb-4"
-                          >
-                            <span className="font-semibold uppercase shrink-0">
-                              {name} :
-                            </span>
-                            {refs.map((ref, ri) => (
-                              <React.Fragment key={ri}>
-                                {ri > 0 && (
-                                  <span className="text-gray-300">·</span>
-                                )}
-                                <span className="font-medium">
-                                  {hlRef(ref)}
-                                </span>
-                              </React.Fragment>
-                            ))}
-                          </div>
-                        ),
-                      )}
+                      {renderGroups(compGroups, "comp")}
+                      {renderGroups(unviewGroups, "unview")}
                     </>
                   );
                 } catch {

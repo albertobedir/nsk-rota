@@ -1,11 +1,12 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { stripPartSeparators } from "@/lib/utils/part-number";
+import { useProductsStore } from "@/store/products-store";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { v1 as uuid } from "uuid";
 import Icons from "./icons";
-import { useProductsStore } from "@/store/products-store";
-import { useRouter } from "next/navigation";
 
 interface Tag {
   id: string;
@@ -59,10 +60,7 @@ export default function Search() {
     }
 
     if (type === "single") {
-      const val = value
-        .trim()
-        .replace(/[\s,_*#.\-]+/g, "")
-        .replace(/[a-zA-Z]+$/g, "");
+      const val = stripPartSeparators(value.trim());
       if (val.length < 4) return;
       if (lastSearchRef.current === val) return;
 
@@ -116,7 +114,7 @@ export default function Search() {
 
           const parts = value
             .split(/[\s,]+/)
-            .map((v) => v.trim().replace(/[_*#.\-]+/g, ""))
+            .map((v) => stripPartSeparators(v.trim()))
             .filter(Boolean);
 
           // Get existing tag values for duplicate check
@@ -210,9 +208,13 @@ export default function Search() {
 
   const placeholder = useMemo(() => {
     return type === "single"
-      ? "Search by OEM or ROTA No."
-      : "Search by multiple OEM and ROTA codes.";
+      ? "Search by OEM, ROTA or competitor No."
+      : "Search by multiple OEM, ROTA or competitor codes.";
   }, [type]);
+
+  const normalizedInput = stripPartSeparators(value.trim());
+  const singleSearchDisabled =
+    isSearching || (type === "single" && normalizedInput.length < 4);
 
   return (
     <div className="w-full flex flex-col gap-3">
@@ -290,7 +292,7 @@ export default function Search() {
                   const pasted = e.clipboardData.getData("text");
                   const parts = pasted
                     .split(/[\s,]+/)
-                    .map((v) => v.trim().replace(/[_*#.\-]+/g, ""))
+                    .map((v) => stripPartSeparators(v.trim()))
                     .filter(Boolean);
                   if (parts.length === 0) return;
 
@@ -342,18 +344,14 @@ export default function Search() {
 
             <button
               onClick={handleSearch}
-              disabled={
-                isSearching || (type === "single" && value.trim().length < 4)
-              }
+              disabled={singleSearchDisabled}
               className={cn(
                 "p-2 bg-secondary rounded-full transition-opacity",
-                isSearching || (type === "single" && value.trim().length < 4)
+                singleSearchDisabled
                   ? "opacity-50 cursor-not-allowed"
                   : "cursor-pointer hover:opacity-90",
               )}
-              aria-disabled={
-                isSearching || (type === "single" && value.trim().length < 4)
-              }
+              aria-disabled={singleSearchDisabled}
               title={isSearching ? "Aranıyor..." : "Ara"}
             >
               {isSearching ? (

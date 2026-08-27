@@ -4,6 +4,7 @@ export interface IOrder extends Document {
   shopifyId: string; // gid or numeric id as string
   orderNumber?: number;
   name?: string; // e.g. "#1001"
+  poNumber?: string | null;
   customerId?: string; // gid://shopify/Customer/xxx
   paymentCollectionUrl?: string;
   trackingNumber?: string;
@@ -11,6 +12,8 @@ export interface IOrder extends Document {
   trackingCompany?: string;
   fulfillmentStatus?: string;
   financialStatus?: string;
+  cancelledAt?: Date | null;
+  cancelReason?: string | null;
   billingAddress?: Record<string, unknown>;
   shippingAddress?: Record<string, unknown>;
   raw: Record<string, unknown>;
@@ -21,6 +24,7 @@ const OrderSchema = new Schema<IOrder>(
     shopifyId: { type: String, required: true, unique: true },
     orderNumber: { type: Number },
     name: { type: String },
+    poNumber: { type: String, default: null },
     customerId: { type: String, index: true },
     paymentCollectionUrl: { type: String },
     trackingNumber: { type: String },
@@ -28,6 +32,8 @@ const OrderSchema = new Schema<IOrder>(
     trackingCompany: { type: String },
     fulfillmentStatus: { type: String },
     financialStatus: { type: String },
+    cancelledAt: { type: Date, default: null },
+    cancelReason: { type: String, default: null },
     billingAddress: { type: Schema.Types.Mixed },
     shippingAddress: { type: Schema.Types.Mixed },
     raw: { type: Schema.Types.Mixed, required: true },

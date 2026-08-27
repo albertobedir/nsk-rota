@@ -2,6 +2,10 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { connectDB } from "@/lib/mongoose/instance";
+import {
+  escapeRegex,
+  partNumberRegexSource,
+} from "@/lib/utils/part-number";
 import Product from "@/schemas/mongoose/product";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -87,71 +91,81 @@ export async function GET(req: NextRequest) {
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-      const regexArray = searchValues.map((v) => new RegExp(v, "i"));
-      const combinedPattern = searchValues.map((v) => `(${v})`).join("|");
+      const partPatterns = searchValues
+        .map((v) => partNumberRegexSource(v))
+        .filter(Boolean);
+      const regexArray = partPatterns.map((p) => new RegExp(p, "i"));
+      const combinedPartPattern = partPatterns.map((p) => `(${p})`).join("|");
+      const literalPattern = searchValues
+        .map((v) => `(${escapeRegex(v)})`)
+        .join("|");
 
-      metafieldConditions.push({
-        $or: [
-          {
-            "raw.metafields": {
-              $elemMatch: {
-                namespace: "custom",
-                key: "rota_no",
-                value: { $in: regexArray },
+      if (partPatterns.length === 0) {
+        metafieldConditions.push({ _id: { $exists: false } });
+      } else {
+        metafieldConditions.push({
+          $or: [
+            {
+              "raw.metafields": {
+                $elemMatch: {
+                  namespace: "custom",
+                  key: "rota_no",
+                  value: { $in: regexArray },
+                },
               },
             },
-          },
-          {
-            "raw.metafields": {
-              $elemMatch: {
-                namespace: "custom",
-                key: "oem_info",
-                value: { $regex: combinedPattern, $options: "i" },
+            {
+              "raw.metafields": {
+                $elemMatch: {
+                  namespace: "custom",
+                  key: "oem_info",
+                  value: { $regex: combinedPartPattern, $options: "i" },
+                },
               },
             },
-          },
-          {
-            "raw.metafields": {
-              $elemMatch: {
-                namespace: "custom",
-                key: "competitor_info",
-                value: { $regex: combinedPattern, $options: "i" },
+            {
+              "raw.metafields": {
+                $elemMatch: {
+                  namespace: "custom",
+                  key: "competitor_info",
+                  value: { $regex: combinedPartPattern, $options: "i" },
+                },
               },
             },
-          },
-          // ✅ YENİ: applications metafield (BrandDescription, ModelDescription, Model2)
-          {
-            "raw.metafields": {
-              $elemMatch: {
-                namespace: "custom",
-                key: "applications",
-                value: { $regex: combinedPattern, $options: "i" },
+            // ✅ YENİ: applications metafield (BrandDescription, ModelDescription, Model2)
+            {
+              "raw.metafields": {
+                $elemMatch: {
+                  namespace: "custom",
+                  key: "applications",
+                  value: { $regex: literalPattern, $options: "i" },
+                },
               },
             },
-          },
-          // ✅ YENİ: brand_info metafield
-          {
-            "raw.metafields": {
-              $elemMatch: {
-                namespace: "custom",
-                key: "brand_info",
-                value: { $regex: combinedPattern, $options: "i" },
+            // ✅ YENİ: brand_info metafield
+            {
+              "raw.metafields": {
+                $elemMatch: {
+                  namespace: "custom",
+                  key: "brand_info",
+                  value: { $regex: literalPattern, $options: "i" },
+                },
               },
             },
-          },
-          // SKU arama (variants.sku = RotaNo)
-          {
-            "raw.variants": {
-              $elemMatch: {
-                sku: { $regex: combinedPattern, $options: "i" },
+            // SKU arama (variants.sku = RotaNo)
+            {
+              "raw.variants": {
+                $elemMatch: {
+                  sku: { $regex: combinedPartPattern, $options: "i" },
+                },
               },
             },
-          },
-          // Title ve handle fallback
-          { "raw.title": { $regex: combinedPattern, $options: "i" } },
-          { "raw.handle": { $regex: combinedPattern, $options: "i" } },
-        ],
-      });
+            // Title ve handle fallback
+            { "raw.title": { $regex: literalPattern, $options: "i" } },
+            { "raw.handle": { $regex: literalPattern, $options: "i" } },
+          ],
+        });
+      }
     }
 
     // OEM arama
@@ -161,15 +175,23 @@ export async function GET(req: NextRequest) {
         .map((s) => s.trim())
         .filter(Boolean);
 
-      metafieldConditions.push({
-        "raw.metafields": {
-          $elemMatch: {
-            namespace: "custom",
-            key: "oem_info",
-            value: { $regex: oemValues.join("|"), $options: "i" },
+      const oemPattern = oemValues
+        .map((v) => partNumberRegexSource(v))
+        .filter(Boolean)
+        .map((p) => `(${p})`)
+        .join("|");
+
+      if (oemPattern) {
+        metafieldConditions.push({
+          "raw.metafields": {
+            $elemMatch: {
+              namespace: "custom",
+              key: "oem_info",
+              value: { $regex: oemPattern, $options: "i" },
+            },
           },
-        },
-      });
+        });
+      }
     }
 
     // Brand filtresi — applications metafield (BrandDescription)
@@ -221,15 +243,23 @@ export async function GET(req: NextRequest) {
         .map((s) => s.trim())
         .filter(Boolean);
 
-      metafieldConditions.push({
-        "raw.metafields": {
-          $elemMatch: {
-            namespace: "custom",
-            key: "competitor_info",
-            value: { $regex: competitorValues.join("|"), $options: "i" },
+      const competitorPattern = competitorValues
+        .map((v) => partNumberRegexSource(v))
+        .filter(Boolean)
+        .map((p) => `(${p})`)
+        .join("|");
+
+      if (competitorPattern) {
+        metafieldConditions.push({
+          "raw.metafields": {
+            $elemMatch: {
+              namespace: "custom",
+              key: "competitor_info",
+              value: { $regex: competitorPattern, $options: "i" },
+            },
           },
-        },
-      });
+        });
+      }
     }
 
     // Stock status filtresi

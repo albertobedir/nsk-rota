@@ -3,16 +3,26 @@
 import { useEffect, useState } from "react";
 import useSessionStore from "@/store/session-store";
 import Link from "next/link";
+import { getOrderStatusInfo, type OrderStatusInfo } from "@/lib/orders/status";
+import {
+  OrderStatusBadges,
+  StatusBadge,
+} from "@/components/orders/order-status";
 
 type Order = {
   orderNo: string;
   id?: string;
+  poNumber?: string | null;
   orderDate: string;
   total: string;
   tracking?: string;
   trackingUrl?: string;
   warehouse?: string;
   deliveryAddress?: string;
+  cancelled?: boolean;
+  cancelReason?: string | null;
+  status?: string;
+  statusInfo: OrderStatusInfo;
 };
 
 export default function OrderHistoryPage() {
@@ -67,16 +77,15 @@ export default function OrderHistoryPage() {
 
       const mapped: Order[] = (data.orders || [])
         .filter((o: any) => {
-          // Hide cancelled draft orders (credit-card-payment tag)
-          // These are duplicates from the checkout flow and should not be shown
-          const tags: string[] = o.tags ?? [];
-          const isCancelled =
-            o.financialStatus === "voided" || o.cancelledAt != null;
+          // Hide cancelled checkout duplicates tagged as credit-card-payment.
+          // Real cancelled orders from Shopify admin should still be visible.
+          const tags: string[] = Array.isArray(o.tags) ? o.tags : [];
+          const isCancelled = Boolean(o.cancelled || o.cancelledAt);
 
           if (isCancelled && tags.includes("credit-card-payment")) {
-            return false; // Hide this order
+            return false;
           }
-          return true; // Show this order
+          return true;
         })
         .map((o: any) => {
           const orderNo = o.name || o.order_number || o.id || "";
@@ -98,31 +107,35 @@ export default function OrderHistoryPage() {
               }`.trim()
             : "";
 
-          const fulfillments: any[] = Array.isArray(o.raw?.fulfillments)
-            ? o.raw.fulfillments
-            : [];
-
-          const trackingNumbers = fulfillments
-            .map((f: any) => f.tracking_number)
+          const statusInfo = getOrderStatusInfo(o);
+          const trackingNumbers = statusInfo.trackings
+            .map((t) => t.number)
             .filter(Boolean)
             .join(", ");
-
-          const trackingUrl: string =
-            fulfillments.find((f: any) => f.tracking_url)?.tracking_url || "";
-
-          const trackingCompany: string =
-            fulfillments.find((f: any) => f.tracking_company)
-              ?.tracking_company || "";
+          const trackingUrl =
+            statusInfo.trackings.find((t) => t.url)?.url ||
+            o.trackingUrl ||
+            "";
+          const trackingCompany =
+            statusInfo.trackings.find((t) => t.company)?.company ||
+            o.trackingCompany ||
+            o.warehouse ||
+            "";
 
           return {
             id,
             orderNo,
+            poNumber: o.poNumber || o.raw?.po_number || null,
             orderDate: orderDate?.slice?.(0, 10) || orderDate,
             total,
             tracking: (o.tracking || trackingNumbers || "") as string,
             trackingUrl,
-            warehouse: trackingCompany || o.warehouse || "",
+            warehouse: trackingCompany,
             deliveryAddress,
+            cancelled: statusInfo.cancelled,
+            cancelReason: statusInfo.cancelReason,
+            status: o.status || (statusInfo.cancelled ? "Cancelled" : "-"),
+            statusInfo,
           } as Order;
         });
 
@@ -202,10 +215,19 @@ export default function OrderHistoryPage() {
                   Order No
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
+                  PO Number
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold">
                   Order Date
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
                   Total
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold">
+                  Payment
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold">
+                  Shipment
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
                   Tracking
@@ -219,7 +241,13 @@ export default function OrderHistoryPage() {
               {rows.map((r, i) => (
                 <tr
                   key={`${r.orderNo ?? r.id ?? ""}-${i}`}
-                  className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}
+                  className={
+                    r.cancelled
+                      ? "bg-red-50"
+                      : i % 2 === 0
+                        ? "bg-white"
+                        : "bg-slate-50"
+                  }
                 >
                   <td className="px-6 py-4 text-sm text-slate-800">
                     {r.id ? (
@@ -234,25 +262,55 @@ export default function OrderHistoryPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">
+                    {r.poNumber || "—"}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-700">
                     {r.orderDate}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-slate-800">
                     {r.total}
                   </td>
+                  <td className="px-6 py-4 text-sm">
+                    {r.cancelled ? (
+                      <OrderStatusBadges info={r.statusInfo} />
+                    ) : (
+                      <StatusBadge
+                        label={r.statusInfo.paymentLabel}
+                        tone={r.statusInfo.paymentTone}
+                      />
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    {r.cancelled ? (
+                      <span className="text-slate-400">-</span>
+                    ) : (
+                      <StatusBadge
+                        label={r.statusInfo.shipmentLabel}
+                        tone={r.statusInfo.shipmentTone}
+                      />
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm text-slate-700">
                     {r.tracking ? (
-                      r.trackingUrl ? (
-                        <a
-                          href={r.trackingUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 underline"
-                        >
-                          {r.tracking}
-                        </a>
-                      ) : (
-                        r.tracking
-                      )
+                      <div className="flex flex-col gap-1">
+                        {r.trackingUrl ? (
+                          <a
+                            href={r.trackingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 underline"
+                          >
+                            {r.tracking}
+                          </a>
+                        ) : (
+                          r.tracking
+                        )}
+                        {r.warehouse ? (
+                          <span className="text-xs text-slate-500">
+                            {r.warehouse}
+                          </span>
+                        ) : null}
+                      </div>
                     ) : (
                       "-"
                     )}

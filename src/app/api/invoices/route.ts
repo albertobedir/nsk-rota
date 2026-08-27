@@ -21,6 +21,7 @@ const INVOICE_ORDERS_QUERY = `
             id
             name
             orderNumber
+            poNumber
             createdAt
             updatedAt
             displayFinancialStatus
@@ -107,6 +108,7 @@ export async function GET(req: NextRequest) {
     const invoices = orders.map((order: any) => ({
       invoiceNumber: order.name,
       orderNumber: order.orderNumber,
+      poNumber: order.poNumber || null,
       orderId: order.id,
       invoiceDate: order.createdAt,
       customer: {

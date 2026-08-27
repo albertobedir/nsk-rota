@@ -35,6 +35,7 @@ export default function BasketPage() {
   > | null>(null);
   const [discountLoading, setDiscountLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [poNumber, setPoNumber] = useState("");
   const [showCreditWarning, setShowCreditWarning] = useState(false);
   const [pendingCreditWarningData, setPendingCreditWarningData] = useState<{
     cartTotal: number;
@@ -196,6 +197,7 @@ export default function BasketPage() {
           discountPercentage,
           discountCode: discountApplied?.code ?? null,
           creditRemaining: sessionUser?.creditRemaining,
+          poNumber: poNumber.trim() || undefined,
           lineItems: cart.map((i) => ({
             merchandiseId: i.variantId,
             productId: i.productGid ?? `gid://shopify/Product/${i.id}`,
@@ -224,6 +226,7 @@ export default function BasketPage() {
       // ✅ Önce temizle, sonra invoice'ı yeni pencerede aç
       await fetch("/api/cart/clear", { method: "POST" }).catch(() => null);
       clearCartStore();
+      setPoNumber("");
 
       // ✅ Invoice URL'e logged_in_customer_id ekle
       // Extract numeric ID from Shopify GID (gid://shopify/Customer/123456) or use Prisma ID
@@ -899,6 +902,21 @@ export default function BasketPage() {
                       </button>
                     </div>
                   )}
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm text-gray-600 mb-1">
+                    PO Number{" "}
+                    <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={poNumber}
+                    onChange={(e) => setPoNumber(e.target.value)}
+                    placeholder="PO Number (optional)"
+                    autoComplete="off"
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                  />
                 </div>
 
                 <div className="mt-4 pt-4">

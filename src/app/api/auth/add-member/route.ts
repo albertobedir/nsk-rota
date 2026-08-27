@@ -2,35 +2,8 @@
 "use server";
 
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import prisma from "@/lib/prisma/instance";
-import { Resend } from "resend";
-import bcrypt from "bcrypt";
 import { shopifyAdminFetch } from "@/lib/shopify/instance";
-import nodemailer from "nodemailer";
-import { getValidAdminEmails } from "@/lib/email/admin-emails";
-
-const resend = new Resend(process.env.RESEND_API_KEY!);
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS || "",
-  },
-  pool: true,
-  maxConnections: 2,
-  maxMessages: 50,
-  requireTLS: false,
-  tls: {
-    rejectUnauthorized: false,
-  },
-  connectionTimeout: 20000,
-  greetingTimeout: 20000,
-  socketTimeout: 20000,
-});
 
 type CreateUserBody = {
   email: string;
@@ -44,16 +17,29 @@ type CreateUserBody = {
   zip: string;
 };
 
-const generateRandomPassword = (length: number = 12) =>
-  crypto.randomBytes(length).toString("base64").slice(0, length);
+async function waitForPersistedUser({
+  shopifyCustomerId,
+  email,
+  timeoutMs = 8000,
+}: {
+  shopifyCustomerId: string;
+  email: string;
+  timeoutMs?: number;
+}) {
+  const started = Date.now();
+  const normalizedEmail = email.trim().toLowerCase();
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+  while (Date.now() - started < timeoutMs) {
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [{ shopifyCustomerId }, { email: normalizedEmail }],
+      },
+    });
+    if (user) return user;
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+
+  return null;
 }
 
 export async function POST(req: Request) {
@@ -90,22 +76,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const password = generateRandomPassword();
-    const hashedPassword = await bcrypt.hash(password, 10);
-    console.log("Step 2: Generated and hashed password");
+    console.log("Step 2: Creating Shopify customer");
 
     const mutation = `
       mutation customerCreate($input: CustomerInput!) {
         customerCreate(input: $input) {
           customer {
             id
-            email
-            firstName
-            lastName
-            addresses(first: 1) {
-              country
-              countryCodeV2
-            }
           }
           userErrors {
             field
@@ -292,7 +269,7 @@ export async function POST(req: Request) {
                   companyAssignCustomerAsContact(companyId: $companyId, customerId: $customerId) {
                     companyContact {
                       id
-                      customer { id email }
+                      customer { id }
                       isMainContact
                     }
                     userErrors { field message }
@@ -331,195 +308,57 @@ export async function POST(req: Request) {
       console.error("Step 4.6 Error: Failed to create company", companyErr);
     }
 
-    console.log("Step 5: Saving user to DB");
-    const user = await prisma.user.create({
-      data: {
-        id: shopifyCustomer.id,
-        email: shopifyCustomer.email,
-        firstName: shopifyCustomer.firstName || "",
-        lastName: shopifyCustomer.lastName || "",
-        role: "user",
-        password: hashedPassword,
-        shopifyCustomerId: shopifyCustomer.id,
-        companyName,
-        shopifyCompanyId,
-        companyAddress1: address1,
-        companyCity: city,
-        companyState: state,
-        companyZip: zip,
-        addressLine1: address1,
-        city,
-        state,
-        zip,
-        billingAddress: {
-          address1,
+    console.log("Step 5: Waiting for customer-create webhook to persist user");
+    const persistedUser = await waitForPersistedUser({
+      shopifyCustomerId,
+      email,
+    });
+
+    if (persistedUser) {
+      await prisma.user.update({
+        where: { id: persistedUser.id },
+        data: {
+          companyName,
+          shopifyCompanyId,
+          companyAddress1: address1,
+          companyCity: city,
+          companyState: state,
+          companyZip: zip,
+          addressLine1: address1,
           city,
           state,
           zip,
-          country,
+          billingAddress: {
+            address1,
+            city,
+            state,
+            zip,
+            country,
+          },
+          shippingAddress: {
+            address1,
+            city,
+            state,
+            zip,
+            country,
+          },
         },
-        shippingAddress: {
-          address1,
-          city,
-          state,
-          zip,
-          country,
-        },
-      },
-    });
-
-    console.log("Step 6: Sending email via SMTP");
-    const html = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; padding: 20px;">
-        <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <div style="background: linear-gradient(135deg, #0a66c2 0%, #0066a1 100%); padding: 24px; color: #fff;">
-            <h2 style="margin: 0; font-size: 20px; font-weight: 600;">👋 Welcome to Rota USA</h2>
-          </div>
-
-          <div style="padding: 24px;">
-            <p style="margin: 0 0 16px 0; color: #334155; font-size: 14px; line-height: 1.6;">
-              Hello <strong>${firstName || "there"}</strong>,
-            </p>
-
-            <p style="margin: 0 0 20px 0; color: #334155; font-size: 14px; line-height: 1.6;">
-              Your portal account has been created and is ready to use. You can log in with the credentials below.
-            </p>
-
-            <div style="margin-bottom: 20px;">
-              <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Password</p>
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
-                    <span style="color: #64748b; font-size: 12px; font-weight: 600;">EMAIL</span><br>
-                    <span style="color: #334155; font-size: 14px;">${email}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 10px 0;">
-                    <span style="color: #64748b; font-size: 12px; font-weight: 600;">PASSWORD</span><br>
-                    <span style="color: #1e293b; font-size: 14px; font-family: 'Courier New', monospace; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; display: inline-block;">${password}</span>
-                  </td>
-                </tr>
-              </table>
-            </div>
-
-            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin-bottom: 20px;">
-              <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
-                <strong>⚠️ Security Notice:</strong> Please save your password securely. We recommend changing it on your first login.
-              </p>
-            </div>
-
-            <p style="text-align: center; margin-bottom: 20px;">
-              <a href="https://rota-usa.com/auth/login" style="display: inline-block; padding: 12px 28px; background: #0a66c2; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">Log In Now</a>
-            </p>
-
-            <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.6;">
-              If you have any questions or need assistance, please contact our support team at
-              <a href="mailto:y.cankaya@nskgroup.com.tr" style="color: #0a66c2; text-decoration: none; font-weight: 600;">y.cankaya@nskgroup.com.tr</a>.
-            </p>
-          </div>
-
-          <div style="background: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
-            <p style="margin: 0; color: #64748b; font-size: 12px;">Rota USA Portal • <a href="https://rota-usa.com" style="color: #0a66c2; text-decoration: none;">rota-usa.com</a></p>
-          </div>
-        </div>
-      </div>
-    `;
-
-    await transporter.sendMail({
-      from: process.env.FROM_EMAIL,
-      to: user.email,
-      subject: "Your Account Information",
-      html,
-    });
-
-    console.log("Step 7: User email sent successfully");
-
-    const adminEmails = getValidAdminEmails();
-    if (!adminEmails || adminEmails.length === 0) {
-      console.warn("Step 8 Warning: No admin emails configured");
-    } else {
-      const adminHtml = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; padding: 20px;">
-          <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div style="background: linear-gradient(135deg, #0a66c2 0%, #0066a1 100%); padding: 24px; color: #fff;">
-              <h2 style="margin: 0; font-size: 20px; font-weight: 600;">👤 New User Created</h2>
-            </div>
-
-            <div style="padding: 24px;">
-              <p style="margin: 0 0 16px 0; color: #334155; font-size: 14px; line-height: 1.6;">
-                A new user account has been created in the Rota USA system.
-              </p>
-
-              <div style="margin-bottom: 20px;">
-                <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">User Information</p>
-                <table style="width: 100%; border-collapse: collapse;">
-                  <tr>
-                    <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
-                      <span style="color: #64748b; font-size: 12px; font-weight: 600;">NAME</span><br>
-                      <span style="color: #1e293b; font-weight: 600; font-size: 15px;">${escapeHtml(`${firstName || ""} ${lastName || ""}`.trim())}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
-                      <span style="color: #64748b; font-size: 12px; font-weight: 600;">EMAIL</span><br>
-                      <span style="color: #334155; font-size: 14px;">${escapeHtml(email)}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
-                      <span style="color: #64748b; font-size: 12px; font-weight: 600;">COMPANY</span><br>
-                      <span style="color: #334155; font-size: 14px;">${escapeHtml(companyName || "—")}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px 0;">
-                      <span style="color: #64748b; font-size: 12px; font-weight: 600;">PASSWORD</span><br>
-                      <span style="color: #1e293b; font-size: 14px; font-family: 'Courier New', monospace; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; display: inline-block;">${escapeHtml(password)}</span>
-                    </td>
-                  </tr>
-                </table>
-              </div>
-
-              <div style="background: #f0f9ff; border-left: 4px solid #0a66c2; padding: 12px 16px; border-radius: 4px;">
-                <p style="margin: 0; color: #0369a1; font-size: 13px; line-height: 1.5;">
-                  <strong>ℹ️ Note:</strong> The user's password has been securely generated. They will be prompted to set a new password on first login.
-                </p>
-              </div>
-            </div>
-
-            <div style="background: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 0; color: #64748b; font-size: 12px;">Rota USA Admin • <a href="https://rota-usa.com/admin" style="color: #0a66c2; text-decoration: none;">admin.rota-usa.com</a></p>
-            </div>
-          </div>
-        </div>
-      `;
-
-      for (const adminEmail of adminEmails) {
-        try {
-          await transporter.sendMail({
-            from: process.env.FROM_EMAIL,
-            to: adminEmail,
-            subject: `New User Created: ${escapeHtml(`${firstName || ""} ${lastName || ""}`.trim())}`,
-            html: adminHtml,
-          });
-          console.log("Step 8: Admin notification email sent to:", adminEmail);
-          await new Promise((r) => setTimeout(r, 200));
-        } catch (err) {
-          console.error(`Step 8 Error: Failed to send to ${adminEmail}:`, err);
-        }
-      }
-
+      });
       console.log(
-        "Step 8: All admin notification emails sent to:",
-        adminEmails,
+        "Step 5: Linked Shopify company to persisted user",
+        persistedUser.id,
+      );
+    } else {
+      console.warn(
+        "Step 5 Warning: Webhook has not persisted the user yet; Shopify customer was created",
+        shopifyCustomerId,
       );
     }
 
     console.log("Step 9: All steps completed successfully");
 
     return NextResponse.json(
-      { message: "User created & email sent", user },
+      { message: "User created & email sent" },
       { status: 201 },
     );
   } catch (err) {

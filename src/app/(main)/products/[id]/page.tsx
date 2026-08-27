@@ -5,7 +5,7 @@
 import React from "react";
 import Image from "next/image";
 import { Image as ImageIcon } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { calculateProductPrice } from "@/lib/pricing";
+import { partNumberContains } from "@/lib/utils/part-number";
 import {
   Dialog,
   DialogContent,
@@ -105,6 +106,8 @@ const TECH_INFO: TechInfoRow[] = [
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const searchTerm = searchParams.get("q") ?? "";
   const addToCart = useSessionStore((s) => s.addToCart);
   const cart = useSessionStore((s) => s.cart);
   const user = useSessionStore((s) => s.user);
@@ -1163,18 +1166,24 @@ export default function ProductDetailPage() {
                     }
                   }
                 }
+                const searchTerms = String(searchTerm)
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
                 for (const c of rawCompetitors) {
-                  if (
-                    String(c?.Type || "")
-                      .trim()
-                      .toLowerCase() !== "view"
-                  )
-                    continue;
+                  const type = String(c?.Type || "")
+                    .trim()
+                    .toLowerCase();
                   const name = String(c.CompetitorName || "")
                     .trim()
                     .toUpperCase();
                   const ref = String(c.ReferansView || "").trim();
                   if (!name || !ref) continue;
+                  const isView = type === "view";
+                  const isMatchingUnview =
+                    !isView &&
+                    searchTerms.some((t) => partNumberContains(ref, t));
+                  if (!isView && !isMatchingUnview) continue;
                   if (!competitorGrouped[name]) competitorGrouped[name] = [];
                   if (!competitorGrouped[name].includes(ref)) {
                     competitorGrouped[name].push(ref);

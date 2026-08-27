@@ -1,24 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { connectDB } from "@/lib/mongoose/instance";
-import Order from "@/schemas/mongoose/order";
+import {
+  applyShopifyOrderUpdate,
+  verifyShopifyWebhook,
+} from "@/lib/shopify/order-webhook";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function verifyShopifyWebhook(req: NextRequest, rawBody: string) {
-  const hmacHeader = req.headers.get("X-Shopify-Hmac-Sha256");
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
-  if (!hmacHeader || !secret) return false;
-
-  const hash = crypto
-    .createHmac("sha256", secret)
-    .update(rawBody, "utf8")
-    .digest("base64");
-
-  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(hmacHeader));
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,47 +18,22 @@ export async function POST(req: NextRequest) {
 
     const orderData = JSON.parse(rawBody);
 
-    const shopifyId = orderData.admin_graphql_api_id
+    const shopifyIdHint = orderData.admin_graphql_api_id
       ? String(orderData.admin_graphql_api_id).split("?")[0]
       : `gid://shopify/Order/${orderData.id}`;
 
-    console.log("📦 orders/updated webhook:", shopifyId);
+    console.log("📦 orders/updated webhook:", shopifyIdHint);
 
-    // Fulfillment'lardan tracking bilgisini çıkar
-    const fulfillments: any[] = orderData.fulfillments ?? [];
-    const latestFulfillment = fulfillments[fulfillments.length - 1];
-
-    const trackingNumber = latestFulfillment?.tracking_number ?? undefined;
-    const trackingUrl = latestFulfillment?.tracking_url ?? undefined;
-    const trackingCompany = latestFulfillment?.tracking_company ?? undefined;
-    const fulfillmentStatus = orderData.fulfillment_status ?? undefined;
-    const financialStatus = orderData.financial_status ?? undefined;
-
-    await connectDB();
-
-    // Sadece mevcut order'ı güncelle, yeni doküman AÇMA
-    const result = await Order.findOneAndUpdate(
-      { shopifyId },
-      {
-        $set: {
-          ...(trackingNumber && { trackingNumber }),
-          ...(trackingUrl && { trackingUrl }),
-          ...(trackingCompany && { trackingCompany }),
-          ...(fulfillmentStatus && { fulfillmentStatus }),
-          ...(financialStatus && { financialStatus }),
-          // raw'ı da güncelle
-          raw: orderData,
-        },
-      },
-      { upsert: false, new: true }, // ✅ upsert: false — yeni doküman açılmaz
-    );
+    const { shopifyId, result, cancelledAt, financialStatus, fulfillmentStatus } =
+      await applyShopifyOrderUpdate(orderData, { upsert: false });
 
     if (!result) {
       console.warn("⚠️ Order not found in DB:", shopifyId);
     } else {
       console.log("✅ Order updated:", shopifyId, {
-        trackingNumber,
         fulfillmentStatus,
+        financialStatus,
+        cancelledAt,
       });
     }
 

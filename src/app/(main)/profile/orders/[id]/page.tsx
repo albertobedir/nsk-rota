@@ -6,6 +6,15 @@ import { useParams, useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import useSessionStore from "@/store/session-store";
+import {
+  formatCancelReason,
+  getOrderStatusInfo,
+  isOrderCancelled,
+} from "@/lib/orders/status";
+import {
+  OrderProgress,
+  StatusBadge,
+} from "@/components/orders/order-status";
 
 type LineItem = {
   title: string;
@@ -217,11 +226,14 @@ export default function OrderDetailPage() {
           });
         })();
 
+        const statusInfo = getOrderStatusInfo(src);
+
         const normalized = {
           id: src._id?.toString?.() || src.id || src.shopifyId || raw.id,
           shopifyId: src.shopifyId || raw.id, // Shopify numeric ID
           orderNumber:
             src.orderNumber || src.order_number || raw.order_number || src.name,
+          poNumber: src.poNumber || raw.po_number || raw.poNumber || null,
           processedAt: src.processedAt || raw.processed_at || src.createdAt,
           financialStatus:
             src.financialStatus ||
@@ -231,6 +243,11 @@ export default function OrderDetailPage() {
             src.fulfillmentStatus ||
             raw.displayFulfillmentStatus ||
             raw.fulfillment_status,
+          cancelled: isOrderCancelled(src),
+          cancelledAt: src.cancelledAt || raw.cancelled_at || null,
+          cancelReason: formatCancelReason(
+            src.cancelReason || raw.cancel_reason || null,
+          ),
           totalPrice: {
             amount:
               src.totalPriceSet?.shopMoney?.amount ||
@@ -281,31 +298,8 @@ export default function OrderDetailPage() {
               : null),
           lineItems: { edges: lineItemsEdges },
           paymentCollectionUrl: src.paymentCollectionUrl || undefined,
-          trackings: (() => {
-            const fulfillments: any[] = raw.fulfillments || [];
-            return fulfillments.flatMap((f: any) => {
-              // GraphQL formatı
-              if (f.trackingInfo) {
-                return (f.trackingInfo || []).map((t: any) => ({
-                  company: t.company || f.trackingCompany || null,
-                  number: t.number || null,
-                  url: t.url || null,
-                }));
-              }
-              // REST formatı (eski kayıtlar)
-              return (f.tracking_numbers || [f.tracking_number])
-                .filter(Boolean)
-                .map((_: string, i: number) => ({
-                  company: f.tracking_company || null,
-                  number:
-                    (f.tracking_numbers || [f.tracking_number])[i] || null,
-                  url:
-                    (f.tracking_urls || [f.tracking_url])[i] ||
-                    f.tracking_url ||
-                    null,
-                }));
-            });
-          })(),
+          statusInfo,
+          trackings: statusInfo.trackings,
         } as any;
 
         setOrder(normalized);
@@ -326,9 +320,13 @@ export default function OrderDetailPage() {
       return;
     }
 
-    // Only pending orders can be paid
-    if (order.financialStatus?.toLowerCase() !== "pending") {
-      toast.info("This order has already been paid.");
+    // Only pending, non-cancelled orders can be paid
+    if (order.cancelled || order.financialStatus?.toLowerCase() !== "pending") {
+      toast.info(
+        order.cancelled
+          ? "This order was cancelled."
+          : "This order has already been paid.",
+      );
       return;
     }
 
@@ -494,7 +492,9 @@ export default function OrderDetailPage() {
             type="button"
             onClick={handlePayOrder}
             disabled={
-              !order || order.financialStatus?.toLowerCase() !== "pending"
+              !order ||
+              order.cancelled ||
+              order.financialStatus?.toLowerCase() !== "pending"
             }
             className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 hover:brightness-110 transition"
           >
@@ -512,10 +512,21 @@ export default function OrderDetailPage() {
         <div className="p-6">No order found</div>
       ) : (
         <div className="rounded-lg bg-white p-6 shadow-sm">
+          {order.cancelled && (
+            <div className="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              This order was cancelled
+              {order.cancelReason ? ` (${order.cancelReason})` : ""}.
+            </div>
+          )}
+          {order.statusInfo ? <OrderProgress info={order.statusInfo} /> : null}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <div className="text-sm text-slate-600">Order No</div>
               <div className="font-medium">{order.orderNumber || order.id}</div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-600">PO Number</div>
+              <div className="font-medium">{order.poNumber || "—"}</div>
             </div>
             <div>
               <div className="text-sm text-slate-600">Date</div>
@@ -524,9 +535,40 @@ export default function OrderDetailPage() {
               </div>
             </div>
             <div>
-              <div className="text-sm text-slate-600">Status</div>
-              <div className="font-medium">
-                {order.financialStatus || order.fulfillmentStatus || "-"}
+              <div className="text-sm text-slate-600">Payment</div>
+              <div className="mt-1">
+                {order.cancelled ? (
+                  <StatusBadge label="Cancelled" tone="danger" />
+                ) : order.statusInfo ? (
+                  <StatusBadge
+                    label={order.statusInfo.paymentLabel}
+                    tone={order.statusInfo.paymentTone}
+                  />
+                ) : (
+                  <span className="font-medium">
+                    {order.financialStatus || "-"}
+                  </span>
+                )}
+              </div>
+              {order.cancelled && order.cancelReason ? (
+                <div className="mt-1 text-xs text-slate-500">
+                  Reason: {order.cancelReason}
+                </div>
+              ) : null}
+            </div>
+            <div>
+              <div className="text-sm text-slate-600">Shipment</div>
+              <div className="mt-1">
+                {order.statusInfo ? (
+                  <StatusBadge
+                    label={order.statusInfo.shipmentLabel}
+                    tone={order.statusInfo.shipmentTone}
+                  />
+                ) : (
+                  <span className="font-medium">
+                    {order.fulfillmentStatus || "-"}
+                  </span>
+                )}
               </div>
             </div>
             <div>
@@ -583,9 +625,9 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          {order.trackings?.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-lg font-semibold">Shipment Tracking</h3>
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold">Shipment Tracking</h3>
+            {order.trackings?.length > 0 ? (
               <div className="mt-2 space-y-2">
                 {order.trackings.map((t: any, i: number) => (
                   <div
@@ -602,6 +644,15 @@ export default function OrderDetailPage() {
                         {t.number}
                       </span>
                     )}
+                    <StatusBadge
+                      label={t.shipmentLabel || "Shipped"}
+                      tone={t.shipmentTone || "info"}
+                    />
+                    {t.createdAt ? (
+                      <span className="text-xs text-slate-500">
+                        {String(t.createdAt).slice(0, 10)}
+                      </span>
+                    ) : null}
                     {t.url ? (
                       <a
                         href={t.url}
@@ -615,8 +666,14 @@ export default function OrderDetailPage() {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="mt-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                {order.cancelled
+                  ? "This order was cancelled before shipment."
+                  : "Shipment has not been dispatched yet."}
+              </div>
+            )}
+          </div>
 
           <div className="mt-6">
             <h3 className="text-lg font-semibold">Items</h3>

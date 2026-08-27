@@ -4,6 +4,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 export interface IInvoice extends Document {
   invoiceNumber?: string;
   orderNumber?: number;
+  poNumber?: string | null;
   orderId: string;
   invoiceDate?: Date;
   customer?: Record<string, unknown>;
@@ -29,6 +30,7 @@ const InvoiceSchema = new Schema<IInvoice>(
   {
     invoiceNumber: { type: String },
     orderNumber: { type: Number },
+    poNumber: { type: String, default: null },
     orderId: { type: String, required: true, unique: true },
     invoiceDate: { type: Date },
     customer: { type: Schema.Types.Mixed },

@@ -10,36 +10,29 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
-
     const verified = verifyShopifyWebhook(req, rawBody);
     if (!verified) {
       return NextResponse.json({ error: "Invalid HMAC" }, { status: 401 });
     }
 
     const orderData = JSON.parse(rawBody);
-
-    const shopifyIdHint = orderData.admin_graphql_api_id
-      ? String(orderData.admin_graphql_api_id).split("?")[0]
-      : `gid://shopify/Order/${orderData.id}`;
-
-    console.log("📦 orders/update webhook:", shopifyIdHint);
-
-    const { shopifyId, result, cancelledAt, financialStatus, fulfillmentStatus } =
-      await applyShopifyOrderUpdate(orderData, { upsert: false });
+    const { shopifyId, result } = await applyShopifyOrderUpdate(orderData, {
+      upsert: true,
+    });
 
     if (!result) {
-      console.warn("⚠️ Order not found in DB:", shopifyId);
+      console.warn("⚠️ Cancelled order could not be saved:", shopifyId);
     } else {
-      console.log("✅ Order updated:", shopifyId, {
-        fulfillmentStatus,
-        financialStatus,
-        cancelledAt,
+      console.log("✅ Order cancelled and saved:", shopifyId, {
+        cancelledAt: orderData.cancelled_at,
+        cancelReason: orderData.cancel_reason,
+        financialStatus: orderData.financial_status,
       });
     }
 
-    return NextResponse.json({ status: "ok", shopifyId });
+    return NextResponse.json({ status: "ok", shopifyId, cancelled: true });
   } catch (err) {
-    console.error("orders/update webhook error:", err);
+    console.error("orders/cancelled webhook error:", err);
     return NextResponse.json(
       { error: (err as Error).message },
       { status: 500 },
