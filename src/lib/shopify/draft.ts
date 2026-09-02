@@ -87,8 +87,12 @@ function toShopifyDraftInput(input: DraftOrderInput | Partial<DraftOrderInput>) 
         note: appendPoNumberToNote(input.note, poNumber),
       }
     : input;
-  const { purchasingCompany, ...rest } = prepared;
-  if (!purchasingCompany) return rest;
+  const { purchasingCompany, customerId, ...rest } = prepared;
+  if (!purchasingCompany) {
+    return customerId ? { ...rest, customerId } : rest;
+  }
+  // Shopify rejects customerId + purchasingEntity on the same draft.
+  // The customer is implied by companyContactId.
   return {
     ...rest,
     purchasingEntity: { purchasingCompany },
