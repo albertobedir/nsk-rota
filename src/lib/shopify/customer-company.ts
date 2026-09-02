@@ -11,6 +11,7 @@ export type CustomerCompanyInfo = {
   companyLocationId: string;
   companyContactId: string;
   companyName: string;
+  locationRoleAssigned?: boolean;
 };
 
 export type SessionCompanyFields = {
