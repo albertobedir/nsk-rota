@@ -114,13 +114,13 @@ const COMPANY_ASSIGN_CUSTOMER = `
 `;
 
 const COMPANY_LOCATION_ASSIGN_ROLES = `
-  mutation AssignRoles(
-    $companyLocationId: ID!
-    $rolesToAssign: [CompanyLocationRoleAssignInput!]!
-  ) {
+  mutation AssignRoles($companyLocationId: ID!, $contactId: ID!, $roleId: ID!) {
     companyLocationAssignRoles(
       companyLocationId: $companyLocationId
-      rolesToAssign: $rolesToAssign
+      rolesToAssign: [{
+        companyContactId: $contactId
+        companyContactRoleId: $roleId
+      }]
     ) {
       roleAssignments {
         id
@@ -306,25 +306,10 @@ export async function createCompanyWithContact({
   }
 
   const contactId = String(contactPayload.companyContact.id);
-  const orderingRoleId = ORDERING_ROLE_ID;
-
-  const roleResult = await shopifyAdminFetch({
-    query: COMPANY_LOCATION_ASSIGN_ROLES,
-    variables: {
-      companyLocationId: locationId,
-      rolesToAssign: [
-        {
-          companyContactId: contactId,
-          companyContactRoleId: orderingRoleId,
-        },
-      ],
-    },
+  await assignCompanyLocationOrderingRole({
+    companyLocationId: locationId,
+    companyContactId: contactId,
   });
-
-  const rolePayload = roleResult.data?.companyLocationAssignRoles;
-  if (graphqlFailed(roleResult, rolePayload)) {
-    throw new Error(`assignRoles failed: ${JSON.stringify(roleResult)}`);
-  }
 
   return {
     companyId,
@@ -380,12 +365,8 @@ export async function assignCompanyLocationOrderingRole({
     query: COMPANY_LOCATION_ASSIGN_ROLES,
     variables: {
       companyLocationId,
-      rolesToAssign: [
-        {
-          companyContactId,
-          companyContactRoleId,
-        },
-      ],
+      contactId: companyContactId,
+      roleId: companyContactRoleId,
     },
   });
   const rolePayload = roleResult.data?.companyLocationAssignRoles;
