@@ -113,9 +113,12 @@ const GET_CUSTOMER_COMPANY = `
   }
 `;
 
-const COMPANY_CONTACT_CREATE = `
-  mutation CompanyContactCreate($companyId: ID!, $input: CompanyContactInput!) {
-    companyContactCreate(companyId: $companyId, input: $input) {
+const COMPANY_ASSIGN_CUSTOMER = `
+  mutation CompanyAssignCustomer($companyId: ID!, $customerId: ID!) {
+    companyAssignCustomerAsContact(
+      companyId: $companyId
+      customerId: $customerId
+    ) {
       companyContact {
         id
       }
@@ -333,20 +336,20 @@ export async function createCompanyWithContact({
   }
 
   const contactResult = await shopifyAdminFetch({
-    query: COMPANY_CONTACT_CREATE,
+    query: COMPANY_ASSIGN_CUSTOMER,
     variables: {
       companyId,
-      input: { customerId },
+      customerId,
     },
   });
 
-  const contactPayload = contactResult.data?.companyContactCreate;
+  const contactPayload = contactResult.data?.companyAssignCustomerAsContact;
   if (
     graphqlFailed(contactResult, contactPayload) ||
     !contactPayload?.companyContact?.id
   ) {
     throw new Error(
-      `companyContactCreate failed: ${JSON.stringify(contactResult)}`,
+      `companyAssignCustomerAsContact failed: ${JSON.stringify(contactResult)}`,
     );
   }
 
@@ -395,47 +398,21 @@ export async function createCompanyContact({
   firstName?: string;
   lastName?: string;
 }): Promise<string | null> {
-  const created = await shopifyAdminFetch({
-    query: COMPANY_CONTACT_CREATE,
-    variables: {
-      companyId,
-      input: { customerId },
-    },
-  });
-
-  const payload = created.data?.companyContactCreate;
-  if (payload?.companyContact?.id && mutationSucceeded(payload, created)) {
-    return String(payload.companyContact.id);
-  }
-
-  if (payload?.userErrors?.length) {
-    console.warn(
-      "[customer-company] companyContactCreate userErrors:",
-      payload.userErrors,
-    );
-  }
-
-  const fallback = await shopifyAdminFetch({
-    query: `
-      mutation companyAssignCustomerAsContact($companyId: ID!, $customerId: ID!) {
-        companyAssignCustomerAsContact(companyId: $companyId, customerId: $customerId) {
-          companyContact { id }
-          userErrors { field message }
-        }
-      }
-    `,
+  const assigned = await shopifyAdminFetch({
+    query: COMPANY_ASSIGN_CUSTOMER,
     variables: { companyId, customerId },
   });
-  const assigned = fallback.data?.companyAssignCustomerAsContact;
-  if (assigned?.userErrors?.length) {
+  const payload = assigned.data?.companyAssignCustomerAsContact;
+  if (payload?.companyContact?.id && mutationSucceeded(payload, assigned)) {
+    return String(payload.companyContact.id);
+  }
+  if (payload?.userErrors?.length || assigned.errors?.length) {
     console.warn(
-      "[customer-company] companyAssignCustomerAsContact userErrors:",
-      assigned.userErrors,
+      "[customer-company] companyAssignCustomerAsContact failed:",
+      payload?.userErrors ?? assigned.errors,
     );
   }
-  return assigned?.companyContact?.id
-    ? String(assigned.companyContact.id)
-    : null;
+  return null;
 }
 
 export async function assignCompanyLocationOrderingRole({
