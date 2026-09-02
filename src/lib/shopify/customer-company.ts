@@ -61,9 +61,6 @@ const COMPANY_CREATE = `
     companyCreate(input: $input) {
       company {
         id
-        mainLocation {
-          id
-        }
         locations(first: 1) {
           nodes {
             id
@@ -329,9 +326,7 @@ export async function createCompanyWithContact({
 
   const companyId = String(companyPayload.company.id);
   const locationId = String(
-    companyPayload.company.mainLocation?.id ??
-      companyPayload.company.locations?.nodes?.[0]?.id ??
-      "",
+    companyPayload.company.locations?.nodes?.[0]?.id ?? "",
   );
   if (!locationId) {
     throw new Error(`companyCreate failed: ${JSON.stringify(companyResult)}`);
