@@ -47,7 +47,7 @@ const cachedOrderingRoleId: {
 
 const GET_SHOP_COMPANY_CONTACT_ROLES = `
   query GetShopCompanyContactRoles {
-    companyContactRoles(first: 20) {
+    companyContactRoles(first: 10) {
       nodes {
         id
         name
@@ -56,64 +56,13 @@ const GET_SHOP_COMPANY_CONTACT_ROLES = `
   }
 `;
 
-const GET_COMPANY_CONTACT_ROLES = `
-  query GetCompanyContactRoles($companyId: ID!) {
-    company(id: $companyId) {
-      id
-      contactRoles(first: 20) {
-        nodes {
-          id
-          name
-        }
-      }
-    }
-  }
-`;
-
 const COMPANY_CREATE = `
-  mutation companyCreate($input: CompanyCreateInput!) {
+  mutation CompanyCreate($input: CompanyCreateInput!) {
     companyCreate(input: $input) {
       company {
         id
-        name
         mainLocation {
           id
-        }
-        mainContact {
-          id
-        }
-        contacts(first: 1) {
-          nodes {
-            id
-          }
-        }
-        locations(first: 1) {
-          nodes {
-            id
-          }
-        }
-      }
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-
-const COMPANY_CREATE_WITHOUT_MAIN_LOCATION = `
-  mutation companyCreate($input: CompanyCreateInput!) {
-    companyCreate(input: $input) {
-      company {
-        id
-        name
-        mainContact {
-          id
-        }
-        contacts(first: 1) {
-          nodes {
-            id
-          }
         }
         locations(first: 1) {
           nodes {
@@ -168,21 +117,23 @@ const GET_CUSTOMER_COMPANY = `
 `;
 
 const COMPANY_CONTACT_CREATE = `
-  mutation companyContactCreate($companyId: ID!, $input: CompanyContactInput!) {
+  mutation CompanyContactCreate($companyId: ID!, $input: CompanyContactInput!) {
     companyContactCreate(companyId: $companyId, input: $input) {
       companyContact {
         id
-        customer { id }
       }
-      userErrors { field message }
+      userErrors {
+        field
+        message
+      }
     }
   }
 `;
 
 const COMPANY_LOCATION_ASSIGN_ROLES = `
-  mutation companyLocationAssignRoles(
+  mutation AssignRoles(
     $companyLocationId: ID!
-    $rolesToAssign: [CompanyLocationRoleAssign!]!
+    $rolesToAssign: [CompanyLocationRoleAssignInput!]!
   ) {
     companyLocationAssignRoles(
       companyLocationId: $companyLocationId
@@ -191,24 +142,10 @@ const COMPANY_LOCATION_ASSIGN_ROLES = `
       roleAssignments {
         id
       }
-      userErrors { field message }
-    }
-  }
-`;
-
-const COMPANY_CONTACT_ASSIGN_ROLES = `
-  mutation companyContactAssignRoles(
-    $companyContactId: ID!
-    $rolesToAssign: [CompanyContactRoleAssign!]!
-  ) {
-    companyContactAssignRoles(
-      companyContactId: $companyContactId
-      rolesToAssign: $rolesToAssign
-    ) {
-      roleAssignments {
-        id
+      userErrors {
+        field
+        message
       }
-      userErrors { field message }
     }
   }
 `;
@@ -281,17 +218,6 @@ function toContactRoles(nodes: any[] | undefined): ContactRole[] {
     .filter((role) => role.id);
 }
 
-function pickOrderingRoleId(roles: ContactRole[]): string | null {
-  if (roles.length === 0) return null;
-  const ordering =
-    roles.find(
-      (role) => role.name.trim().toLowerCase() === "ordering only",
-    ) ??
-    roles.find((role) => /order/i.test(role.name)) ??
-    roles.find((role) => /buyer|purchas/i.test(role.name));
-  return ordering?.id ?? null;
-}
-
 function mutationSucceeded(
   payload: { userErrors?: any[] } | null | undefined,
   response?: any,
@@ -307,49 +233,39 @@ function mutationSucceeded(
   );
 }
 
-function firstErrorMessage(
-  payload?: { userErrors?: Array<{ message?: string }> | null } | null,
-  response?: any,
-) {
-  return (
-    payload?.userErrors?.[0]?.message ||
-    response?.errors?.[0]?.message ||
-    null
+function graphqlFailed(result: any, payload?: { userErrors?: any[] } | null) {
+  if (result?.errors?.length) return true;
+  const userErrors = payload?.userErrors;
+  if (!Array.isArray(userErrors) || userErrors.length === 0) return false;
+  return !userErrors.every((err) =>
+    /already|exists|assigned/i.test(String(err?.message ?? "")),
   );
 }
 
-async function fetchOrderingRoleIdFromShopify(
-  companyId?: string,
-): Promise<string> {
-  const shopRoles = await shopifyAdminFetch({
+async function fetchOrderingRoleIdFromShopify(): Promise<string> {
+  const result = await shopifyAdminFetch({
     query: GET_SHOP_COMPANY_CONTACT_ROLES,
   });
-  if (!shopRoles.errors?.length) {
-    const fromShop = pickOrderingRoleId(
-      toContactRoles(shopRoles.data?.companyContactRoles?.nodes),
+  if (result.errors?.length) {
+    throw new Error(
+      `companyContactRoles failed: ${JSON.stringify(result.errors)}`,
     );
-    if (fromShop) return fromShop;
   }
 
-  if (companyId) {
-    const companyRoles = await shopifyAdminFetch({
-      query: GET_COMPANY_CONTACT_ROLES,
-      variables: { companyId },
-    });
-    const fromCompany = pickOrderingRoleId(
-      toContactRoles(companyRoles.data?.company?.contactRoles?.nodes),
-    );
-    if (fromCompany) return fromCompany;
+  const role = toContactRoles(result.data?.companyContactRoles?.nodes).find(
+    (item) => item.name === "Ordering only",
+  );
+  if (!role) {
+    throw new Error("Ordering role not found");
   }
-
-  throw new Error('Shopify "Ordering only" role could not be found at runtime');
+  return role.id;
 }
 
-export async function getOrderingRoleId(companyId?: string): Promise<string> {
+export async function getOrderingRoleId(): Promise<string> {
   if (cachedOrderingRoleId.value) return cachedOrderingRoleId.value;
   if (cachedOrderingRoleId.pending) return cachedOrderingRoleId.pending;
 
-  cachedOrderingRoleId.pending = fetchOrderingRoleIdFromShopify(companyId)
+  cachedOrderingRoleId.pending = fetchOrderingRoleIdFromShopify()
     .then((roleId) => {
       cachedOrderingRoleId.value = roleId;
       return roleId;
@@ -364,9 +280,6 @@ export async function getOrderingRoleId(companyId?: string): Promise<string> {
 export async function createCompanyWithContact({
   companyName,
   customerId,
-  email,
-  firstName,
-  lastName,
   address1,
   city,
   country,
@@ -375,9 +288,9 @@ export async function createCompanyWithContact({
 }: {
   companyName: string;
   customerId: string;
-  email: string;
-  firstName: string;
-  lastName: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
   address1: string;
   city: string;
   country: string;
@@ -389,107 +302,85 @@ export async function createCompanyWithContact({
   companyContactId: string;
   companyName: string;
 }> {
-  const locationInput = {
-    name: "Main Location",
-    billingSameAsShipping: true,
-    shippingAddress: {
-      address1,
-      city,
-      countryCode: country,
-      zoneCode: state,
-      zip,
-    },
-  };
-
-  const contactInput = {
-    customerId,
-    email,
-    firstName,
-    lastName,
-    isMainContact: true,
-  };
-
-  const createInput = {
-    company: { name: companyName },
-    companyLocation: locationInput,
-    companyContact: contactInput,
-  };
-
-  let response = await shopifyAdminFetch({
+  const companyResult = await shopifyAdminFetch({
     query: COMPANY_CREATE,
-    variables: { input: createInput },
-  });
-
-  if (
-    Array.isArray(response.errors) &&
-    response.errors.some((err: { message?: string }) =>
-      /mainLocation/i.test(String(err?.message ?? "")),
-    )
-  ) {
-    response = await shopifyAdminFetch({
-      query: COMPANY_CREATE_WITHOUT_MAIN_LOCATION,
-      variables: { input: createInput },
-    });
-  }
-
-  if (
-    Array.isArray(response.errors) &&
-    response.errors.some((err: { message?: string }) =>
-      /isMainContact|customerId/i.test(String(err?.message ?? "")),
-    )
-  ) {
-    const { isMainContact: _ignored, ...contactWithoutFlag } = contactInput;
-    response = await shopifyAdminFetch({
-      query: COMPANY_CREATE_WITHOUT_MAIN_LOCATION,
-      variables: {
-        input: {
-          company: { name: companyName },
-          companyLocation: locationInput,
-          companyContact: contactWithoutFlag,
+    variables: {
+      input: {
+        company: { name: companyName },
+        companyLocation: {
+          name: "Main Location",
+          billingSameAsShipping: true,
+          shippingAddress: {
+            address1,
+            city,
+            countryCode: country,
+            zoneCode: state,
+            zip,
+          },
         },
       },
-    });
+    },
+  });
+
+  const companyPayload = companyResult.data?.companyCreate;
+  if (graphqlFailed(companyResult, companyPayload) || !companyPayload?.company?.id) {
+    throw new Error(`companyCreate failed: ${JSON.stringify(companyResult)}`);
   }
 
-  const payload = response.data?.companyCreate;
-  const createError = firstErrorMessage(payload, response);
-  if (!payload?.company?.id || createError) {
-    throw new Error(createError || "companyCreate failed");
+  const companyId = String(companyPayload.company.id);
+  const locationId = String(
+    companyPayload.company.mainLocation?.id ??
+      companyPayload.company.locations?.nodes?.[0]?.id ??
+      "",
+  );
+  if (!locationId) {
+    throw new Error(`companyCreate failed: ${JSON.stringify(companyResult)}`);
   }
 
-  const company = payload.company;
-  const companyLocationId =
-    company.mainLocation?.id ??
-    company.locations?.nodes?.[0]?.id ??
-    company.locations?.edges?.[0]?.node?.id ??
-    null;
-  let companyContactId =
-    company.mainContact?.id ?? company.contacts?.nodes?.[0]?.id ?? null;
+  const contactResult = await shopifyAdminFetch({
+    query: COMPANY_CONTACT_CREATE,
+    variables: {
+      companyId,
+      input: { customerId },
+    },
+  });
 
-  if (!companyContactId) {
-    companyContactId = await createCompanyContact({
-      companyId: company.id,
-      customerId,
-    });
-  }
-
-  if (!companyLocationId || !companyContactId) {
+  const contactPayload = contactResult.data?.companyContactCreate;
+  if (
+    graphqlFailed(contactResult, contactPayload) ||
+    !contactPayload?.companyContact?.id
+  ) {
     throw new Error(
-      "companyCreate did not return a location and contact to assign a role",
+      `companyContactCreate failed: ${JSON.stringify(contactResult)}`,
     );
   }
 
-  await assignCompanyLocationOrderingRole({
-    companyId: company.id,
-    companyLocationId,
-    companyContactId,
+  const contactId = String(contactPayload.companyContact.id);
+  const orderingRoleId = await getOrderingRoleId();
+
+  const roleResult = await shopifyAdminFetch({
+    query: COMPANY_LOCATION_ASSIGN_ROLES,
+    variables: {
+      companyLocationId: locationId,
+      rolesToAssign: [
+        {
+          companyContactId: contactId,
+          companyContactRoleId: orderingRoleId,
+        },
+      ],
+    },
   });
 
+  const rolePayload = roleResult.data?.companyLocationAssignRoles;
+  if (graphqlFailed(roleResult, rolePayload)) {
+    throw new Error(`assignRoles failed: ${JSON.stringify(roleResult)}`);
+  }
+
   return {
-    companyId: String(company.id),
-    companyLocationId: String(companyLocationId),
-    companyContactId: String(companyContactId),
-    companyName: String(company.name ?? companyName),
+    companyId,
+    companyLocationId: locationId,
+    companyContactId: contactId,
+    companyName,
   };
 }
 
@@ -555,53 +446,34 @@ export async function createCompanyContact({
 export async function assignCompanyLocationOrderingRole({
   companyLocationId,
   companyContactId,
-  companyId,
 }: {
   companyLocationId: string;
   companyContactId: string;
   companyId?: string;
 }): Promise<boolean> {
-  const companyContactRoleId = await getOrderingRoleId(companyId);
-
-  const locationAssign = await shopifyAdminFetch({
+  const companyContactRoleId = await getOrderingRoleId();
+  const roleResult = await shopifyAdminFetch({
     query: COMPANY_LOCATION_ASSIGN_ROLES,
     variables: {
       companyLocationId,
-      rolesToAssign: [{ companyContactId, companyContactRoleId }],
+      rolesToAssign: [
+        {
+          companyContactId,
+          companyContactRoleId,
+        },
+      ],
     },
   });
-  const locationPayload = locationAssign.data?.companyLocationAssignRoles;
-  if (mutationSucceeded(locationPayload, locationAssign)) {
-    console.log("[customer-company] Location role assigned", {
-      companyLocationId,
-      companyContactId,
-      companyContactRoleId,
-    });
-    return true;
+  const rolePayload = roleResult.data?.companyLocationAssignRoles;
+  if (graphqlFailed(roleResult, rolePayload)) {
+    throw new Error(`assignRoles failed: ${JSON.stringify(roleResult)}`);
   }
-
-  const contactAssign = await shopifyAdminFetch({
-    query: COMPANY_CONTACT_ASSIGN_ROLES,
-    variables: {
-      companyContactId,
-      rolesToAssign: [{ companyContactRoleId, companyLocationId }],
-    },
+  console.log("[customer-company] Location role assigned", {
+    companyLocationId,
+    companyContactId,
+    companyContactRoleId,
   });
-  const contactPayload = contactAssign.data?.companyContactAssignRoles;
-  if (mutationSucceeded(contactPayload, contactAssign)) {
-    console.log("[customer-company] Contact role assigned via fallback", {
-      companyLocationId,
-      companyContactId,
-      companyContactRoleId,
-    });
-    return true;
-  }
-
-  throw new Error(
-    firstErrorMessage(locationPayload, locationAssign) ||
-      firstErrorMessage(contactPayload, contactAssign) ||
-      "companyLocationAssignRoles failed",
-  );
+  return true;
 }
 
 async function ensureCompanyLocationRole(
@@ -617,7 +489,6 @@ async function ensureCompanyLocationRole(
   }
 
   const assigned = await assignCompanyLocationOrderingRole({
-    companyId: info.companyId,
     companyLocationId: info.companyLocationId,
     companyContactId: info.companyContactId,
   });
