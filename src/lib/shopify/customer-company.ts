@@ -37,24 +37,7 @@ type PartialCustomerCompany = {
   locationRoleAssigned?: boolean;
 };
 
-const cachedOrderingRoleId: {
-  value: string | null;
-  pending: Promise<string> | null;
-} = {
-  value: null,
-  pending: null,
-};
-
-const GET_SHOP_COMPANY_CONTACT_ROLES = `
-  query GetShopCompanyContactRoles {
-    companyContactRoles(first: 10) {
-      nodes {
-        id
-        name
-      }
-    }
-  }
-`;
+const ORDERING_ROLE_ID = "gid://shopify/CompanyContactRole/5304221999";
 
 const COMPANY_CREATE = `
   mutation CompanyCreate($input: CompanyCreateInput!) {
@@ -242,41 +225,6 @@ function graphqlFailed(result: any, payload?: { userErrors?: any[] } | null) {
   );
 }
 
-async function fetchOrderingRoleIdFromShopify(): Promise<string> {
-  const result = await shopifyAdminFetch({
-    query: GET_SHOP_COMPANY_CONTACT_ROLES,
-  });
-  if (result.errors?.length) {
-    throw new Error(
-      `companyContactRoles failed: ${JSON.stringify(result.errors)}`,
-    );
-  }
-
-  const role = toContactRoles(result.data?.companyContactRoles?.nodes).find(
-    (item) => item.name === "Ordering only",
-  );
-  if (!role) {
-    throw new Error("Ordering role not found");
-  }
-  return role.id;
-}
-
-export async function getOrderingRoleId(): Promise<string> {
-  if (cachedOrderingRoleId.value) return cachedOrderingRoleId.value;
-  if (cachedOrderingRoleId.pending) return cachedOrderingRoleId.pending;
-
-  cachedOrderingRoleId.pending = fetchOrderingRoleIdFromShopify()
-    .then((roleId) => {
-      cachedOrderingRoleId.value = roleId;
-      return roleId;
-    })
-    .finally(() => {
-      cachedOrderingRoleId.pending = null;
-    });
-
-  return cachedOrderingRoleId.pending;
-}
-
 export async function createCompanyWithContact({
   companyName,
   customerId,
@@ -302,6 +250,10 @@ export async function createCompanyWithContact({
   companyContactId: string;
   companyName: string;
 }> {
+  if (!customerId) {
+    throw new Error("Customer ID missing before company creation");
+  }
+  console.log("[DEBUG] Customer created:", customerId);
   const companyResult = await shopifyAdminFetch({
     query: COMPANY_CREATE,
     variables: {
@@ -354,7 +306,7 @@ export async function createCompanyWithContact({
   }
 
   const contactId = String(contactPayload.companyContact.id);
-  const orderingRoleId = await getOrderingRoleId();
+  const orderingRoleId = ORDERING_ROLE_ID;
 
   const roleResult = await shopifyAdminFetch({
     query: COMPANY_LOCATION_ASSIGN_ROLES,
@@ -423,7 +375,7 @@ export async function assignCompanyLocationOrderingRole({
   companyContactId: string;
   companyId?: string;
 }): Promise<boolean> {
-  const companyContactRoleId = await getOrderingRoleId();
+  const companyContactRoleId = ORDERING_ROLE_ID;
   const roleResult = await shopifyAdminFetch({
     query: COMPANY_LOCATION_ASSIGN_ROLES,
     variables: {

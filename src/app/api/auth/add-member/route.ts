@@ -144,8 +144,13 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log("Step 4.5: Setting tax exempt for customer");
     const shopifyCustomerId = shopifyCustomer.id;
+    console.log("[DEBUG] Customer created:", shopifyCustomerId);
+    if (!shopifyCustomerId) {
+      throw new Error("Customer ID missing before company creation");
+    }
+
+    console.log("Step 4.5: Setting tax exempt for customer");
 
     const adminMutation = `
       mutation customerUpdate($input: CustomerInput!) {
