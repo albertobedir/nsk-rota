@@ -5,8 +5,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma/instance";
 import { shopifyAdminFetch } from "@/lib/shopify/instance";
 import {
-  assignCompanyLocationOrderingRole,
-  createCompanyWithLocationAndContact,
+  createCompanyWithContact,
   saveCustomerCompany,
 } from "@/lib/shopify/customer-company";
 
@@ -202,48 +201,25 @@ export async function POST(req: Request) {
       console.error("Step 4.5 Error: Failed to set tax exempt", taxErr);
     }
 
-    console.log("Step 4.6: Creating company, location, and contact");
-    let shopifyCompanyId: string | null = null;
-    let companyLocationId: string | null = null;
-    let companyContactId: string | null = null;
-    let locationRoleAssigned = false;
-    try {
-      const createdCompany = await createCompanyWithLocationAndContact({
-        companyName,
-        customerId: shopifyCustomer.id,
-        email,
-        firstName,
-        lastName,
-        address1,
-        city,
-        country,
-        state,
-        zip,
-      });
-      console.log("Step 4.6: Company created", createdCompany);
+    console.log("Step 4.6: Creating company, location, contact, and role");
+    const createdCompany = await createCompanyWithContact({
+      companyName,
+      customerId: shopifyCustomer.id,
+      email,
+      firstName,
+      lastName,
+      address1,
+      city,
+      country,
+      state,
+      zip,
+    });
+    console.log("Step 4.6: Company created with location role", createdCompany);
 
-      shopifyCompanyId = createdCompany?.companyId ?? null;
-      companyLocationId = createdCompany?.companyLocationId ?? null;
-      companyContactId = createdCompany?.companyContactId ?? null;
-
-      if (shopifyCompanyId && companyLocationId && companyContactId) {
-        console.log(
-          "Step 4.8: Assigning Ordering only role to company location",
-        );
-        locationRoleAssigned = await assignCompanyLocationOrderingRole({
-          companyId: shopifyCompanyId,
-          companyLocationId,
-          companyContactId,
-        });
-        if (!locationRoleAssigned) {
-          console.warn(
-            "Step 4.8 Warning: Location role assignment did not succeed",
-          );
-        }
-      }
-    } catch (companyErr) {
-      console.error("Step 4.6 Error: Failed to create company", companyErr);
-    }
+    const shopifyCompanyId = createdCompany.companyId;
+    const companyLocationId = createdCompany.companyLocationId;
+    const companyContactId = createdCompany.companyContactId;
+    const locationRoleAssigned = true;
 
     console.log("Step 5: Waiting for customer-create webhook to persist user");
     const persistedUser = await waitForPersistedUser({
