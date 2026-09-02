@@ -13,11 +13,6 @@ import {
   updateCustomerCredit,
 } from "@/lib/shopify/customer-credit";
 import {
-  extractPurchasingCompanyFromOrder,
-  getCustomerCompany,
-  saveCustomerCompany,
-} from "@/lib/shopify/customer-company";
-import {
   appendPoNumberToNote,
   noteAlreadyHasPoNumber,
 } from "@/lib/shopify/po-note";
@@ -441,31 +436,6 @@ export async function POST(req: NextRequest) {
       );
 
       console.log("✅ Order saved to MongoDB:", shopifyId);
-
-      try {
-        const fromOrder = extractPurchasingCompanyFromOrder(
-          orderData,
-          customerGid,
-        );
-        if (
-          fromOrder &&
-          (fromOrder.companyId ||
-            fromOrder.companyLocationId ||
-            fromOrder.companyContactId ||
-            fromOrder.companyName)
-        ) {
-          await saveCustomerCompany(fromOrder);
-        }
-        if (customerGid) {
-          const companyInfo = await getCustomerCompany(customerGid);
-          console.log("[orders/create] Customer company synced:", companyInfo);
-        }
-      } catch (companyErr) {
-        console.warn(
-          "[orders/create] Customer company sync failed:",
-          companyErr,
-        );
-      }
     } catch (dbErr) {
       // DB hatası webhook'u bloklamamalı
       console.error("❌ MongoDB upsert error:", dbErr);

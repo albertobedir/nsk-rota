@@ -3,10 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import prisma from "@/lib/prisma/instance";
 import { computeTier } from "@/lib/utils/tier";
-import {
-  getCustomerCompany,
-  toSessionCompanyFields,
-} from "@/lib/shopify/customer-company";
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET ?? "";
 
@@ -94,15 +90,13 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const companyInfo = shopifyCustomerId
-      ? await getCustomerCompany(shopifyCustomerId, { staleOk: true }).catch(
-          (err) => {
-            console.warn("[get-session] customer company lookup failed:", err);
-            return null;
-          },
-        )
-      : null;
-    const companyFields = toSessionCompanyFields(companyInfo);
+    const companyFields = {
+      companyName: user.companyName ?? null,
+      shopifyCompanyId: user.shopifyCompanyId ?? null,
+      companyId: user.shopifyCompanyId ?? null,
+      companyLocationId: null as string | null,
+      companyContactId: null as string | null,
+    };
 
     const sessionUser = {
       id: user.id,

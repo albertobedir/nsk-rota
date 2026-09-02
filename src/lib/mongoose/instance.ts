@@ -3,6 +3,7 @@ import Product from "@/schemas/mongoose/product"; // Mongoose model
 import Order from "@/schemas/mongoose/order";
 import Collection from "@/schemas/mongoose/collection";
 import Customer from "@/schemas/mongoose/customer";
+import PendingRegistration from "@/schemas/mongoose/pending-registration";
 
 const MONGO_URL = process.env.MONGO_URL;
 
@@ -71,6 +72,16 @@ export async function connectDB() {
     console.log("✅ Customer collection indexes created!");
   } catch (err) {
     console.error("❌ Failed to create Customer indexes:", err);
+  }
+
+  try {
+    await PendingRegistration.collection.createIndex(
+      { email: 1 },
+      { unique: true },
+    );
+    console.log("✅ pendingRegistrations indexes created!");
+  } catch (err) {
+    console.error("❌ Failed to create pendingRegistrations indexes:", err);
   }
 
   return cached.conn;

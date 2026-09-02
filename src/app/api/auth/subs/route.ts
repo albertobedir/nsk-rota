@@ -2,6 +2,7 @@
 "use server";
 
 import prisma from "@/lib/prisma/instance";
+import { upsertPendingRegistration } from "@/lib/registrations/pending";
 import { subscribeSchema } from "@/schemas/subscribe.schema";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
@@ -72,6 +73,26 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "EMAIL_EXISTS", message: "Bu e-posta zaten kayıtlı." },
         { status: 409 },
+      );
+    }
+
+    try {
+      await upsertPendingRegistration({
+        email: normalizedEmail,
+        companyName,
+        firstName,
+        lastName,
+        address1,
+        city,
+        state,
+        zip,
+        country,
+      });
+    } catch (pendingErr) {
+      console.error("Subscribe pending registration error:", pendingErr);
+      return NextResponse.json(
+        { error: "SERVER_ERROR", message: "Bir hata oluştu." },
+        { status: 500 },
       );
     }
 

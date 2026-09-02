@@ -4,6 +4,7 @@ import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import prisma from "@/lib/prisma/instance";
 import { getValidAdminEmails } from "@/lib/email/admin-emails";
+import { linkCustomerCompanyFromPending } from "@/lib/shopify/customer-company";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -124,13 +125,25 @@ export async function POST(req: NextRequest) {
 
     if (existing) {
       console.log(
-        "[🔗 Customer Create Webhook] User already exists, skipping:",
+        "[🔗 Customer Create Webhook] User already exists, linking company if needed:",
         email,
       );
-      return NextResponse.json(
+      const response = NextResponse.json(
         { status: "already_exists", message: "User already in database" },
         { status: 200 },
       );
+      if (!existing.shopifyCompanyId) {
+        linkCustomerCompanyFromPending({
+          shopifyCustomerId: admin_graphql_api_id,
+          email,
+        }).catch((companyErr) => {
+          console.error(
+            "[🔗 Customer Create Webhook] Company link failed for existing user:",
+            companyErr,
+          );
+        });
+      }
+      return response;
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -288,6 +301,18 @@ export async function POST(req: NextRequest) {
     });
 
     console.log("[🔗 Customer Create Webhook] User saved to DB:", user.id);
+
+    try {
+      await linkCustomerCompanyFromPending({
+        shopifyCustomerId: admin_graphql_api_id,
+        email,
+      });
+    } catch (companyErr) {
+      console.error(
+        "[🔗 Customer Create Webhook] Company create/link failed:",
+        companyErr,
+      );
+    }
 
     // ────────────────────────────────────────────────────────────────
     // 6. Early response (Shopify 5sn timeout)

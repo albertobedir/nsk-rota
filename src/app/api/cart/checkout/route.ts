@@ -3,11 +3,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createDraftOrder } from "@/lib/shopify/draft";
 import prisma from "@/lib/prisma/instance";
-import {
-  getCustomerCompany,
-  toPurchasingCompany,
-  type CustomerCompanyInfo,
-} from "@/lib/shopify/customer-company";
 
 type IncomingLine = {
   merchandiseId?: string;
@@ -251,17 +246,6 @@ export async function POST(request: NextRequest) {
     // Format: gid://shopify/Customer/123456 or undefined
     console.log(`[SHOPIFY GID] Using shopifyCustomerId: ${shopifyCustomerId}`);
 
-    let companyInfo: CustomerCompanyInfo | null = null;
-    try {
-      companyInfo = shopifyCustomerId
-        ? await getCustomerCompany(shopifyCustomerId)
-        : null;
-    } catch (companyErr) {
-      console.warn("[CUSTOMER COMPANY] Failed to load:", companyErr);
-    }
-    const purchasingCompany = toPurchasingCompany(companyInfo);
-    console.log("[CUSTOMER COMPANY]", companyInfo);
-
     // Determine if discount is FIXED_AMOUNT type
     const tierOnly = Number(discountPercentage ?? 0); // sadece tier %
     const isFixedAmount = validatedDiscount?.codeValueType === "FIXED_AMOUNT";
@@ -402,12 +386,10 @@ export async function POST(request: NextRequest) {
       email: email ?? undefined,
       phone: phone ?? undefined,
       lineItems: items,
-      purchasingCompany,
       shippingAddress: shippingAddress
         ? {
             ...shippingAddress,
-            company:
-              companyInfo?.companyName ?? shippingAddress.company ?? undefined,
+            company: shippingAddress.company ?? undefined,
           }
         : undefined,
       tags: ["b2b", "custom-pricing"],

@@ -3,11 +3,8 @@
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma/instance";
+import { upsertPendingRegistration } from "@/lib/registrations/pending";
 import { shopifyAdminFetch } from "@/lib/shopify/instance";
-import {
-  createCompanyWithContact,
-  saveCustomerCompany,
-} from "@/lib/shopify/customer-company";
 
 type CreateUserBody = {
   email: string;
@@ -80,6 +77,27 @@ export async function POST(req: Request) {
       );
     }
 
+    console.log("Step 1.5: Saving pending registration");
+    try {
+      await upsertPendingRegistration({
+        email,
+        companyName,
+        firstName,
+        lastName,
+        address1,
+        city,
+        state,
+        zip,
+        country,
+      });
+    } catch (pendingErr) {
+      console.error("Step 1.5 Error: Failed to save pending registration", pendingErr);
+      return NextResponse.json(
+        { message: "Failed to save registration data" },
+        { status: 500 },
+      );
+    }
+
     console.log("Step 2: Creating Shopify customer");
 
     const mutation = `
@@ -147,7 +165,7 @@ export async function POST(req: Request) {
     const shopifyCustomerId = shopifyCustomer.id;
     console.log("[DEBUG] Customer created:", shopifyCustomerId);
     if (!shopifyCustomerId) {
-      throw new Error("Customer ID missing before company creation");
+      throw new Error("Customer ID missing after customerCreate");
     }
 
     console.log("Step 4.5: Setting tax exempt for customer");
@@ -206,26 +224,6 @@ export async function POST(req: Request) {
       console.error("Step 4.5 Error: Failed to set tax exempt", taxErr);
     }
 
-    console.log("Step 4.6: Creating company, location, contact, and role");
-    const createdCompany = await createCompanyWithContact({
-      companyName,
-      customerId: shopifyCustomer.id,
-      email,
-      firstName,
-      lastName,
-      address1,
-      city,
-      country,
-      state,
-      zip,
-    });
-    console.log("Step 4.6: Company created with location role", createdCompany);
-
-    const shopifyCompanyId = createdCompany.companyId;
-    const companyLocationId = createdCompany.companyLocationId;
-    const companyContactId = createdCompany.companyContactId;
-    const locationRoleAssigned = true;
-
     console.log("Step 5: Waiting for customer-create webhook to persist user");
     const persistedUser = await waitForPersistedUser({
       shopifyCustomerId,
@@ -237,7 +235,6 @@ export async function POST(req: Request) {
         where: { id: persistedUser.id },
         data: {
           companyName,
-          shopifyCompanyId,
           companyAddress1: address1,
           companyCity: city,
           companyState: state,
@@ -263,31 +260,13 @@ export async function POST(req: Request) {
         },
       });
       console.log(
-        "Step 5: Linked Shopify company to persisted user",
+        "Step 5: Saved local company/address on persisted user",
         persistedUser.id,
       );
     } else {
       console.warn(
         "Step 5 Warning: Webhook has not persisted the user yet; Shopify customer was created",
         shopifyCustomerId,
-      );
-    }
-
-    try {
-      await saveCustomerCompany({
-        shopifyCustomerId,
-        email,
-        companyId: shopifyCompanyId,
-        companyLocationId,
-        companyContactId,
-        companyName,
-        locationRoleAssigned,
-      });
-      console.log("Step 5.1: Saved customer company to MongoDB");
-    } catch (mongoErr) {
-      console.warn(
-        "Step 5.1 Warning: Failed to save MongoDB customer:",
-        mongoErr,
       );
     }
 

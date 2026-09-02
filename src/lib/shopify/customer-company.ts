@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { connectDB } from "@/lib/mongoose/instance";
 import prisma from "@/lib/prisma/instance";
+import {
+  findPendingRegistrationByEmail,
+  markPendingRegistrationUsed,
+} from "@/lib/registrations/pending";
 import Customer from "@/schemas/mongoose/customer";
 import { toCustomerGid } from "@/lib/shopify/ids";
 import { shopifyAdminFetch } from "./instance";
@@ -20,11 +24,6 @@ export type SessionCompanyFields = {
   companyId: string | null;
   companyLocationId: string | null;
   companyContactId: string | null;
-};
-
-type ContactRole = {
-  id: string;
-  name: string;
 };
 
 type PartialCustomerCompany = {
@@ -53,44 +52,6 @@ const COMPANY_CREATE = `
       userErrors {
         field
         message
-      }
-    }
-  }
-`;
-
-const GET_CUSTOMER_COMPANY = `
-  query GetCustomerCompany($customerId: ID!) {
-    customer(id: $customerId) {
-      id
-      email
-      companyContactProfiles {
-        id
-        company {
-          id
-          name
-          contactRoles(first: 20) {
-            nodes {
-              id
-              name
-            }
-          }
-          locations(first: 5) {
-            nodes {
-              id
-            }
-          }
-        }
-        roleAssignments(first: 20) {
-          nodes {
-            role {
-              id
-              name
-            }
-            companyLocation {
-              id
-            }
-          }
-        }
       }
     }
   }
@@ -133,19 +94,6 @@ const COMPANY_LOCATION_ASSIGN_ROLES = `
   }
 `;
 
-function asGid(
-  resource: "Customer" | "Company" | "CompanyLocation" | "CompanyContact",
-  value?: string | number | null,
-): string | null {
-  if (value == null) return null;
-  const raw = String(value).trim().split("?")[0];
-  if (!raw) return null;
-  if (raw.startsWith(`gid://shopify/${resource}/`)) return raw;
-  if (raw.startsWith("gid://")) return raw;
-  const numeric = raw.match(/(\d+)\s*$/)?.[1];
-  return numeric ? `gid://shopify/${resource}/${numeric}` : null;
-}
-
 export function isCompleteCompanyInfo(
   info?: PartialCustomerCompany | null,
 ): info is CustomerCompanyInfo {
@@ -169,15 +117,6 @@ export function toSessionCompanyFields(
   };
 }
 
-export function toPurchasingCompany(info?: PartialCustomerCompany | null) {
-  if (!isCompleteCompanyInfo(info)) return undefined;
-  return {
-    companyId: info.companyId,
-    companyLocationId: info.companyLocationId,
-    companyContactId: info.companyContactId,
-  };
-}
-
 function fromMongoDoc(doc: any): PartialCustomerCompany | null {
   if (!doc) return null;
   return {
@@ -191,14 +130,13 @@ function fromMongoDoc(doc: any): PartialCustomerCompany | null {
   };
 }
 
-function toContactRoles(nodes: any[] | undefined): ContactRole[] {
-  if (!Array.isArray(nodes)) return [];
-  return nodes
-    .map((node) => ({
-      id: String(node?.id ?? ""),
-      name: String(node?.name ?? ""),
-    }))
-    .filter((role) => role.id);
+function graphqlFailed(result: any, payload?: { userErrors?: any[] } | null) {
+  if (result?.errors?.length) return true;
+  const userErrors = payload?.userErrors;
+  if (!Array.isArray(userErrors) || userErrors.length === 0) return false;
+  return !userErrors.every((err) =>
+    /already|exists|assigned/i.test(String(err?.message ?? "")),
+  );
 }
 
 function mutationSucceeded(
@@ -212,15 +150,6 @@ function mutationSucceeded(
   const userErrors = payload.userErrors;
   if (!Array.isArray(userErrors) || userErrors.length === 0) return true;
   return userErrors.every((err) =>
-    /already|exists|assigned/i.test(String(err?.message ?? "")),
-  );
-}
-
-function graphqlFailed(result: any, payload?: { userErrors?: any[] } | null) {
-  if (result?.errors?.length) return true;
-  const userErrors = payload?.userErrors;
-  if (!Array.isArray(userErrors) || userErrors.length === 0) return false;
-  return !userErrors.every((err) =>
     /already|exists|assigned/i.test(String(err?.message ?? "")),
   );
 }
@@ -381,154 +310,6 @@ export async function assignCompanyLocationOrderingRole({
   return true;
 }
 
-async function ensureCompanyLocationRole(
-  info: PartialCustomerCompany,
-): Promise<PartialCustomerCompany> {
-  if (
-    info.locationRoleAssigned ||
-    !info.companyId ||
-    !info.companyLocationId ||
-    !info.companyContactId
-  ) {
-    return info;
-  }
-
-  const assigned = await assignCompanyLocationOrderingRole({
-    companyLocationId: info.companyLocationId,
-    companyContactId: info.companyContactId,
-  });
-  return { ...info, locationRoleAssigned: assigned };
-}
-
-function pickCompanyFromProfiles(profiles: any[] | undefined) {
-  if (!Array.isArray(profiles) || profiles.length === 0) return null;
-
-  const profile =
-    profiles.find((p) =>
-      p?.roleAssignments?.nodes?.some((n: any) => n?.companyLocation?.id),
-    ) ?? profiles[0];
-
-  const companyId = asGid("Company", profile?.company?.id);
-  const companyContactId = asGid("CompanyContact", profile?.id);
-  const assignedLocationId = asGid(
-    "CompanyLocation",
-    profile?.roleAssignments?.nodes?.find((n: any) => n?.companyLocation?.id)
-      ?.companyLocation?.id,
-  );
-  const fallbackLocationId = asGid(
-    "CompanyLocation",
-    profile?.company?.locations?.nodes?.[0]?.id,
-  );
-  const companyLocationId = assignedLocationId ?? fallbackLocationId;
-
-  return {
-    companyId,
-    companyContactId,
-    companyLocationId,
-    companyName: profile?.company?.name ? String(profile.company.name) : null,
-    locationRoleAssigned: Boolean(assignedLocationId),
-    roles: toContactRoles(profile?.company?.contactRoles?.nodes),
-  };
-}
-
-export async function fetchCustomerCompanyFromShopify(
-  customerId: string,
-): Promise<PartialCustomerCompany | null> {
-  const shopifyCustomerId = toCustomerGid(customerId);
-  if (!shopifyCustomerId) return null;
-
-  const response = await shopifyAdminFetch({
-    query: GET_CUSTOMER_COMPANY,
-    variables: { customerId: shopifyCustomerId },
-  });
-
-  const customer = response.data?.customer;
-  if (!customer?.id) {
-    console.warn(
-      "[customer-company] Shopify customer not found:",
-      shopifyCustomerId,
-    );
-    return null;
-  }
-
-  const picked = pickCompanyFromProfiles(customer.companyContactProfiles);
-  if (!picked?.companyId) {
-    console.log(
-      "[customer-company] No company contact profile for",
-      shopifyCustomerId,
-    );
-    return {
-      shopifyCustomerId,
-      email: customer.email ?? null,
-    };
-  }
-
-  return ensureCompanyLocationRole({
-    shopifyCustomerId,
-    email: customer.email ?? null,
-    companyId: picked.companyId,
-    companyLocationId: picked.companyLocationId,
-    companyContactId: picked.companyContactId,
-    companyName: picked.companyName,
-    locationRoleAssigned: picked.locationRoleAssigned,
-  });
-}
-
-export function extractPurchasingCompanyFromOrder(
-  orderData: any,
-  customerGid?: string | null,
-): PartialCustomerCompany | null {
-  const shopifyCustomerId = toCustomerGid(
-    customerGid ||
-      orderData?.customer?.admin_graphql_api_id ||
-      orderData?.customer?.id,
-  );
-  if (!shopifyCustomerId) return null;
-
-  const purchasingEntity =
-    orderData?.purchasing_entity ?? orderData?.purchasingEntity ?? null;
-  const purchasingCompany =
-    purchasingEntity?.purchasing_company ??
-    purchasingEntity?.purchasingCompany ??
-    null;
-  const company = orderData?.company ?? purchasingCompany?.company ?? null;
-
-  const companyId = asGid(
-    "Company",
-    purchasingCompany?.company_id ??
-      purchasingCompany?.companyId ??
-      company?.id,
-  );
-  const companyLocationId = asGid(
-    "CompanyLocation",
-    purchasingCompany?.company_location_id ??
-      purchasingCompany?.companyLocationId ??
-      company?.location_id ??
-      company?.locationId,
-  );
-  const companyContactId = asGid(
-    "CompanyContact",
-    purchasingCompany?.company_contact_id ??
-      purchasingCompany?.companyContactId ??
-      purchasingCompany?.contact_id,
-  );
-  const companyName =
-    purchasingCompany?.company?.name ??
-    company?.name ??
-    orderData?.shipping_address?.company ??
-    orderData?.billing_address?.company ??
-    null;
-
-  return {
-    shopifyCustomerId,
-    companyId,
-    companyLocationId,
-    companyContactId,
-    companyName: companyName ? String(companyName) : null,
-    email: orderData?.email ?? orderData?.customer?.email ?? null,
-  };
-}
-
 export async function saveCustomerCompany(
   info: PartialCustomerCompany,
 ): Promise<PartialCustomerCompany> {
@@ -581,46 +362,96 @@ async function findStoredCompany(
 
 export async function getCustomerCompany(
   customerId?: string | null,
-  {
-    refresh = false,
-    staleOk = false,
-  }: { refresh?: boolean; staleOk?: boolean } = {},
 ): Promise<CustomerCompanyInfo | null> {
   const shopifyCustomerId = toCustomerGid(customerId);
   if (!shopifyCustomerId) return null;
 
   try {
-    const stored = refresh
-      ? null
-      : await findStoredCompany(shopifyCustomerId);
-
-    if (isCompleteCompanyInfo(stored) && stored.locationRoleAssigned) {
-      return stored;
-    }
-    if (isCompleteCompanyInfo(stored) && !staleOk) {
-      const ensured = await ensureCompanyLocationRole(stored);
-      await saveCustomerCompany(ensured);
-      if (isCompleteCompanyInfo(ensured) && ensured.locationRoleAssigned) {
-        return ensured;
-      }
-    }
-    if (!refresh && staleOk && stored) return null;
-
-    const fetched = await fetchCustomerCompanyFromShopify(shopifyCustomerId);
-    if (fetched) {
-      const saved = await saveCustomerCompany(fetched);
-      return isCompleteCompanyInfo(saved) ? saved : null;
-    }
-
-    const fallback = stored ?? (await findStoredCompany(shopifyCustomerId));
-    return isCompleteCompanyInfo(fallback) ? fallback : null;
+    const stored = await findStoredCompany(shopifyCustomerId);
+    return isCompleteCompanyInfo(stored) ? stored : null;
   } catch (err) {
     console.warn("[customer-company] getCustomerCompany failed:", err);
-    try {
-      const stored = await findStoredCompany(shopifyCustomerId);
-      return isCompleteCompanyInfo(stored) ? stored : null;
-    } catch {
-      return null;
-    }
+    return null;
   }
+}
+
+export async function linkCustomerCompanyFromPending({
+  shopifyCustomerId,
+  email,
+}: {
+  shopifyCustomerId?: string | null;
+  email?: string | null;
+}): Promise<PartialCustomerCompany | null> {
+  const customerId = toCustomerGid(shopifyCustomerId);
+  const normalizedEmail = String(email ?? "").trim().toLowerCase();
+  if (!customerId || !normalizedEmail) return null;
+
+  const stored = await findStoredCompany(customerId);
+  if (stored?.companyId) {
+    console.log(
+      "[customer-company] Company already linked, skipping create:",
+      stored.companyId,
+    );
+    return stored;
+  }
+
+  const pending = await findPendingRegistrationByEmail(normalizedEmail);
+  if (!pending?.companyName) {
+    console.log(
+      "[customer-company] No pending companyName for",
+      normalizedEmail,
+    );
+    return null;
+  }
+
+  const created = await createCompanyWithContact({
+    companyName: pending.companyName,
+    customerId,
+    email: normalizedEmail,
+    firstName: pending.firstName ?? undefined,
+    lastName: pending.lastName ?? undefined,
+    address1: pending.address1,
+    city: pending.city,
+    country: pending.country,
+    state: pending.state,
+    zip: pending.zip,
+  });
+
+  const saved = await saveCustomerCompany({
+    shopifyCustomerId: customerId,
+    email: normalizedEmail,
+    companyId: created.companyId,
+    companyLocationId: created.companyLocationId,
+    companyContactId: created.companyContactId,
+    companyName: created.companyName,
+    locationRoleAssigned: true,
+  });
+
+  try {
+    await prisma.user.updateMany({
+      where: {
+        OR: [{ shopifyCustomerId: customerId }, { email: normalizedEmail }],
+      },
+      data: {
+        companyName: pending.companyName,
+        shopifyCompanyId: created.companyId,
+        companyAddress1: pending.address1,
+        companyCity: pending.city,
+        companyState: pending.state,
+        companyZip: pending.zip,
+      },
+    });
+  } catch (err) {
+    console.warn(
+      "[customer-company] Prisma address update from pending failed:",
+      err,
+    );
+  }
+
+  await markPendingRegistrationUsed(normalizedEmail);
+  console.log("[customer-company] Linked company from pending registration", {
+    customerId,
+    companyId: created.companyId,
+  });
+  return saved;
 }
