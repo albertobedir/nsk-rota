@@ -6,7 +6,7 @@ import prisma from "@/lib/prisma/instance";
 import { shopifyAdminFetch } from "@/lib/shopify/instance";
 import {
   assignCompanyLocationOrderingRole,
-  createCompanyContact,
+  createCompanyWithLocationAndContact,
   saveCustomerCompany,
 } from "@/lib/shopify/customer-company";
 
@@ -202,106 +202,42 @@ export async function POST(req: Request) {
       console.error("Step 4.5 Error: Failed to set tax exempt", taxErr);
     }
 
-    console.log("Step 4.6: Creating company for customer");
+    console.log("Step 4.6: Creating company, location, and contact");
     let shopifyCompanyId: string | null = null;
     let companyLocationId: string | null = null;
     let companyContactId: string | null = null;
     let locationRoleAssigned = false;
-    let companyRoles: { id: string; name: string }[] = [];
     try {
-      const companyData = await shopifyAdminFetch({
-        query: `mutation companyCreate($input: CompanyCreateInput!) {
-          companyCreate(input: $input) {
-            company {
-              id
-              name
-              contactRoles(first: 20) { nodes { id name } }
-              locations(first: 1) {
-                nodes { id }
-                edges { node { id } }
-              }
-            }
-            userErrors { field message }
-          }
-        }`,
-        variables: {
-          input: {
-            company: { name: companyName },
-            companyLocation: {
-              name: "Main Location",
-              billingSameAsShipping: true,
-              shippingAddress: {
-                address1,
-                city,
-                countryCode: country,
-                zoneCode: state,
-                zip,
-              },
-            },
-          },
-        },
+      const createdCompany = await createCompanyWithLocationAndContact({
+        companyName,
+        customerId: shopifyCustomer.id,
+        email,
+        firstName,
+        lastName,
+        address1,
+        city,
+        country,
+        state,
+        zip,
       });
+      console.log("Step 4.6: Company created", createdCompany);
 
-      const company = companyData?.data?.companyCreate?.company;
-      companyRoles = (company?.contactRoles?.nodes ?? []).map(
-        (role: { id?: string; name?: string }) => ({
-          id: String(role?.id ?? ""),
-          name: String(role?.name ?? ""),
-        }),
-      );
-      console.log("Step 4.6: Company created", company);
+      shopifyCompanyId = createdCompany?.companyId ?? null;
+      companyLocationId = createdCompany?.companyLocationId ?? null;
+      companyContactId = createdCompany?.companyContactId ?? null;
 
-      if (companyData.data?.companyCreate?.userErrors?.length > 0) {
-        console.warn(
-          "Step 4.6 Warning: Company creation had errors",
-          companyData.data.companyCreate.userErrors,
+      if (shopifyCompanyId && companyLocationId && companyContactId) {
+        console.log(
+          "Step 4.8: Assigning Ordering only role to company location",
         );
-      } else {
-        shopifyCompanyId = company?.id || null;
-        companyLocationId =
-          company?.locations?.nodes?.[0]?.id ||
-          company?.locations?.edges?.[0]?.node?.id ||
-          null;
-      }
-
-      if (company?.id) {
-        console.log("Step 4.7: Creating company contact");
-        try {
-          companyContactId = await createCompanyContact({
-            companyId: company.id,
-            customerId: shopifyCustomer.id,
-            email,
-            firstName,
-            lastName,
-          });
-          if (companyContactId) {
-            console.log("Step 4.7: Company contact created", companyContactId);
-          } else {
-            console.warn("Step 4.7 Warning: Company contact was not created");
-          }
-        } catch (contactErr) {
-          console.error("Step 4.7 Error: Failed to create contact", contactErr);
-        }
-      }
-
-      if (company?.id && companyLocationId && companyContactId) {
-        console.log("Step 4.8: Assigning ordering role to company location");
-        try {
-          locationRoleAssigned = await assignCompanyLocationOrderingRole({
-            companyId: company.id,
-            companyLocationId,
-            companyContactId,
-            roles: companyRoles,
-          });
-          if (!locationRoleAssigned) {
-            console.warn(
-              "Step 4.8 Warning: Location role assignment did not succeed",
-            );
-          }
-        } catch (roleErr) {
-          console.error(
-            "Step 4.8 Error: Failed to assign location role",
-            roleErr,
+        locationRoleAssigned = await assignCompanyLocationOrderingRole({
+          companyId: shopifyCompanyId,
+          companyLocationId,
+          companyContactId,
+        });
+        if (!locationRoleAssigned) {
+          console.warn(
+            "Step 4.8 Warning: Location role assignment did not succeed",
           );
         }
       }

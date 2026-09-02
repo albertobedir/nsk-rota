@@ -37,7 +37,64 @@ type PartialCustomerCompany = {
   locationRoleAssigned?: boolean;
 };
 
-const orderingRoleCache = new Map<string, string>();
+const cachedOrderingRoleId: { value: string | null; pending: Promise<string | null> | null } =
+  {
+    value: null,
+    pending: null,
+  };
+
+const GET_SHOP_COMPANY_CONTACT_ROLES = `
+  query GetShopCompanyContactRoles {
+    companyContactRoles(first: 20) {
+      nodes {
+        id
+        name
+      }
+    }
+  }
+`;
+
+const GET_COMPANY_CONTACT_ROLES = `
+  query GetCompanyContactRoles($companyId: ID!) {
+    company(id: $companyId) {
+      id
+      contactRoles(first: 20) {
+        nodes {
+          id
+          name
+        }
+      }
+    }
+  }
+`;
+
+const COMPANY_CREATE = `
+  mutation companyCreate($input: CompanyCreateInput!) {
+    companyCreate(input: $input) {
+      company {
+        id
+        name
+        mainContact {
+          id
+        }
+        contacts(first: 1) {
+          nodes {
+            id
+          }
+        }
+        locations(first: 1) {
+          nodes {
+            id
+          }
+        }
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
 
 const GET_CUSTOMER_COMPANY = `
   query GetCustomerCompany($customerId: ID!) {
@@ -71,20 +128,6 @@ const GET_CUSTOMER_COMPANY = `
               id
             }
           }
-        }
-      }
-    }
-  }
-`;
-
-const GET_COMPANY_CONTACT_ROLES = `
-  query GetCompanyContactRoles($companyId: ID!) {
-    company(id: $companyId) {
-      id
-      contactRoles(first: 20) {
-        nodes {
-          id
-          name
         }
       }
     }
@@ -208,9 +251,11 @@ function toContactRoles(nodes: any[] | undefined): ContactRole[] {
 function pickOrderingRoleId(roles: ContactRole[]): string | null {
   if (roles.length === 0) return null;
   const ordering =
+    roles.find(
+      (role) => role.name.trim().toLowerCase() === "ordering only",
+    ) ??
     roles.find((role) => /order/i.test(role.name)) ??
-    roles.find((role) => /buyer|purchas/i.test(role.name)) ??
-    roles[0];
+    roles.find((role) => /buyer|purchas/i.test(role.name));
   return ordering?.id ?? null;
 }
 
@@ -229,29 +274,174 @@ function mutationSucceeded(
   );
 }
 
-export async function getOrderingRoleId(
-  companyId: string,
-  roles?: ContactRole[],
+async function fetchOrderingRoleIdFromShopify(
+  companyId?: string,
 ): Promise<string | null> {
-  const cached = orderingRoleCache.get(companyId);
-  if (cached) return cached;
-
-  const fromProvided = pickOrderingRoleId(roles ?? []);
-  if (fromProvided) {
-    orderingRoleCache.set(companyId, fromProvided);
-    return fromProvided;
+  const shopRoles = await shopifyAdminFetch({
+    query: GET_SHOP_COMPANY_CONTACT_ROLES,
+  });
+  if (!shopRoles.errors?.length) {
+    const fromShop = pickOrderingRoleId(
+      toContactRoles(shopRoles.data?.companyContactRoles?.nodes),
+    );
+    if (fromShop) return fromShop;
+  } else {
+    console.warn(
+      "[customer-company] companyContactRoles query failed:",
+      shopRoles.errors,
+    );
   }
 
-  const response = await shopifyAdminFetch({
+  if (!companyId) return null;
+
+  const companyRoles = await shopifyAdminFetch({
     query: GET_COMPANY_CONTACT_ROLES,
     variables: { companyId },
   });
-  const fetchedRoles = toContactRoles(
-    response.data?.company?.contactRoles?.nodes,
+  return pickOrderingRoleId(
+    toContactRoles(companyRoles.data?.company?.contactRoles?.nodes),
   );
-  const roleId = pickOrderingRoleId(fetchedRoles);
-  if (roleId) orderingRoleCache.set(companyId, roleId);
-  return roleId;
+}
+
+export async function getOrderingRoleId(companyId?: string): Promise<string | null> {
+  if (cachedOrderingRoleId.value) return cachedOrderingRoleId.value;
+  if (cachedOrderingRoleId.pending) return cachedOrderingRoleId.pending;
+
+  cachedOrderingRoleId.pending = fetchOrderingRoleIdFromShopify(companyId)
+    .then((roleId) => {
+      if (roleId) cachedOrderingRoleId.value = roleId;
+      return roleId;
+    })
+    .finally(() => {
+      cachedOrderingRoleId.pending = null;
+    });
+
+  return cachedOrderingRoleId.pending;
+}
+
+export async function createCompanyWithLocationAndContact({
+  companyName,
+  customerId,
+  email,
+  firstName,
+  lastName,
+  address1,
+  city,
+  country,
+  state,
+  zip,
+}: {
+  companyName: string;
+  customerId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  address1: string;
+  city: string;
+  country: string;
+  state: string;
+  zip: string;
+}): Promise<{
+  companyId: string;
+  companyLocationId: string | null;
+  companyContactId: string | null;
+  companyName: string;
+} | null> {
+  const locationInput = {
+    name: "Main Location",
+    billingSameAsShipping: true,
+    shippingAddress: {
+      address1,
+      city,
+      countryCode: country,
+      zoneCode: state,
+      zip,
+    },
+  };
+
+  const contactInput = {
+    customerId,
+    email,
+    firstName,
+    lastName,
+    isMainContact: true,
+  };
+
+  let response = await shopifyAdminFetch({
+    query: COMPANY_CREATE,
+    variables: {
+      input: {
+        company: { name: companyName },
+        companyLocation: locationInput,
+        companyContact: contactInput,
+      },
+    },
+  });
+
+  const unknownField = JSON.stringify(response.errors ?? []).match(
+    /isMainContact|customerId/i,
+  );
+  if (response.errors?.length && unknownField) {
+    const { isMainContact: _ignored, ...contactWithoutFlag } = contactInput;
+    response = await shopifyAdminFetch({
+      query: COMPANY_CREATE,
+      variables: {
+        input: {
+          company: { name: companyName },
+          companyLocation: locationInput,
+          companyContact: contactWithoutFlag,
+        },
+      },
+    });
+  }
+
+  let payload = response.data?.companyCreate;
+  if (!payload?.company?.id || !mutationSucceeded(payload, response)) {
+    console.warn(
+      "[customer-company] companyCreate with contact failed:",
+      payload?.userErrors ?? response.errors,
+    );
+    response = await shopifyAdminFetch({
+      query: COMPANY_CREATE,
+      variables: {
+        input: {
+          company: { name: companyName },
+          companyLocation: locationInput,
+        },
+      },
+    });
+    payload = response.data?.companyCreate;
+  }
+
+  const company = payload?.company;
+  if (!company?.id || !mutationSucceeded(payload, response)) {
+    console.warn(
+      "[customer-company] companyCreate userErrors:",
+      payload?.userErrors ?? response.errors,
+    );
+    return null;
+  }
+
+  const companyLocationId =
+    company.locations?.nodes?.[0]?.id ??
+    company.locations?.edges?.[0]?.node?.id ??
+    null;
+  let companyContactId =
+    company.mainContact?.id ?? company.contacts?.nodes?.[0]?.id ?? null;
+
+  if (!companyContactId) {
+    companyContactId = await createCompanyContact({
+      companyId: company.id,
+      customerId,
+    });
+  }
+
+  return {
+    companyId: String(company.id),
+    companyLocationId: companyLocationId ? String(companyLocationId) : null,
+    companyContactId: companyContactId ? String(companyContactId) : null,
+    companyName: String(company.name ?? companyName),
+  };
 }
 
 export async function createCompanyContact({
@@ -308,22 +498,17 @@ export async function createCompanyContact({
 }
 
 export async function assignCompanyLocationOrderingRole({
-  companyId,
   companyLocationId,
   companyContactId,
-  roles,
+  companyId,
 }: {
-  companyId: string;
   companyLocationId: string;
   companyContactId: string;
-  roles?: ContactRole[];
+  companyId?: string;
 }): Promise<boolean> {
-  const companyContactRoleId = await getOrderingRoleId(companyId, roles);
+  const companyContactRoleId = await getOrderingRoleId(companyId);
   if (!companyContactRoleId) {
-    console.warn(
-      "[customer-company] No ordering role found for company",
-      companyId,
-    );
+    console.warn("[customer-company] No Ordering only role found at runtime");
     return false;
   }
 
@@ -375,7 +560,6 @@ export async function assignCompanyLocationOrderingRole({
 
 async function ensureCompanyLocationRole(
   info: PartialCustomerCompany,
-  roles?: ContactRole[],
 ): Promise<PartialCustomerCompany> {
   if (
     info.locationRoleAssigned ||
@@ -390,7 +574,6 @@ async function ensureCompanyLocationRole(
     companyId: info.companyId,
     companyLocationId: info.companyLocationId,
     companyContactId: info.companyContactId,
-    roles,
   });
   return { ...info, locationRoleAssigned: assigned };
 }
@@ -458,18 +641,15 @@ export async function fetchCustomerCompanyFromShopify(
     };
   }
 
-  return ensureCompanyLocationRole(
-    {
-      shopifyCustomerId,
-      email: customer.email ?? null,
-      companyId: picked.companyId,
-      companyLocationId: picked.companyLocationId,
-      companyContactId: picked.companyContactId,
-      companyName: picked.companyName,
-      locationRoleAssigned: picked.locationRoleAssigned,
-    },
-    picked.roles,
-  );
+  return ensureCompanyLocationRole({
+    shopifyCustomerId,
+    email: customer.email ?? null,
+    companyId: picked.companyId,
+    companyLocationId: picked.companyLocationId,
+    companyContactId: picked.companyContactId,
+    companyName: picked.companyName,
+    locationRoleAssigned: picked.locationRoleAssigned,
+  });
 }
 
 export function extractPurchasingCompanyFromOrder(
