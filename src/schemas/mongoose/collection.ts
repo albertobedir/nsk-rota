@@ -10,6 +10,8 @@ export interface ICollection extends Document {
     gid: string;
   }[];
   productCount: number;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 const CollectionSchema = new Schema<ICollection>(

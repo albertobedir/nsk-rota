@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma/instance";
 import { computeTier } from "@/lib/utils/tier";
 import crypto from "crypto";
+import { getCustomerCompany } from "@/lib/shopify/customer-company";
 
 export const runtime = "nodejs";
 
@@ -300,6 +301,17 @@ export async function POST(req: NextRequest) {
       });
     } catch (e) {
       console.warn("Failed to upsert prisma.Customer:", e);
+    }
+
+    const shopifyCustomerGid = customer.admin_graphql_api_id
+      ? String(customer.admin_graphql_api_id).split("?")[0]
+      : customer.id
+        ? `gid://shopify/Customer/${customer.id}`
+        : null;
+    if (shopifyCustomerGid) {
+      getCustomerCompany(shopifyCustomerGid, { refresh: true }).catch((err) =>
+        console.warn("[webhook:user:update] customer company sync failed:", err),
+      );
     }
 
     return NextResponse.json({ success: true });

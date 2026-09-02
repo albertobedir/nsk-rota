@@ -7,14 +7,19 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import useSessionStore from "@/store/session-store";
 import {
+  canCollectPayment,
   formatCancelReason,
   getOrderStatusInfo,
   isOrderCancelled,
 } from "@/lib/orders/status";
 import {
+  FulfillmentStatusBadge,
   OrderProgress,
+  PaymentStatusBadges,
   StatusBadge,
 } from "@/components/orders/order-status";
+import { normalizeLineItemEdges } from "@/lib/orders/line-items";
+import { extractNumericId } from "@/lib/shopify/ids";
 
 type LineItem = {
   title: string;
@@ -65,166 +70,13 @@ export default function OrderDetailPage() {
 
         const src = d.data?.data?.node || null;
         if (!src) {
+          setError(d?.error || "Order not found");
           setOrder(null);
           return;
         }
 
         const raw = (src.raw || {}) as any;
-
-        // Normalize line items: convert raw.line_items -> { edges: [{ node: {...} }] }
-        const lineItemsEdges = ((): any[] => {
-          console.log("\n=== 📦 LINE ITEMS DEBUG (Frontend) ===");
-          console.log("src.lineItems:", JSON.stringify(src.lineItems, null, 2));
-          console.log("raw.lineItems:", JSON.stringify(raw.lineItems, null, 2));
-          console.log(
-            "raw.line_items:",
-            JSON.stringify(raw.line_items, null, 2),
-          );
-          console.log("typeof raw.line_items:", typeof raw.line_items);
-          console.log(
-            "Array.isArray(raw.line_items):",
-            Array.isArray(raw.line_items),
-          );
-          console.log("=== END DEBUG ===\n");
-
-          // GraphQL formatı (Mongo'dan gelen yeni kayıtlar)
-          if (src.lineItems?.edges) {
-            return src.lineItems.edges.map((e: any) => {
-              const node = e.node;
-              const originalPrice = Number(
-                node.originalUnitPriceSet?.shopMoney?.amount || 0,
-              );
-              const discountedPrice = Number(
-                node.discountedUnitPriceSet?.shopMoney?.amount || originalPrice,
-              );
-              const currencyCode =
-                node.originalUnitPriceSet?.shopMoney?.currencyCode || "USD";
-              const discountDescription =
-                node.discountAllocations?.[0]?.discountApplication
-                  ?.description ||
-                node.discountAllocations?.[0]?.discountApplication?.title ||
-                null;
-
-              return {
-                node: {
-                  ...node,
-                  originalUnitPrice: originalPrice,
-                  discountedUnitPrice: discountedPrice,
-                  discountDescription,
-                  variant: {
-                    ...node.variant,
-                    price: {
-                      amount: String(originalPrice),
-                      currencyCode,
-                    },
-                  },
-                },
-              };
-            });
-          }
-
-          // raw içinde GraphQL formatı
-          if (raw.lineItems?.edges) {
-            return raw.lineItems.edges.map((e: any) => {
-              const node = e.node;
-              const originalPrice = Number(
-                node.originalUnitPriceSet?.shopMoney?.amount || 0,
-              );
-              const discountedPrice = Number(
-                node.discountedUnitPriceSet?.shopMoney?.amount || originalPrice,
-              );
-              const currencyCode =
-                node.originalUnitPriceSet?.shopMoney?.currencyCode ||
-                raw.currency ||
-                "USD";
-              const discountDescription =
-                node.discountAllocations?.[0]?.discountApplication
-                  ?.description ||
-                node.discountAllocations?.[0]?.discountApplication?.title ||
-                null;
-
-              return {
-                node: {
-                  ...node,
-                  originalUnitPrice: originalPrice,
-                  discountedUnitPrice: discountedPrice,
-                  discountDescription,
-                  variant: {
-                    ...node.variant,
-                    price: {
-                      amount: String(originalPrice),
-                      currencyCode,
-                    },
-                  },
-                },
-              };
-            });
-          }
-
-          // REST formatı (eski kayıtlar)
-          const arr = Array.isArray(raw.line_items)
-            ? raw.line_items
-            : Array.isArray(raw.lineItems)
-              ? raw.lineItems
-              : [];
-
-          const discountApplications: any[] = raw.discount_applications || [];
-
-          // Safety check
-          if (!Array.isArray(arr)) {
-            console.warn("line_items is not an array, returning empty");
-            return [];
-          }
-
-          return arr.map((li: any) => {
-            // GraphQL formatı
-            const originalPrice = Number(
-              li.originalUnitPriceSet?.shopMoney?.amount || li.price || 0,
-            );
-            const discountedPrice = Number(
-              li.discountedUnitPriceSet?.shopMoney?.amount || originalPrice,
-            );
-            const currencyCode =
-              li.originalUnitPriceSet?.shopMoney?.currencyCode ||
-              raw.currency ||
-              "USD";
-
-            const discountDescription =
-              li.discountAllocations?.[0]?.discountApplication?.description ||
-              li.discountAllocations?.[0]?.discountApplication?.title ||
-              ((): string | null => {
-                const allocation = li.discount_allocations?.[0];
-                const appIndex = allocation?.discount_application_index ?? null;
-                const discountApp =
-                  appIndex != null ? discountApplications[appIndex] : null;
-                return discountApp?.description ?? discountApp?.title ?? null;
-              })() ||
-              null;
-
-            return {
-              node: {
-                title: li.title || li.name,
-                quantity: li.quantity ?? 1,
-                productId: li.product_id ?? null,
-                originalUnitPrice: originalPrice,
-                discountedUnitPrice: discountedPrice,
-                discountDescription,
-                discountValue:
-                  li.discountAllocations?.[0]?.allocatedAmountSet?.shopMoney
-                    ?.amount ?? null,
-                variant: {
-                  image: {
-                    url: li.variant?.image?.url || li.image?.src || null,
-                  },
-                  price: {
-                    amount: String(originalPrice),
-                    currencyCode,
-                  },
-                },
-              },
-            };
-          });
-        })();
+        const lineItemsEdges = normalizeLineItemEdges(src);
 
         const statusInfo = getOrderStatusInfo(src);
 
@@ -234,7 +86,12 @@ export default function OrderDetailPage() {
           orderNumber:
             src.orderNumber || src.order_number || raw.order_number || src.name,
           poNumber: src.poNumber || raw.po_number || raw.poNumber || null,
-          processedAt: src.processedAt || raw.processed_at || src.createdAt,
+          processedAt:
+            src.processedAt ||
+            raw.processed_at ||
+            raw.created_at ||
+            raw.createdAt ||
+            src.createdAt,
           financialStatus:
             src.financialStatus ||
             raw.displayFinancialStatus ||
@@ -320,10 +177,9 @@ export default function OrderDetailPage() {
       return;
     }
 
-    // Only pending, non-cancelled orders can be paid
-    if (order.cancelled || order.financialStatus?.toLowerCase() !== "pending") {
+    if (!order?.statusInfo || !canCollectPayment(order.statusInfo)) {
       toast.info(
-        order.cancelled
+        order?.cancelled
           ? "This order was cancelled."
           : "This order has already been paid.",
       );
@@ -471,13 +327,14 @@ export default function OrderDetailPage() {
             type="button"
             onClick={() => {
               const params = new URLSearchParams();
-              // Extract numeric ID from full GID if present
-              const numericId = (id as string).includes("/")
-                ? (id as string).split("/").pop() || (id as string)
-                : (id as string);
-              params.append("id", numericId as string);
-              if (user?.id) {
-                params.append("customerId", user.id);
+              const numericId =
+                extractNumericId(id as string) ||
+                extractNumericId(order?.shopifyId) ||
+                (id as string);
+              params.append("id", numericId);
+              const customerId = user?.shopifyCustomerId || user?.id;
+              if (customerId) {
+                params.append("customerId", customerId);
               }
               if (userDiscount) {
                 params.append("discount", String(userDiscount));
@@ -493,8 +350,8 @@ export default function OrderDetailPage() {
             onClick={handlePayOrder}
             disabled={
               !order ||
-              order.cancelled ||
-              order.financialStatus?.toLowerCase() !== "pending"
+              !order.statusInfo ||
+              !canCollectPayment(order.statusInfo)
             }
             className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 hover:brightness-110 transition"
           >
@@ -537,12 +394,10 @@ export default function OrderDetailPage() {
             <div>
               <div className="text-sm text-slate-600">Payment</div>
               <div className="mt-1">
-                {order.cancelled ? (
-                  <StatusBadge label="Cancelled" tone="danger" />
-                ) : order.statusInfo ? (
-                  <StatusBadge
-                    label={order.statusInfo.paymentLabel}
-                    tone={order.statusInfo.paymentTone}
+                {order.statusInfo ? (
+                  <PaymentStatusBadges
+                    info={order.statusInfo}
+                    showCancelled={false}
                   />
                 ) : (
                   <span className="font-medium">
@@ -560,10 +415,7 @@ export default function OrderDetailPage() {
               <div className="text-sm text-slate-600">Shipment</div>
               <div className="mt-1">
                 {order.statusInfo ? (
-                  <StatusBadge
-                    label={order.statusInfo.shipmentLabel}
-                    tone={order.statusInfo.shipmentTone}
-                  />
+                  <FulfillmentStatusBadge info={order.statusInfo} />
                 ) : (
                   <span className="font-medium">
                     {order.fulfillmentStatus || "-"}

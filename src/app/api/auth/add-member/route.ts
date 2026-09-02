@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma/instance";
 import { shopifyAdminFetch } from "@/lib/shopify/instance";
+import { saveCustomerCompany } from "@/lib/shopify/customer-company";
 
 type CreateUserBody = {
   email: string;
@@ -199,6 +200,8 @@ export async function POST(req: Request) {
 
     console.log("Step 4.6: Creating company for customer");
     let shopifyCompanyId: string | null = null;
+    let companyLocationId: string | null = null;
+    let companyContactId: string | null = null;
     try {
       const companyRes = await fetch(
         `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-01/graphql.json`,
@@ -250,6 +253,10 @@ export async function POST(req: Request) {
         );
       } else {
         shopifyCompanyId = company?.id || null;
+        companyLocationId =
+          company?.locations?.edges?.[0]?.node?.id ||
+          company?.locations?.nodes?.[0]?.id ||
+          null;
       }
 
       if (company?.id) {
@@ -298,6 +305,9 @@ export async function POST(req: Request) {
               contactData.data.companyAssignCustomerAsContact.userErrors,
             );
           } else {
+            companyContactId =
+              contactData.data?.companyAssignCustomerAsContact?.companyContact
+                ?.id || null;
             console.log("Step 4.7: Customer assigned as contact successfully");
           }
         } catch (contactErr) {
@@ -352,6 +362,23 @@ export async function POST(req: Request) {
       console.warn(
         "Step 5 Warning: Webhook has not persisted the user yet; Shopify customer was created",
         shopifyCustomerId,
+      );
+    }
+
+    try {
+      await saveCustomerCompany({
+        shopifyCustomerId,
+        email,
+        companyId: shopifyCompanyId,
+        companyLocationId,
+        companyContactId,
+        companyName,
+      });
+      console.log("Step 5.1: Saved customer company to MongoDB");
+    } catch (mongoErr) {
+      console.warn(
+        "Step 5.1 Warning: Failed to save MongoDB customer:",
+        mongoErr,
       );
     }
 

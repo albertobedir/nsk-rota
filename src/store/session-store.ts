@@ -36,6 +36,9 @@ export interface SessionUser {
   // Company information
   companyName?: string | null;
   shopifyCompanyId?: string | null;
+  companyId?: string | null;
+  companyLocationId?: string | null;
+  companyContactId?: string | null;
   companyAddress1?: string | null;
   companyCity?: string | null;
   companyState?: string | null;

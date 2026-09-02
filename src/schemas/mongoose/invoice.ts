@@ -24,6 +24,8 @@ export interface IInvoice extends Document {
   note?: string;
   discountCodes?: any[];
   raw?: Record<string, unknown>;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 const InvoiceSchema = new Schema<IInvoice>(

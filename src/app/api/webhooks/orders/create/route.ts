@@ -5,6 +5,23 @@ import { connectDB } from "@/lib/mongoose/instance";
 import Order from "@/schemas/mongoose/order";
 import nodemailer from "nodemailer";
 import { resolveOrderPoNumber } from "@/lib/shopify/order-webhook";
+import {
+  fetchOrderPaymentDetails,
+  markOrderCreditDeducted,
+  orderUsesMyCredits,
+  parseMoneyMetafield,
+  updateCustomerCredit,
+} from "@/lib/shopify/customer-credit";
+import {
+  extractPurchasingCompanyFromOrder,
+  getCustomerCompany,
+  saveCustomerCompany,
+} from "@/lib/shopify/customer-company";
+import {
+  appendPoNumberToNote,
+  noteAlreadyHasPoNumber,
+} from "@/lib/shopify/po-note";
+import { updateOrderNote } from "@/lib/shopify/order";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -294,229 +311,6 @@ function verifyShopifyWebhook(req: NextRequest, rawBody: string) {
   return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(hmacHeader));
 }
 
-async function fetchOrderPaymentGateway(orderId: string) {
-  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
-  const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
-
-  const query = `
-    query getOrder($id: ID!) {
-      order(id: $id) {
-        paymentGatewayNames
-        paymentCollectionDetails {
-          additionalPaymentCollectionUrl
-        }
-        customer {
-          id
-          creditLimit: metafield(namespace: "custom", key: "credit_limit") {
-            value
-          }
-          creditRemaining: metafield(namespace: "custom", key: "credit_remaining") {
-            value
-          }
-          creditUsed: metafield(namespace: "custom", key: "credit_used") {
-            value
-          }
-        }
-        transactions {
-          gateway
-          kind
-          status
-        }
-      }
-    }
-  `;
-
-  const response = await fetch(
-    `https://${shopifyDomain}/admin/api/2024-10/graphql.json`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": accessToken!,
-      },
-      body: JSON.stringify({ query, variables: { id: orderId } }),
-    },
-  );
-
-  const data = await response.json();
-
-  if (data.errors) {
-    console.error("GraphQL errors:", data.errors);
-    return null;
-  }
-
-  return data.data?.order || null;
-}
-
-async function updateCustomerCredit(
-  customerId: string,
-  orderAmount: number,
-  currencyCode: string,
-) {
-  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
-  const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
-
-  if (!shopifyDomain || !accessToken) {
-    return {
-      success: false,
-      errors: [{ message: "Missing Shopify config" }],
-    };
-  }
-
-  if (!customerId || Number.isNaN(orderAmount) || orderAmount <= 0) {
-    return {
-      success: false,
-      errors: [{ message: "Invalid customerId or orderAmount" }],
-    };
-  }
-
-  const getQuery = `
-    query getCustomer($id: ID!) {
-      customer(id: $id) {
-        creditRemaining: metafield(namespace: "custom", key: "credit_remaining") {
-          value
-        }
-        creditUsed: metafield(namespace: "custom", key: "credit_used") {
-          value
-        }
-      }
-    }
-  `;
-
-  const getResponse = await fetch(
-    `https://${shopifyDomain}/admin/api/2024-10/graphql.json`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": accessToken,
-      },
-      body: JSON.stringify({ query: getQuery, variables: { id: customerId } }),
-    },
-  );
-
-  const getData = await getResponse.json();
-  if (getData.errors) {
-    return { success: false, errors: getData.errors };
-  }
-
-  const customer = getData.data?.customer;
-
-  // Parse money metafields (JSON string: { amount, currency_code })
-  let currentRemaining = 0;
-  let currentUsed = 0;
-
-  try {
-    const remainingData = JSON.parse(
-      customer?.creditRemaining?.value || '{"amount":"0"}',
-    );
-    currentRemaining = Number.parseFloat(remainingData.amount || "0");
-  } catch (e) {
-    console.error("Error parsing credit_remaining:", e);
-  }
-
-  try {
-    const usedData = JSON.parse(
-      customer?.creditUsed?.value || '{"amount":"0"}',
-    );
-    currentUsed = Number.parseFloat(usedData.amount || "0");
-  } catch (e) {
-    console.error("Error parsing credit_used:", e);
-  }
-
-  const newRemaining = currentRemaining - orderAmount;
-  const newUsed = currentUsed + orderAmount;
-
-  console.log("=== CREDIT UPDATE ===");
-  console.log("Current Remaining:", currentRemaining);
-  console.log("Current Used:", currentUsed);
-  console.log("Order Amount:", orderAmount);
-  console.log("New Remaining:", newRemaining);
-  console.log("New Used:", newUsed);
-
-  const remainingMoneyValue = JSON.stringify({
-    amount: newRemaining.toFixed(2),
-    currency_code: currencyCode,
-  });
-
-  const usedMoneyValue = JSON.stringify({
-    amount: newUsed.toFixed(2),
-    currency_code: currencyCode,
-  });
-
-  const updateMutation = `
-    mutation updateCustomerMetafields($input: CustomerInput!) {
-      customerUpdate(input: $input) {
-        customer {
-          id
-          creditRemaining: metafield(namespace: "custom", key: "credit_remaining") {
-            value
-          }
-          creditUsed: metafield(namespace: "custom", key: "credit_used") {
-            value
-          }
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-  `;
-
-  const updateResponse = await fetch(
-    `https://${shopifyDomain}/admin/api/2024-10/graphql.json`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": accessToken,
-      },
-      body: JSON.stringify({
-        query: updateMutation,
-        variables: {
-          input: {
-            id: customerId,
-            metafields: [
-              {
-                namespace: "custom",
-                key: "credit_remaining",
-                value: remainingMoneyValue,
-                type: "money",
-              },
-              {
-                namespace: "custom",
-                key: "credit_used",
-                value: usedMoneyValue,
-                type: "money",
-              },
-            ],
-          },
-        },
-      }),
-    },
-  );
-
-  const updateData = await updateResponse.json();
-
-  if (updateData.errors) {
-    return { success: false, errors: updateData.errors };
-  }
-
-  if (updateData.data?.customerUpdate?.userErrors?.length > 0) {
-    console.error("Update errors:", updateData.data.customerUpdate.userErrors);
-    return {
-      success: false,
-      errors: updateData.data.customerUpdate.userErrors,
-    };
-  }
-
-  console.log("Credit updated successfully");
-  console.log("New Remaining Value:", remainingMoneyValue);
-  console.log("New Used Value:", usedMoneyValue);
-  return { success: true, newRemaining, newUsed };
-}
-
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
@@ -538,6 +332,9 @@ export async function POST(req: NextRequest) {
     }
 
     const orderData = JSON.parse(rawBody);
+    const shopifyId = orderData.admin_graphql_api_id
+      ? String(orderData.admin_graphql_api_id).split("?")[0]
+      : `gid://shopify/Order/${orderData.id}`;
 
     // Guard against fulfillment events being sent to orders/create
     if (
@@ -560,10 +357,6 @@ export async function POST(req: NextRequest) {
     // 💾 MongoDB'ye kaydet
     try {
       await connectDB();
-
-      const shopifyId = orderData.admin_graphql_api_id
-        ? String(orderData.admin_graphql_api_id).split("?")[0]
-        : `gid://shopify/Order/${orderData.id}`;
 
       const orderNumber = orderData.order_number
         ? Number(orderData.order_number)
@@ -589,11 +382,36 @@ export async function POST(req: NextRequest) {
 
       // Payment gateway bilgisini GraphQL ile çek (MongoDB'ye kaydetmeden önce)
       try {
-        orderDetails = await fetchOrderPaymentGateway(
+        orderDetails = await fetchOrderPaymentDetails(
           orderData.admin_graphql_api_id,
         );
       } catch (fetchErr) {
         console.error("Fetch order details error:", fetchErr);
+      }
+
+      const poNumber = resolveOrderPoNumber(orderData);
+      if (poNumber && !noteAlreadyHasPoNumber(orderData.note, poNumber)) {
+        try {
+          const nextNote = appendPoNumberToNote(orderData.note, poNumber);
+          const updated = await updateOrderNote(shopifyId, nextNote);
+          if (updated?.userErrors?.length) {
+            console.error(
+              "[PO note] orderUpdate userErrors:",
+              updated.userErrors,
+            );
+          } else {
+            orderData.note = nextNote;
+            console.log(
+              "[PO note] Appended PO Number to Shopify order note:",
+              poNumber,
+            );
+          }
+        } catch (poNoteErr) {
+          console.error(
+            "[PO note] Failed to append PO to order note:",
+            poNoteErr,
+          );
+        }
       }
 
       await Order.findOneAndUpdate(
@@ -615,7 +433,7 @@ export async function POST(req: NextRequest) {
               ? new Date(orderData.cancelled_at)
               : null,
             cancelReason: orderData.cancel_reason ?? null,
-            poNumber: resolveOrderPoNumber(orderData),
+            poNumber,
             raw: orderData,
           },
         },
@@ -623,6 +441,31 @@ export async function POST(req: NextRequest) {
       );
 
       console.log("✅ Order saved to MongoDB:", shopifyId);
+
+      try {
+        const fromOrder = extractPurchasingCompanyFromOrder(
+          orderData,
+          customerGid,
+        );
+        if (
+          fromOrder &&
+          (fromOrder.companyId ||
+            fromOrder.companyLocationId ||
+            fromOrder.companyContactId ||
+            fromOrder.companyName)
+        ) {
+          await saveCustomerCompany(fromOrder);
+        }
+        if (customerGid) {
+          const companyInfo = await getCustomerCompany(customerGid);
+          console.log("[orders/create] Customer company synced:", companyInfo);
+        }
+      } catch (companyErr) {
+        console.warn(
+          "[orders/create] Customer company sync failed:",
+          companyErr,
+        );
+      }
     } catch (dbErr) {
       // DB hatası webhook'u bloklamamalı
       console.error("❌ MongoDB upsert error:", dbErr);
@@ -684,11 +527,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Manuel ödeme kontrolü
-    const order = orderData;
-    const isManualPayment =
-      order.payment_gateway_names?.includes("Use My Credits");
-    const isManualPaymentResolved =
-      isManualPayment || orderDetails?.paymentGatewayNames?.includes("manual");
+    const isManualPaymentResolved = orderUsesMyCredits(
+      orderData.payment_gateway_names,
+      orderDetails?.paymentGatewayNames,
+    );
 
     console.log("=== PAYMENT CHECK ===");
     console.log("Is Manual Payment:", isManualPaymentResolved);
@@ -701,20 +543,28 @@ export async function POST(req: NextRequest) {
       console.log("Customer ID:", orderData.customer?.id);
       console.log("Amount to decrease:", orderData.total_price);
 
+      await connectDB();
+      const existingCreditOrder = await Order.findOne({ shopifyId });
+      if (existingCreditOrder?.creditDeducted) {
+        console.log(
+          "✅ Credit already deducted for this order — skipping duplicate deduct",
+          shopifyId,
+        );
+        return NextResponse.json({
+          status: "ok",
+          orderId: orderData.id,
+          orderNumber: orderData.order_number,
+          skipped: "credit_already_deducted",
+        });
+      }
+
       const customerGid = orderDetails?.customer?.id;
       const amount = Number.parseFloat(String(orderData.total_price ?? "0"));
       const currencyCode = String(orderData.currency || "USD");
 
-      // ✅ NEW: Kredi yeterlilik kontrolü
-      let currentRemaining = 0;
-      try {
-        const remainingData = JSON.parse(
-          orderDetails?.customer?.creditRemaining?.value || '{"amount":"0"}',
-        );
-        currentRemaining = Number.parseFloat(remainingData.amount || "0");
-      } catch (e) {
-        console.error("Error parsing credit_remaining for check:", e);
-      }
+      const currentRemaining = parseMoneyMetafield(
+        orderDetails?.customer?.creditRemaining?.value,
+      );
 
       if (currentRemaining < amount) {
         console.log(
@@ -763,6 +613,20 @@ export async function POST(req: NextRequest) {
       console.log("Credit update result:", creditUpdateResult);
 
       if (creditUpdateResult?.success) {
+        try {
+          await markOrderCreditDeducted({
+            shopifyId,
+            amount,
+            currencyCode,
+            financialStatus: orderData.financial_status,
+          });
+        } catch (markErr) {
+          console.error(
+            "[credit-deduct] Failed to persist credit flags:",
+            markErr,
+          );
+        }
+
         try {
           await sendAdminInvoiceEmail({
             orderId: orderData.admin_graphql_api_id,

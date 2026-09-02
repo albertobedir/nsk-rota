@@ -23,17 +23,23 @@ export async function POST(req: NextRequest) {
       ? String(orderData.admin_graphql_api_id).split("?")[0]
       : `gid://shopify/Order/${orderData.id}`;
 
-    console.log("📦 orders/update webhook:", shopifyIdHint);
+    console.log("📦 orders/paid webhook:", shopifyIdHint);
 
-    const { shopifyId, result, cancelledAt, financialStatus, fulfillmentStatus, previousFinancialStatus } =
-      await applyShopifyOrderUpdate(orderData, { upsert: false });
+    const {
+      shopifyId,
+      result,
+      cancelledAt,
+      financialStatus,
+      fulfillmentStatus,
+      previousFinancialStatus,
+    } = await applyShopifyOrderUpdate(orderData, { upsert: false });
 
     if (!result) {
       console.warn("⚠️ Order not found in DB:", shopifyId);
       return NextResponse.json({ status: "ok", shopifyId, skipped: "not_found" });
     }
 
-    console.log("✅ Order updated:", shopifyId, {
+    console.log("✅ Order paid:", shopifyId, {
       fulfillmentStatus,
       financialStatus,
       cancelledAt,
@@ -51,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ status: "ok", shopifyId, creditRestore });
   } catch (err) {
-    console.error("orders/update webhook error:", err);
+    console.error("orders/paid webhook error:", err);
     return NextResponse.json(
       { error: (err as Error).message },
       { status: 500 },

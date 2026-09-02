@@ -4,6 +4,8 @@ export interface IProduct extends Document {
   shopifyId: number;
   raw: Record<string, unknown>;
   originalPrice?: number; // Store original/base price before customer pricing
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 const ProductSchema = new Schema<IProduct>(

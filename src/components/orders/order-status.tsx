@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 import {
   isDelivered,
   isPaymentComplete,
-  isShipped,
   type OrderStatusInfo,
   type StatusTone,
 } from "@/lib/orders/status";
@@ -41,6 +40,35 @@ export function StatusBadge({
   );
 }
 
+export function PaymentStatusBadges({
+  info,
+  showCancelled = true,
+}: {
+  info: OrderStatusInfo;
+  showCancelled?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {showCancelled && info.cancelled ? (
+        <StatusBadge label="Cancelled" tone="danger" />
+      ) : null}
+      <StatusBadge label={info.paymentLabel} tone={info.paymentTone} />
+      {info.paymentWarning ? (
+        <StatusBadge
+          label={info.paymentWarning.label}
+          tone={info.paymentWarning.tone}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+export function FulfillmentStatusBadge({ info }: { info: OrderStatusInfo }) {
+  return (
+    <StatusBadge label={info.shipmentLabel} tone={info.shipmentTone} />
+  );
+}
+
 export function OrderStatusBadges({
   info,
   stacked = false,
@@ -48,18 +76,15 @@ export function OrderStatusBadges({
   info: OrderStatusInfo;
   stacked?: boolean;
 }) {
-  if (info.cancelled) {
-    return (
-      <div className={cn("flex flex-wrap gap-1.5", stacked && "flex-col items-start")}>
-        <StatusBadge label="Cancelled" tone="danger" />
-      </div>
-    );
-  }
-
   return (
-    <div className={cn("flex flex-wrap gap-1.5", stacked && "flex-col items-start")}>
-      <StatusBadge label={info.paymentLabel} tone={info.paymentTone} />
-      <StatusBadge label={info.shipmentLabel} tone={info.shipmentTone} />
+    <div
+      className={cn(
+        "flex flex-wrap gap-1.5",
+        stacked && "flex-col items-start",
+      )}
+    >
+      <PaymentStatusBadges info={info} />
+      <FulfillmentStatusBadge info={info} />
     </div>
   );
 }
@@ -71,13 +96,13 @@ export function OrderProgress({ info }: { info: OrderStatusInfo }) {
     { key: "ordered", label: "Ordered", done: true },
     {
       key: "paid",
-      label: info.paymentKey === "pending" ? "Paid" : info.paymentLabel,
+      label: info.paymentLabel,
       done: isPaymentComplete(info.paymentKey),
     },
     {
       key: "shipped",
-      label: "Shipped",
-      done: isShipped(info.shipmentKey),
+      label: "Fulfilled",
+      done: info.shipmentKey === "fulfilled" || isDelivered(info.shipmentKey),
     },
     {
       key: "delivered",
@@ -98,7 +123,8 @@ export function OrderProgress({ info }: { info: OrderStatusInfo }) {
       </div>
       <ol className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {steps.map((step, index) => {
-          const active = index === currentIndex && !steps[steps.length - 1].done;
+          const active =
+            index === currentIndex && !steps[steps.length - 1].done;
           return (
             <li key={step.key} className="flex items-center gap-2">
               <span

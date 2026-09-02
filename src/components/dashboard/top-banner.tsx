@@ -13,6 +13,8 @@ export default function TopBanner() {
 
     if (p.startsWith("/profile/invoices"))
       return { title: "Invoices", rotaNo: "" };
+    if (p.startsWith("/profile/order-history"))
+      return { title: "Order History", rotaNo: "" };
     if (p.startsWith("/profile/account-statement"))
       return { title: "Account Statement", rotaNo: "" };
     if (p.startsWith("/profile/payment"))

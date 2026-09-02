@@ -5,8 +5,8 @@ import useSessionStore from "@/store/session-store";
 import Link from "next/link";
 import { getOrderStatusInfo, type OrderStatusInfo } from "@/lib/orders/status";
 import {
-  OrderStatusBadges,
-  StatusBadge,
+  FulfillmentStatusBadge,
+  PaymentStatusBadges,
 } from "@/components/orders/order-status";
 
 type Order = {
@@ -34,6 +34,7 @@ export default function OrderHistoryPage() {
   const [error, setError] = useState<string | null>(null);
 
   const user = useSessionStore((s) => s.user);
+  const customerKey = user?.shopifyCustomerId || user?.id || "";
 
   const clearFilters = () => {
     setOrderNo("");
@@ -44,16 +45,15 @@ export default function OrderHistoryPage() {
     setLoading(true);
     setError(null);
     try {
-      if (!user?.id) {
+      if (!customerKey) {
         setOrders([]);
         setError("Not logged in or missing customer info.");
         setLoading(false);
         return;
       }
 
-      const shopifyId = user.shopifyCustomerId || user.id;
       const res = await fetch(
-        `/api/orders?customerId=${encodeURIComponent(shopifyId)}`,
+        `/api/orders?customerId=${encodeURIComponent(customerKey)}`,
       );
       if (res.status === 401) {
         setOrders([]);
@@ -95,9 +95,11 @@ export default function OrderHistoryPage() {
             ? fullId.split("/").pop() || fullId
             : fullId;
           const orderDate = o.createdAt || o.raw?.created_at || "";
-          const total = o.raw?.total_price
-            ? `${o.raw.total_price} ${o.raw.currency || "USD"}`
-            : "";
+          const total = o.totalPrice?.amount
+            ? `${o.totalPrice.amount} ${o.totalPrice.currencyCode || o.raw?.currency || "USD"}`
+            : o.raw?.total_price
+              ? `${o.raw.total_price} ${o.raw.currency || "USD"}`
+              : "";
           const shipping = o.shippingAddress || o.shipping_address;
           const deliveryAddress = shipping
             ? `${shipping.address1 || ""}${
@@ -151,7 +153,7 @@ export default function OrderHistoryPage() {
   useEffect(() => {
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [customerKey]);
 
   const rows = orders.filter((o) => {
     if (orderNo && !o.orderNo.includes(orderNo)) return false;
@@ -238,7 +240,17 @@ export default function OrderHistoryPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
+              {rows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-6 py-8 text-center text-sm text-slate-500"
+                  >
+                    No orders found.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((r, i) => (
                 <tr
                   key={`${r.orderNo ?? r.id ?? ""}-${i}`}
                   className={
@@ -271,24 +283,10 @@ export default function OrderHistoryPage() {
                     {r.total}
                   </td>
                   <td className="px-6 py-4 text-sm">
-                    {r.cancelled ? (
-                      <OrderStatusBadges info={r.statusInfo} />
-                    ) : (
-                      <StatusBadge
-                        label={r.statusInfo.paymentLabel}
-                        tone={r.statusInfo.paymentTone}
-                      />
-                    )}
+                    <PaymentStatusBadges info={r.statusInfo} />
                   </td>
                   <td className="px-6 py-4 text-sm">
-                    {r.cancelled ? (
-                      <span className="text-slate-400">-</span>
-                    ) : (
-                      <StatusBadge
-                        label={r.statusInfo.shipmentLabel}
-                        tone={r.statusInfo.shipmentTone}
-                      />
-                    )}
+                    <FulfillmentStatusBadge info={r.statusInfo} />
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-700">
                     {r.tracking ? (
@@ -319,7 +317,8 @@ export default function OrderHistoryPage() {
                     {r.deliveryAddress || "-"}
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         )}

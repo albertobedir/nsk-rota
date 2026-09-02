@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { maybeRestoreCreditWhenPaid } from "@/lib/shopify/customer-credit";
 import {
   applyShopifyOrderUpdate,
   verifyShopifyWebhook,
@@ -24,20 +25,31 @@ export async function POST(req: NextRequest) {
 
     console.log("📦 orders/updated webhook:", shopifyIdHint);
 
-    const { shopifyId, result, cancelledAt, financialStatus, fulfillmentStatus } =
+    const { shopifyId, result, cancelledAt, financialStatus, fulfillmentStatus, previousFinancialStatus } =
       await applyShopifyOrderUpdate(orderData, { upsert: false });
 
     if (!result) {
       console.warn("⚠️ Order not found in DB:", shopifyId);
-    } else {
-      console.log("✅ Order updated:", shopifyId, {
-        fulfillmentStatus,
-        financialStatus,
-        cancelledAt,
-      });
+      return NextResponse.json({ status: "ok", shopifyId, skipped: "not_found" });
     }
 
-    return NextResponse.json({ status: "ok", shopifyId });
+    console.log("✅ Order updated:", shopifyId, {
+      fulfillmentStatus,
+      financialStatus,
+      cancelledAt,
+    });
+
+    const creditRestore = await maybeRestoreCreditWhenPaid({
+      shopifyId,
+      orderData,
+      previousFinancialStatus,
+    });
+
+    if (creditRestore.restored) {
+      console.log("🟢 Credit restored after invoice paid:", shopifyId);
+    }
+
+    return NextResponse.json({ status: "ok", shopifyId, creditRestore });
   } catch (err) {
     console.error("orders/updated webhook error:", err);
     return NextResponse.json(

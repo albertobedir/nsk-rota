@@ -10,6 +10,10 @@ import prisma from "@/lib/prisma/instance";
 import { shopifyFetch } from "@/lib/shopify/instance";
 import { createCart, getCart } from "@/lib/shopify/cart";
 import { getShopifyCustomerIdByEmail } from "@/lib/shopify-customer";
+import {
+  getCustomerCompany,
+  toSessionCompanyFields,
+} from "@/lib/shopify/customer-company";
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET!;
@@ -137,6 +141,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const shopifyCustomerId =
+      user.shopifyCustomerId || shopifyCustomer.id || null;
+    let companyFields = {
+      ...toSessionCompanyFields(null),
+      companyName: user.companyName ?? null,
+      shopifyCompanyId: user.shopifyCompanyId ?? null,
+      companyId: user.shopifyCompanyId ?? null,
+    };
+    if (shopifyCustomerId) {
+      try {
+        const companyInfo = await getCustomerCompany(shopifyCustomerId, {
+          refresh: true,
+        });
+        companyFields = {
+          ...toSessionCompanyFields(companyInfo),
+          companyName:
+            companyInfo?.companyName ?? user.companyName ?? null,
+          shopifyCompanyId:
+            companyInfo?.companyId ?? user.shopifyCompanyId ?? null,
+          companyId: companyInfo?.companyId ?? user.shopifyCompanyId ?? null,
+        };
+        console.log("🏢 Customer company:", companyFields);
+      } catch (companyErr) {
+        console.warn("Failed to sync customer company on login:", companyErr);
+      }
+    }
+
     const accessToken = jwt.sign(
       { id: user.id, email: user.email },
       ACCESS_TOKEN_SECRET,
@@ -170,6 +201,8 @@ export async function POST(request: NextRequest) {
         lastName: user.lastName,
         role: user.role,
         // include Shopify tags if available so client can populate zustand
+        shopifyCustomerId,
+        ...companyFields,
         tags: shopifyCustomer.tags ?? [],
         tier:
           Array.isArray(shopifyCustomer.tags) &&

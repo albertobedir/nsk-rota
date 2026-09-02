@@ -48,6 +48,12 @@ export async function applyShopifyOrderUpdate(
   await connectDB();
 
   const shopifyId = resolveShopifyId(orderData);
+  const existing = await Order.findOne({ shopifyId }).lean();
+  const previousFinancialStatus =
+    existing?.financialStatus ??
+    (typeof existing?.raw?.financial_status === "string"
+      ? existing.raw.financial_status
+      : null);
   const fulfillments: any[] = orderData.fulfillments ?? [];
   const latestFulfillment = fulfillments[fulfillments.length - 1];
 
@@ -103,5 +109,12 @@ export async function applyShopifyOrderUpdate(
     { upsert, new: true },
   );
 
-  return { shopifyId, result, cancelledAt, financialStatus, fulfillmentStatus };
+  return {
+    shopifyId,
+    result,
+    cancelledAt,
+    financialStatus,
+    fulfillmentStatus,
+    previousFinancialStatus,
+  };
 }

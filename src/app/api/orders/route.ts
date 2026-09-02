@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongoose/instance";
 import Order from "@/schemas/mongoose/order";
 import {
+  buildCustomerOrderMongoQuery,
+  resolveCustomerIdentity,
+} from "@/lib/orders/customer";
+import { formatOrderMoney } from "@/lib/orders/line-items";
+import {
   formatCancelReason,
   formatOrderStatus,
   getOrderStatusInfo,
@@ -23,32 +28,22 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const identity = await resolveCustomerIdentity(customerId);
+    if (!identity) {
+      return NextResponse.json(
+        { ok: false, error: "Missing customerId" },
+        { status: 400 },
+      );
+    }
+
     await connectDB();
 
-    // GID veya numeric ID her ikisini de handle et
-    const numericId = customerId.includes("gid://")
-      ? Number(customerId.split("/").pop())
-      : Number(customerId);
-
-    const customerGid = customerId.startsWith("gid://")
-      ? customerId
-      : Number.isNaN(numericId)
-        ? null
-        : `gid://shopify/Customer/${numericId}`;
-
-    const query: Record<string, unknown> = Number.isNaN(numericId)
-      ? { customerId: customerGid || customerId }
-      : {
-          $or: [
-            { "raw.customer.id": numericId },
-            ...(customerGid ? [{ customerId: customerGid }] : []),
-          ],
-        };
-
+    const query = buildCustomerOrderMongoQuery(identity);
     const orders = await Order.find(query).sort({ createdAt: -1 }).lean();
 
     const mapped = orders.map((order) => {
       const statusInfo = getOrderStatusInfo(order);
+      const money = formatOrderMoney(order);
 
       return {
         ...order,
@@ -69,6 +64,10 @@ export async function GET(req: NextRequest) {
         shipmentKey: statusInfo.shipmentKey,
         trackings: statusInfo.trackings,
         status: formatOrderStatus(order),
+        totalPrice: {
+          amount: money.amount || null,
+          currencyCode: money.currency,
+        },
       };
     });
 

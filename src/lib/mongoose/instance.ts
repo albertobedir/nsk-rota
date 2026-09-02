@@ -2,6 +2,7 @@ import mongoose, { Mongoose } from "mongoose";
 import Product from "@/schemas/mongoose/product"; // Mongoose model
 import Order from "@/schemas/mongoose/order";
 import Collection from "@/schemas/mongoose/collection";
+import Customer from "@/schemas/mongoose/customer";
 
 const MONGO_URL = process.env.MONGO_URL;
 
@@ -60,6 +61,16 @@ export async function connectDB() {
     console.log("✅ Order collection indexes created!");
   } catch (err) {
     console.error("❌ Failed to create Order indexes:", err);
+  }
+
+  try {
+    await Customer.collection.createIndex(
+      { shopifyCustomerId: 1 },
+      { unique: true },
+    );
+    console.log("✅ Customer collection indexes created!");
+  } catch (err) {
+    console.error("❌ Failed to create Customer indexes:", err);
   }
 
   return cached.conn;

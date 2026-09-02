@@ -3,138 +3,135 @@
 import { useEffect, useState } from "react";
 import useSessionStore from "@/store/session-store";
 import Link from "next/link";
+import { extractNumericId } from "@/lib/shopify/ids";
+import { getOrderStatusInfo, type OrderStatusInfo } from "@/lib/orders/status";
+import {
+  FulfillmentStatusBadge,
+  PaymentStatusBadges,
+} from "@/components/orders/order-status";
 
-type Order = {
-  orderNo: string;
-  id?: string;
+type InvoiceRow = {
+  id: string;
+  invoiceNumber: string;
   poNumber?: string | null;
-  orderDate: string;
+  invoiceDate: string;
   total: string;
-  tracking?: string;
-  trackingUrl?: string;
-  warehouse?: string;
   deliveryAddress?: string;
+  cancelled?: boolean;
+  statusInfo: OrderStatusInfo;
 };
 
-export default function OrderHistoryPage() {
-  const [orderNo, setOrderNo] = useState("");
-  const [trackingNo, setTrackingNo] = useState("");
+function formatDate(value?: string | null) {
+  if (!value) return "-";
+  return String(value).slice(0, 10);
+}
 
-  const [orders, setOrders] = useState<Order[]>([]);
+function formatAddress(addr: any) {
+  if (!addr) return "";
+  return `${addr.address1 || ""}${addr.city ? ", " + addr.city : ""}${
+    addr.zip ? " " + addr.zip : ""
+  }${addr.country ? ", " + addr.country : ""}`.trim();
+}
+
+export default function InvoicesPage() {
+  const [orderNo, setOrderNo] = useState("");
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const user = useSessionStore((s) => s.user);
+  const customerKey = user?.shopifyCustomerId || user?.id || "";
 
   const clearFilters = () => {
     setOrderNo("");
-    setTrackingNo("");
   };
 
-  async function fetchOrders() {
+  async function fetchInvoices() {
     setLoading(true);
     setError(null);
     try {
-      if (!user?.id) {
-        setOrders([]);
+      if (!customerKey) {
+        setInvoices([]);
         setError("Not logged in or missing customer info.");
         setLoading(false);
         return;
       }
 
       const res = await fetch(
-        `/api/orders?customerId=${encodeURIComponent(user.id)}`,
+        `/api/invoices?customerId=${encodeURIComponent(customerKey)}`,
       );
       if (res.status === 401) {
-        setOrders([]);
+        setInvoices([]);
         setError("Not logged in or missing customer info.");
         setLoading(false);
         return;
       }
       const data = await res.json();
 
-      // 🔍 DEBUG: Log API response
-      console.log("📦 API response:", data);
-      console.log("Orders array:", data.orders);
-      console.log("Orders count:", data.orders?.length);
-
       if (!data?.ok) {
-        setError(data?.error || "Failed to fetch orders");
-        setOrders([]);
+        setError(data?.error || "Failed to fetch invoices");
+        setInvoices([]);
         setLoading(false);
         return;
       }
 
-      const mapped: Order[] = (data.orders || [])
-        .filter((o: any) => !o.cancelled)
-        .map((o: any) => {
-        const orderNo = o.name || o.order_number || o.id || "";
-        // Extract numeric ID from full GID (e.g., "gid://shopify/Order/6614677946439" → "6614677946439")
-        const fullId = o.shopifyId || o.id || "";
-        const id = fullId.includes("/")
-          ? fullId.split("/").pop() || fullId
-          : fullId;
-        const orderDate = o.createdAt || o.raw?.created_at || "";
-        const total = o.raw?.total_price
-          ? `${o.raw.total_price} ${o.raw.currency || "USD"}`
-          : "";
-        const shipping = o.shippingAddress || o.shipping_address;
-        const deliveryAddress = shipping
-          ? `${shipping.address1 || ""}${
-              shipping.city ? ", " + shipping.city : ""
-            }${shipping.zip ? " " + shipping.zip : ""}${
-              shipping.country ? ", " + shipping.country : ""
-            }`.trim()
-          : "";
+      const mapped: InvoiceRow[] = (data.invoices || [])
+        .filter((inv: any) => {
+          const tags: string[] = Array.isArray(inv.tags) ? inv.tags : [];
+          const isCancelled = Boolean(inv.cancelledAt);
+          if (isCancelled && tags.includes("credit-card-payment")) return false;
+          return true;
+        })
+        .map((inv: any) => {
+          const id =
+            extractNumericId(inv.orderId) ||
+            String(inv.orderId || inv.invoiceNumber || "");
+          const total = inv.grandTotal
+            ? `${inv.grandTotal} ${inv.currency || "USD"}`
+            : "";
+          const statusSource = inv.raw || inv;
 
-        const fulfillments: any[] = Array.isArray(o.raw?.fulfillments)
-          ? o.raw.fulfillments
-          : [];
+          return {
+            id,
+            invoiceNumber: inv.invoiceNumber || `#${inv.orderNumber || id}`,
+            poNumber: inv.poNumber || null,
+            invoiceDate: formatDate(inv.invoiceDate),
+            total,
+            deliveryAddress: formatAddress(inv.shippingAddress),
+            cancelled: Boolean(inv.cancelledAt),
+            statusInfo: getOrderStatusInfo(statusSource),
+          } as InvoiceRow;
+        });
 
-        const trackingNumbers = fulfillments
-          .map((f: any) => f.tracking_number)
-          .filter(Boolean)
-          .join(", ");
-
-        const trackingUrl: string =
-          fulfillments.find((f: any) => f.tracking_url)?.tracking_url || "";
-
-        const trackingCompany: string =
-          fulfillments.find((f: any) => f.tracking_company)?.tracking_company ||
-          "";
-
-        return {
-          id,
-          orderNo,
-          poNumber: o.poNumber || o.raw?.po_number || null,
-          orderDate: orderDate?.slice?.(0, 10) || orderDate,
-          total,
-          tracking: (o.tracking || trackingNumbers || "") as string,
-          trackingUrl,
-          warehouse: trackingCompany || o.warehouse || "",
-          deliveryAddress,
-        } as Order;
-      });
-
-      setOrders(mapped);
+      setInvoices(mapped);
     } catch (err: any) {
       setError(err?.message || "An error occurred");
-      setOrders([]);
+      setInvoices([]);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchOrders();
+    fetchInvoices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [customerKey]);
 
-  const rows = orders.filter((o) => {
-    if (orderNo && !o.orderNo.includes(orderNo)) return false;
-    if (trackingNo && !(o.tracking || "").includes(trackingNo)) return false;
-    return true;
+  const rows = invoices.filter((inv) => {
+    if (!orderNo) return true;
+    const q = orderNo.toLowerCase();
+    return (
+      inv.invoiceNumber.toLowerCase().includes(q) ||
+      (inv.poNumber || "").toLowerCase().includes(q)
+    );
   });
+
+  const downloadPdf = (id: string) => {
+    const params = new URLSearchParams();
+    params.append("id", id);
+    if (customerKey) params.append("customerId", customerKey);
+    window.open(`/api/pdf?${params.toString()}`);
+  };
 
   return (
     <div className="space-y-6 px-6 py-6">
@@ -142,8 +139,10 @@ export default function OrderHistoryPage() {
 
       <div className="rounded-lg bg-white p-6 shadow-sm">
         <form className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-6">
-          <div className="md:col-span-1 lg:col-span-1">
-            <label className="block text-xs text-slate-600">Order No</label>
+          <div className="md:col-span-1 lg:col-span-2">
+            <label className="block text-xs text-slate-600">
+              Invoice / Order / PO No
+            </label>
             <input
               value={orderNo}
               onChange={(e) => setOrderNo(e.target.value)}
@@ -151,19 +150,10 @@ export default function OrderHistoryPage() {
             />
           </div>
 
-          <div className="md:col-span-1 lg:col-span-1">
-            <label className="block text-xs text-slate-600">Tracking No</label>
-            <input
-              value={trackingNo}
-              onChange={(e) => setTrackingNo(e.target.value)}
-              className="mt-1 w-full rounded border px-3 py-2 text-sm"
-            />
-          </div>
-
           <div className="md:col-span-2 lg:col-span-2 flex items-end gap-3">
             <button
               type="button"
-              onClick={fetchOrders}
+              onClick={fetchInvoices}
               className="inline-flex items-center rounded bg-amber-500 px-4 py-2 text-white"
             >
               Search
@@ -189,75 +179,99 @@ export default function OrderHistoryPage() {
             <thead>
               <tr className="bg-amber-500 text-white">
                 <th className="px-6 py-4 text-left text-sm font-semibold">
-                  Order No
+                  Invoice No
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
                   PO Number
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
-                  Order Date
+                  Date
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
                   Total
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
-                  Tracking
+                  Payment
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold">
+                  Shipment
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
                   Delivery Address
                 </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold">
+                  PDF
+                </th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
-                <tr
-                  key={`${r.orderNo ?? r.id ?? ""}-${i}`}
-                  className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}
-                >
-                  <td className="px-6 py-4 text-sm text-slate-800">
-                    {r.id ? (
-                      <Link
-                        href={`/profile/orders/${encodeURIComponent(r.id)}`}
-                        className="text-blue-600 underline"
-                      >
-                        {r.orderNo}
-                      </Link>
-                    ) : (
-                      r.orderNo
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-700">
-                    {r.poNumber || "—"}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-700">
-                    {r.orderDate}
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium text-slate-800">
-                    {r.total}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-700">
-                    {r.tracking ? (
-                      r.trackingUrl ? (
-                        <a
-                          href={r.trackingUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 underline"
-                        >
-                          {r.tracking}
-                        </a>
-                      ) : (
-                        r.tracking
-                      )
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-700">
-                    {r.deliveryAddress || "-"}
+              {rows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-6 py-8 text-center text-sm text-slate-500"
+                  >
+                    No invoices found.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                rows.map((r, i) => (
+                  <tr
+                    key={`${r.invoiceNumber}-${r.id}-${i}`}
+                    className={
+                      r.cancelled
+                        ? "bg-red-50"
+                        : i % 2 === 0
+                          ? "bg-white"
+                          : "bg-slate-50"
+                    }
+                  >
+                    <td className="px-6 py-4 text-sm text-slate-800">
+                      {r.id ? (
+                        <Link
+                          href={`/profile/orders/${encodeURIComponent(r.id)}`}
+                          className="text-blue-600 underline"
+                        >
+                          {r.invoiceNumber}
+                        </Link>
+                      ) : (
+                        r.invoiceNumber
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">
+                      {r.poNumber || "—"}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">
+                      {r.invoiceDate}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-800">
+                      {r.total || "—"}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <PaymentStatusBadges info={r.statusInfo} />
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <FulfillmentStatusBadge info={r.statusInfo} />
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">
+                      {r.deliveryAddress || "—"}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      {r.id ? (
+                        <button
+                          type="button"
+                          onClick={() => downloadPdf(r.id)}
+                          className="text-blue-600 underline"
+                        >
+                          Download
+                        </button>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         )}

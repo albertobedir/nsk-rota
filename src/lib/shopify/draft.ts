@@ -1,6 +1,7 @@
 // shopify/draft-orders.ts
 
 import { shopifyAdminFetch } from "./instance";
+import { appendPoNumberToNote } from "./po-note";
 
 // Types
 export interface DraftOrderLineItem {
@@ -18,10 +19,17 @@ export interface DraftOrderLineItem {
   requiresShipping?: boolean;
 }
 
+export interface PurchasingCompanyInput {
+  companyId: string;
+  companyLocationId: string;
+  companyContactId: string;
+}
+
 export interface DraftOrderInput {
   customerId?: string;
   email?: string;
   phone?: string;
+  purchasingCompany?: PurchasingCompanyInput;
   lineItems: DraftOrderLineItem[];
   shippingAddress?: {
     firstName?: string;
@@ -70,6 +78,23 @@ export interface DraftOrderInput {
 }
 
 // 1. Draft Order Oluştur
+function toShopifyDraftInput(input: DraftOrderInput | Partial<DraftOrderInput>) {
+  const poNumber = input.poNumber?.trim();
+  const prepared = poNumber
+    ? {
+        ...input,
+        poNumber,
+        note: appendPoNumberToNote(input.note, poNumber),
+      }
+    : input;
+  const { purchasingCompany, ...rest } = prepared;
+  if (!purchasingCompany) return rest;
+  return {
+    ...rest,
+    purchasingEntity: { purchasingCompany },
+  };
+}
+
 export async function createDraftOrder(input: DraftOrderInput) {
   const mutation = `
     mutation draftOrderCreate($input: DraftOrderInput!) {
@@ -99,6 +124,24 @@ export async function createDraftOrder(input: DraftOrderInput) {
             email
             firstName
             lastName
+          }
+          purchasingEntity {
+            ... on PurchasingCompany {
+              company {
+                id
+                name
+              }
+              contact {
+                id
+              }
+              location {
+                id
+              }
+            }
+            ... on Customer {
+              id
+              email
+            }
           }
           shippingAddress {
             firstName
@@ -169,7 +212,7 @@ export async function createDraftOrder(input: DraftOrderInput) {
     }
   `;
 
-  const variables = { input };
+  const variables = { input: toShopifyDraftInput(input) };
   const response = await shopifyAdminFetch({ query: mutation, variables });
 
   // 👇 DEBUG: Log raw response
@@ -223,7 +266,7 @@ export async function updateDraftOrder(
     }
   `;
 
-  const variables = { id, input };
+  const variables = { id, input: toShopifyDraftInput(input) };
   const response = await shopifyAdminFetch({ query: mutation, variables });
   return response.data?.draftOrderUpdate;
 }

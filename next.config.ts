@@ -27,6 +27,21 @@ const nextConfig: NextConfig = {
         destination: "https://rota-usa.com/:path*",
         permanent: true, // 308 redirect
       },
+      {
+        source: "/invoice",
+        destination: "/profile/invoices",
+        permanent: false,
+      },
+      {
+        source: "/invoices",
+        destination: "/profile/invoices",
+        permanent: false,
+      },
+      {
+        source: "/order-history",
+        destination: "/profile/order-history",
+        permanent: false,
+      },
     ];
   },
 };

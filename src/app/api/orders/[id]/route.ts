@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongoose/instance";
 import Order from "@/schemas/mongoose/order";
+import { extractNumericId, toOrderGid } from "@/lib/shopify/ids";
 
 export async function GET(
   _req: Request,
@@ -39,45 +40,32 @@ export async function GET(
 
     let order: any = null;
 
-    // If the incoming id is a plain Mongo ObjectId, try that first
-    if (mongoose.Types.ObjectId.isValid(id)) {
+    const isMongoObjectId =
+      mongoose.Types.ObjectId.isValid(id) &&
+      String(new mongoose.Types.ObjectId(id)) === id;
+
+    if (isMongoObjectId) {
       order = await Order.findById(id).lean();
     }
 
-    // Extract possible Shopify numeric id from values like
-    // "gid://shopify/Order/6419982483527" or "/.../6419982483527"
-    const shopifyCandidateMatch = id.match(/(\d+)$/);
-    const shopifyCandidate = shopifyCandidateMatch
-      ? shopifyCandidateMatch[1]
-      : id.includes("/")
-        ? id.split("/").pop() || id
-        : id;
+    const shopifyCandidate = extractNumericId(id);
+    const orderGid = toOrderGid(id);
 
-    // Try matching by shopifyId (numeric first)
     if (!order) {
-      console.log("\n=== 🔍 MONGO SEARCH DEBUG ===");
-      console.log("Searching by numeric shopifyId:", shopifyCandidate);
-      order = await Order.findOne({ shopifyId: shopifyCandidate }).lean();
-      console.log("Result:", order ? "✅ Found" : "❌ Not found");
-    }
-
-    // Try matching by full GID format
-    if (!order) {
-      const fullGid = `gid://shopify/Order/${shopifyCandidate}`;
-      console.log("Searching by full GID:", fullGid);
       order = await Order.findOne({
-        shopifyId: fullGid,
+        $or: [
+          { shopifyId: id },
+          ...(orderGid ? [{ shopifyId: orderGid }] : []),
+          ...(shopifyCandidate
+            ? [
+                { shopifyId: shopifyCandidate },
+                { "raw.id": Number(shopifyCandidate) },
+                { "raw.id": shopifyCandidate },
+                { orderNumber: Number(shopifyCandidate) },
+              ]
+            : []),
+        ],
       }).lean();
-      console.log("Result:", order ? "✅ Found" : "❌ Not found");
-    }
-
-    // Fallback: try numeric orderNumber when candidate is numeric
-    if (!order && !Number.isNaN(Number(shopifyCandidate))) {
-      console.log("Searching by orderNumber:", Number(shopifyCandidate));
-      order = await Order.findOne({
-        orderNumber: Number(shopifyCandidate),
-      }).lean();
-      console.log("Result:", order ? "✅ Found" : "❌ Not found");
     }
 
     if (!order) {

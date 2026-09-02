@@ -39,6 +39,8 @@ export type InvoicePdfInput = {
   shipTo: string[];
   items: InvoicePdfItem[];
   subtotal: number;
+  discount?: number;
+  discountLabel?: string;
   taxes: number;
   shipping: number;
   grandTotal: number;
@@ -360,9 +362,6 @@ class InvoiceLayout {
     const bill = this.input.billTo.length ? this.input.billTo : ["-"];
     const ship = this.input.shipTo.length ? this.input.shipTo : ["-"];
     const details: [string, string][] = [
-      ["Invoice #", this.input.orderNumber],
-      ["PO Number", this.input.poNumber || "—"],
-      ["Date", this.input.dateLabel],
       ["Status", (this.input.status || "-").toUpperCase()],
       ["Terms", this.input.terms || "Net 30"],
     ];
@@ -399,26 +398,28 @@ class InvoiceLayout {
     });
 
     let billY = this.y + headerH;
-    for (const line of bill) {
+    bill.forEach((line, i) => {
       const h = this.measureHeight(line, colW - 10, lineSize, 2);
       this.text(line, MARGIN + 8, billY, {
         width: colW - 10,
         height: h,
         size: lineSize,
+        bold: i === 0,
       });
       billY += h;
-    }
+    });
 
     let shipY = this.y + headerH;
-    for (const line of ship) {
+    ship.forEach((line, i) => {
       const h = this.measureHeight(line, colW - 10, lineSize, 2);
       this.text(line, MARGIN + colW + 10, shipY, {
         width: colW - 10,
         height: h,
         size: lineSize,
+        bold: i === 0,
       });
       shipY += h;
-    }
+    });
 
     let detailY = this.y + headerH;
     const detailX = MARGIN + colW * 2 + 20;
@@ -659,7 +660,7 @@ class InvoiceLayout {
     drawFooterRow(
       "TOTAL",
       String(totalQty),
-      this.formatMoney(this.input.grandTotal),
+      this.formatMoney(this.input.subtotal),
       true,
     );
     drawFooterRow("TOTAL DAP", "0", null, false);
@@ -667,7 +668,9 @@ class InvoiceLayout {
   }
 
   private drawSummaryAndTotals() {
-    const blockH = 96;
+    const discount = Number(this.input.discount || 0);
+    const showDiscount = Number.isFinite(discount) && discount > 0.004;
+    const blockH = showDiscount ? 112 : 96;
     this.ensureSpace(blockH, "closing");
 
     const startY = this.y;
@@ -735,6 +738,10 @@ class InvoiceLayout {
     };
 
     totRow("Subtotal", this.formatMoney(this.input.subtotal));
+    if (showDiscount) {
+      const label = (this.input.discountLabel || "Discount").slice(0, 22);
+      totRow(label, `-${this.formatMoney(discount)}`);
+    }
     totRow("Sales Tax", this.formatMoney(this.input.taxes));
     totRow("Shipping", this.formatMoney(this.input.shipping));
     this.doc

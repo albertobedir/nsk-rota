@@ -13,35 +13,37 @@ export default function ProfileSessionGuard({
 }) {
   const [ready, setReady] = useState(false);
   const router = useRouter();
-  const user = useSessionStore((s) => s.user);
 
   useEffect(() => {
-    // If zustand/persist already has a user hydrated, skip the fetch
-    if (user) {
+    let mounted = true;
+
+    if (useSessionStore.getState().user) {
       setReady(true);
-      return;
     }
 
-    let mounted = true;
     auth
       .getSession()
       .then((data) => {
         if (!mounted) return;
-        if (!data?.user) {
+        if (!data?.user && !useSessionStore.getState().user) {
           router.replace("/auth/login");
-        } else {
-          setReady(true);
+          return;
         }
+        setReady(true);
       })
       .catch(() => {
-        if (mounted) router.replace("/auth/login");
+        if (!mounted) return;
+        if (useSessionStore.getState().user) {
+          setReady(true);
+          return;
+        }
+        router.replace("/auth/login");
       });
 
     return () => {
       mounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router]);
 
   if (!ready) {
     return (

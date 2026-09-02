@@ -16,7 +16,16 @@ export interface IOrder extends Document {
   cancelReason?: string | null;
   billingAddress?: Record<string, unknown>;
   shippingAddress?: Record<string, unknown>;
+  creditDeducted?: boolean;
+  creditDeductedAmount?: number;
+  creditCurrency?: string;
+  creditDeductedAt?: Date | null;
+  creditRestoreEligible?: boolean;
+  creditRestored?: boolean;
+  creditRestoredAt?: Date | null;
   raw: Record<string, unknown>;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 const OrderSchema = new Schema<IOrder>(
@@ -36,6 +45,13 @@ const OrderSchema = new Schema<IOrder>(
     cancelReason: { type: String, default: null },
     billingAddress: { type: Schema.Types.Mixed },
     shippingAddress: { type: Schema.Types.Mixed },
+    creditDeducted: { type: Boolean, default: false },
+    creditDeductedAmount: { type: Number },
+    creditCurrency: { type: String },
+    creditDeductedAt: { type: Date, default: null },
+    creditRestoreEligible: { type: Boolean, default: false },
+    creditRestored: { type: Boolean, default: false },
+    creditRestoredAt: { type: Date, default: null },
     raw: { type: Schema.Types.Mixed, required: true },
   },
   { timestamps: true },
