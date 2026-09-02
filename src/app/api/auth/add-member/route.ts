@@ -4,7 +4,11 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma/instance";
 import { shopifyAdminFetch } from "@/lib/shopify/instance";
-import { saveCustomerCompany } from "@/lib/shopify/customer-company";
+import {
+  assignCompanyLocationOrderingRole,
+  createCompanyContact,
+  saveCustomerCompany,
+} from "@/lib/shopify/customer-company";
 
 type CreateUserBody = {
   email: string;
@@ -202,48 +206,49 @@ export async function POST(req: Request) {
     let shopifyCompanyId: string | null = null;
     let companyLocationId: string | null = null;
     let companyContactId: string | null = null;
+    let locationRoleAssigned = false;
+    let companyRoles: { id: string; name: string }[] = [];
     try {
-      const companyRes = await fetch(
-        `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-01/graphql.json`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!,
-          },
-          body: JSON.stringify({
-            query: `mutation companyCreate($input: CompanyCreateInput!) {
-              companyCreate(input: $input) {
-                company {
-                  id
-                  name
-                  locations(first: 1) { edges { node { id } } }
-                }
-                userErrors { field message }
+      const companyData = await shopifyAdminFetch({
+        query: `mutation companyCreate($input: CompanyCreateInput!) {
+          companyCreate(input: $input) {
+            company {
+              id
+              name
+              contactRoles(first: 20) { nodes { id name } }
+              locations(first: 1) {
+                nodes { id }
+                edges { node { id } }
               }
-            }`,
-            variables: {
-              input: {
-                company: { name: companyName },
-                companyLocation: {
-                  name: "Main Location",
-                  billingSameAsShipping: true,
-                  shippingAddress: {
-                    address1,
-                    city,
-                    countryCode: country,
-                    zoneCode: state,
-                    zip,
-                  },
-                },
+            }
+            userErrors { field message }
+          }
+        }`,
+        variables: {
+          input: {
+            company: { name: companyName },
+            companyLocation: {
+              name: "Main Location",
+              billingSameAsShipping: true,
+              shippingAddress: {
+                address1,
+                city,
+                countryCode: country,
+                zoneCode: state,
+                zip,
               },
             },
-          }),
+          },
         },
-      );
+      });
 
-      const companyData = await companyRes.json();
       const company = companyData?.data?.companyCreate?.company;
+      companyRoles = (company?.contactRoles?.nodes ?? []).map(
+        (role: { id?: string; name?: string }) => ({
+          id: String(role?.id ?? ""),
+          name: String(role?.name ?? ""),
+        }),
+      );
       console.log("Step 4.6: Company created", company);
 
       if (companyData.data?.companyCreate?.userErrors?.length > 0) {
@@ -254,64 +259,50 @@ export async function POST(req: Request) {
       } else {
         shopifyCompanyId = company?.id || null;
         companyLocationId =
-          company?.locations?.edges?.[0]?.node?.id ||
           company?.locations?.nodes?.[0]?.id ||
+          company?.locations?.edges?.[0]?.node?.id ||
           null;
       }
 
       if (company?.id) {
-        console.log("Step 4.7: Assigning customer as company contact");
+        console.log("Step 4.7: Creating company contact");
         try {
-          const contactRes = await fetch(
-            `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2025-01/graphql.json`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Shopify-Access-Token":
-                  process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!,
-              },
-              body: JSON.stringify({
-                query: `mutation companyAssignCustomerAsContact($companyId: ID!, $customerId: ID!) {
-                  companyAssignCustomerAsContact(companyId: $companyId, customerId: $customerId) {
-                    companyContact {
-                      id
-                      customer { id }
-                      isMainContact
-                    }
-                    userErrors { field message }
-                  }
-                }`,
-                variables: {
-                  companyId: company.id,
-                  customerId: shopifyCustomer.id,
-                },
-              }),
-            },
-          );
-
-          const contactData = await contactRes.json();
-          console.log(
-            "Step 4.7: Contact assigned",
-            JSON.stringify(contactData, null, 2),
-          );
-
-          if (
-            contactData.data?.companyAssignCustomerAsContact?.userErrors
-              ?.length > 0
-          ) {
-            console.warn(
-              "Step 4.7 Warning: Contact assignment had errors",
-              contactData.data.companyAssignCustomerAsContact.userErrors,
-            );
+          companyContactId = await createCompanyContact({
+            companyId: company.id,
+            customerId: shopifyCustomer.id,
+            email,
+            firstName,
+            lastName,
+          });
+          if (companyContactId) {
+            console.log("Step 4.7: Company contact created", companyContactId);
           } else {
-            companyContactId =
-              contactData.data?.companyAssignCustomerAsContact?.companyContact
-                ?.id || null;
-            console.log("Step 4.7: Customer assigned as contact successfully");
+            console.warn("Step 4.7 Warning: Company contact was not created");
           }
         } catch (contactErr) {
-          console.error("Step 4.7 Error: Failed to assign contact", contactErr);
+          console.error("Step 4.7 Error: Failed to create contact", contactErr);
+        }
+      }
+
+      if (company?.id && companyLocationId && companyContactId) {
+        console.log("Step 4.8: Assigning ordering role to company location");
+        try {
+          locationRoleAssigned = await assignCompanyLocationOrderingRole({
+            companyId: company.id,
+            companyLocationId,
+            companyContactId,
+            roles: companyRoles,
+          });
+          if (!locationRoleAssigned) {
+            console.warn(
+              "Step 4.8 Warning: Location role assignment did not succeed",
+            );
+          }
+        } catch (roleErr) {
+          console.error(
+            "Step 4.8 Error: Failed to assign location role",
+            roleErr,
+          );
         }
       }
     } catch (companyErr) {
@@ -373,6 +364,7 @@ export async function POST(req: Request) {
         companyLocationId,
         companyContactId,
         companyName,
+        locationRoleAssigned,
       });
       console.log("Step 5.1: Saved customer company to MongoDB");
     } catch (mongoErr) {

@@ -7,6 +7,7 @@ export interface ICustomer extends Document {
   companyContactId?: string | null;
   companyName?: string | null;
   email?: string | null;
+  locationRoleAssigned?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -24,6 +25,7 @@ const CustomerSchema = new Schema<ICustomer>(
     companyContactId: { type: String, default: null },
     companyName: { type: String, default: null },
     email: { type: String, default: null },
+    locationRoleAssigned: { type: Boolean, default: false },
   },
   { timestamps: true },
 );
