@@ -23,6 +23,7 @@ export interface PurchasingCompanyInput {
   companyId: string;
   companyLocationId: string;
   companyContactId: string;
+  companyName?: string;
 }
 
 export interface DraftOrderInput {
@@ -74,28 +75,121 @@ export interface DraftOrderInput {
     key: string;
     value: string;
   }>;
+  metafields?: Array<{
+    namespace: string;
+    key: string;
+    value: string;
+    type: string;
+  }>;
   useCustomerDefaultAddress?: boolean;
 }
 
+function appendCompanyToNote(
+  note: string | null | undefined,
+  company: PurchasingCompanyInput,
+): string {
+  if (note?.includes(company.companyId)) return note ?? "";
+  const lines = [
+    company.companyName ? `Company: ${company.companyName}` : null,
+    `Company ID: ${company.companyId}`,
+    `Location: ${company.companyLocationId}`,
+    company.companyContactId ? `Contact: ${company.companyContactId}` : null,
+  ].filter(Boolean) as string[];
+  const block = lines.join("\n");
+  const existing = note?.trim();
+  return existing ? `${existing}\n${block}` : block;
+}
+
+function b2bCompanyAttributes(company: PurchasingCompanyInput) {
+  return [
+    { key: "b2b_company_id", value: company.companyId },
+    { key: "b2b_company_location_id", value: company.companyLocationId },
+    ...(company.companyContactId
+      ? [{ key: "b2b_company_contact_id", value: company.companyContactId }]
+      : []),
+    ...(company.companyName
+      ? [{ key: "b2b_company_name", value: company.companyName }]
+      : []),
+  ];
+}
+
+function b2bCompanyMetafields(company: PurchasingCompanyInput) {
+  return [
+    {
+      namespace: "b2b",
+      key: "company_id",
+      value: company.companyId,
+      type: "single_line_text_field",
+    },
+    {
+      namespace: "b2b",
+      key: "company_location_id",
+      value: company.companyLocationId,
+      type: "single_line_text_field",
+    },
+    ...(company.companyContactId
+      ? [
+          {
+            namespace: "b2b",
+            key: "company_contact_id",
+            value: company.companyContactId,
+            type: "single_line_text_field",
+          },
+        ]
+      : []),
+  ];
+}
+
 // 1. Draft Order Oluştur
+// purchasingCompany is Shopify Plus / B2B only — Basic plans reject it as
+// "Field is not defined on DraftOrderInput". Carry company GIDs via note,
+// customAttributes, and metafields instead.
 function toShopifyDraftInput(input: DraftOrderInput | Partial<DraftOrderInput>) {
-  const poNumber = input.poNumber?.trim();
-  const prepared = poNumber
-    ? {
-        ...input,
-        poNumber,
-        note: appendPoNumberToNote(input.note, poNumber),
-      }
-    : input;
-  const { purchasingCompany, ...rest } = prepared;
-  if (
-    purchasingCompany?.companyId &&
-    purchasingCompany?.companyLocationId &&
-    purchasingCompany?.companyContactId
-  ) {
-    return { ...rest, purchasingCompany };
+  const {
+    purchasingCompany,
+    customAttributes,
+    metafields,
+    poNumber: rawPoNumber,
+    note: rawNote,
+    ...rest
+  } = input;
+  const poNumber = rawPoNumber?.trim();
+
+  let note = rawNote;
+  if (poNumber) {
+    note = appendPoNumberToNote(note, poNumber);
   }
-  return rest;
+
+  const company =
+    purchasingCompany?.companyId && purchasingCompany?.companyLocationId
+      ? purchasingCompany
+      : null;
+
+  if (company) {
+    note = appendCompanyToNote(note, company);
+  }
+
+  return {
+    ...rest,
+    ...(poNumber ? { poNumber } : {}),
+    ...(note ? { note } : {}),
+    ...((customAttributes?.length || company)
+      ? {
+          customAttributes: [
+            ...(customAttributes ?? []),
+            ...(company ? b2bCompanyAttributes(company) : []),
+          ],
+        }
+      : {}),
+    ...((metafields?.length || company)
+      ? {
+          metafields: [
+            ...(metafields ?? []),
+            ...(company ? b2bCompanyMetafields(company) : []),
+          ],
+        }
+      : {}),
+  };
 }
 
 export async function createDraftOrder(input: DraftOrderInput) {
@@ -128,23 +222,9 @@ export async function createDraftOrder(input: DraftOrderInput) {
             firstName
             lastName
           }
-          purchasingEntity {
-            ... on PurchasingCompany {
-              company {
-                id
-                name
-              }
-              contact {
-                id
-              }
-              location {
-                id
-              }
-            }
-            ... on Customer {
-              id
-              email
-            }
+          customAttributes {
+            key
+            value
           }
           shippingAddress {
             firstName
@@ -202,10 +282,6 @@ export async function createDraftOrder(input: DraftOrderInput) {
             valueType
             description
           }
-          customAttributes {
-            key
-            value
-          }
         }
         userErrors {
           field
@@ -215,8 +291,33 @@ export async function createDraftOrder(input: DraftOrderInput) {
     }
   `;
 
-  const variables = { input: toShopifyDraftInput(input) };
-  const response = await shopifyAdminFetch({ query: mutation, variables });
+  const shopifyInput = toShopifyDraftInput(input);
+  console.log("[SHOPIFY DRAFT INPUT]", JSON.stringify(shopifyInput, null, 2));
+
+  let response = await shopifyAdminFetch({
+    query: mutation,
+    variables: { input: shopifyInput },
+  });
+
+  const metafieldRejected =
+    "metafields" in shopifyInput &&
+    /metafield/i.test(
+      JSON.stringify({
+        errors: response?.errors,
+        userErrors: response?.data?.draftOrderCreate?.userErrors,
+      }),
+    );
+  if (metafieldRejected) {
+    const withoutMetafields = { ...shopifyInput };
+    delete (withoutMetafields as { metafields?: unknown }).metafields;
+    console.warn(
+      "[DRAFT] metafields rejected by Shopify, retrying without them",
+    );
+    response = await shopifyAdminFetch({
+      query: mutation,
+      variables: { input: withoutMetafields },
+    });
+  }
 
   // 👇 DEBUG: Log raw response
   console.log("[SHOPIFY RAW RESPONSE]", JSON.stringify(response, null, 2));
@@ -495,7 +596,7 @@ export async function calculateDraftOrder(input: DraftOrderInput) {
     }
   `;
 
-  const variables = { input };
+  const variables = { input: toShopifyDraftInput(input) };
   const response = await shopifyAdminFetch({ query: mutation, variables });
 
   console.log(

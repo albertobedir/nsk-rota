@@ -497,6 +497,7 @@ export async function POST(request: NextRequest) {
             companyId: companyInfo.companyId,
             companyLocationId: companyInfo.companyLocationId,
             companyContactId: companyInfo.companyContactId,
+            companyName: companyInfo.companyName,
           }
         : undefined,
       shippingAddress: customerEnteredShipping ?? undefined,
