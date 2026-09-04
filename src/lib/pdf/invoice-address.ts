@@ -87,12 +87,8 @@ function expandCountry(country: string, countryCode: string): string {
   return clean(country) || clean(countryCode);
 }
 
-export function formatInvoiceAddressLines(
-  kind: "billing" | "shipping",
-  addr: InvoiceAddress,
-): string[] {
-  const label = kind === "billing" ? "Billing address" : "Shipping address";
-  if (!addr) return [label, "-"];
+export function formatInvoiceAddressLines(addr: InvoiceAddress): string[] {
+  if (!addr) return ["-"];
 
   const company = clean(addr.company);
   const street = [addr.address1, addr.address2].map(clean).filter(Boolean).join(", ");
@@ -101,6 +97,6 @@ export function formatInvoiceAddressLines(
     .join(" ");
   const country = expandCountry(addr.country || "", addr.countryCode || "");
 
-  const lines = [label, company, street, cityLine, country].filter(Boolean);
-  return lines.length > 1 ? lines : [label, "-"];
+  const lines = [company, street, cityLine, country].filter(Boolean);
+  return lines.length ? lines : ["-"];
 }

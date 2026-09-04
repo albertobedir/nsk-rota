@@ -208,7 +208,6 @@ export async function generateInvoicePdf(opts: {
 
   const itemsList =
     (order.lineItems?.edges as Array<Record<string, any>>) || [];
-  let originalSubtotal = 0;
   let discountedSubtotal = 0;
   const items = itemsList.map((e) => {
     const node = (e?.node || e) as Record<string, any>;
@@ -219,7 +218,6 @@ export async function generateInvoicePdf(opts: {
     const discountedPrice = money(node?.discountedUnitPrice ?? originalPrice);
     const unitPrice = discountedPrice > 0 ? discountedPrice : originalPrice;
     const lineTotal = unitPrice * qty;
-    originalSubtotal += (originalPrice > 0 ? originalPrice : unitPrice) * qty;
     discountedSubtotal += lineTotal;
     return {
       title: String(node?.title || node?.name || "Item"),
@@ -239,40 +237,27 @@ export async function generateInvoicePdf(opts: {
       raw.totalDiscountsSet?.shopMoney?.amount ??
       raw.currentTotalDiscountsSet?.shopMoney?.amount,
   );
-  const lineDiscount = Math.max(0, originalSubtotal - discountedSubtotal);
-  const discountApps = [
-    ...(Array.isArray(raw.discount_applications)
-      ? raw.discount_applications
-      : []),
-    ...(Array.isArray(raw.discountApplications?.nodes)
-      ? raw.discountApplications.nodes
-      : []),
-  ];
-  const hasOrderLevelDiscount = discountApps.some((app: any) => {
-    const target = String(app?.target_type || app?.targetType || "").toLowerCase();
-    return target === "order";
-  });
-  const remainder = Math.max(0, shopifyDiscount - lineDiscount);
-  const discountAmount =
-    hasOrderLevelDiscount || remainder > 0.05 ? remainder : 0;
+  // Catalog / tier markdowns live in unit prices and must not swallow the
+  // order-level code (e.g. Pickup%5). Always print Shopify's discount total.
+  const discountAmount = shopifyDiscount;
+  const discountLabel = "Discount";
 
-  const discountCodes = [
-    ...(Array.isArray(raw.discount_codes) ? raw.discount_codes : []),
-    ...(Array.isArray(raw.discountCodes) ? raw.discountCodes : []),
-  ]
-    .map((c: any) => String(c?.code || c || "").trim())
-    .filter(Boolean);
-  const uniqueCodes = [...new Set(discountCodes)];
-  const discountLabel = uniqueCodes.length
-    ? `Discount (${uniqueCodes.join(", ")})`
-    : "Discount";
-
-  const subtotal = discountedSubtotal;
+  const taxes = money(order.taxes);
+  const shipping = money(order.shipping);
   const grandTotal =
     money(order.totalPrice?.amount) ||
-    Math.max(0, subtotal - discountAmount) +
-      money(order.taxes) +
-      money(order.shipping);
+    Math.max(0, discountedSubtotal - discountAmount) + taxes + shipping;
+
+  // If line totals already include the Shopify discount, add it back so
+  // Subtotal − Discount + tax + shipping still equals the order total.
+  let subtotal = discountedSubtotal;
+  const impliedTotal = discountedSubtotal + taxes + shipping;
+  if (
+    discountAmount > 0.004 &&
+    Math.abs(impliedTotal - grandTotal) < 0.05
+  ) {
+    subtotal = discountedSubtotal + discountAmount;
+  }
 
   const companyName =
     firstNonEmpty(
@@ -281,11 +266,8 @@ export async function generateInvoicePdf(opts: {
       customerCompanyName,
     ) || "";
 
-  const withCompany = (
-    addr: Record<string, any> | null,
-    kind: "billing" | "shipping",
-  ) =>
-    formatInvoiceAddressLines(kind, {
+  const withCompany = (addr: Record<string, any> | null) =>
+    formatInvoiceAddressLines({
       ...(addr || {}),
       company: firstNonEmpty(addr?.company, companyName) || undefined,
     });
@@ -297,14 +279,14 @@ export async function generateInvoicePdf(opts: {
     terms: "Net 30",
     currency,
     poNumber: String(order.poNumber || "").trim() || "—",
-    billTo: withCompany(billingAddr, "billing"),
-    shipTo: withCompany(shippingAddr, "shipping"),
+    billTo: withCompany(billingAddr),
+    shipTo: withCompany(shippingAddr),
     items,
     subtotal,
     discount: discountAmount,
     discountLabel,
-    taxes: money(order.taxes),
-    shipping: money(order.shipping),
+    taxes,
+    shipping,
     grandTotal,
     deliveryTerm: "DAP",
     paymentTerm: "Net 30",

@@ -674,9 +674,10 @@ class InvoiceLayout {
   }
 
   private drawSummaryAndTotals() {
-    const discount = Number(this.input.discount || 0);
-    const showDiscount = Number.isFinite(discount) && discount > 0.004;
-    const blockH = showDiscount ? 112 : 96;
+    const discount = Number.isFinite(Number(this.input.discount))
+      ? Math.max(0, Number(this.input.discount))
+      : 0;
+    const blockH = 112;
     this.ensureSpace(blockH, "closing");
 
     const startY = this.y;
@@ -744,10 +745,12 @@ class InvoiceLayout {
     };
 
     totRow("Subtotal", this.formatMoney(this.input.subtotal));
-    if (showDiscount) {
-      const label = (this.input.discountLabel || "Discount").slice(0, 22);
-      totRow(label, `-${this.formatMoney(discount)}`);
-    }
+    totRow(
+      "Discount",
+      discount > 0.004
+        ? `-${this.formatMoney(discount)}`
+        : this.formatMoney(0),
+    );
     totRow("Sales Tax", this.formatMoney(this.input.taxes));
     totRow("Shipping", this.formatMoney(this.input.shipping));
     this.doc
