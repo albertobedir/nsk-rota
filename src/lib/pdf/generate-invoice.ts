@@ -3,9 +3,17 @@ import { connectDB } from "@/lib/mongoose/instance";
 import Order from "@/schemas/mongoose/order";
 import Customer from "@/schemas/mongoose/customer";
 import { buildInvoicePdf } from "@/lib/pdf/invoice-document";
-import { formatInvoiceAddressLines } from "@/lib/pdf/invoice-address";
+import {
+  firstCustomerAddress,
+  formatInvoiceAddressLines,
+  isSupplierAddress,
+  isSupplierCompanyName,
+  normalizeInvoiceAddress,
+  withCustomerCompany,
+} from "@/lib/pdf/invoice-address";
 import { extractNumericId, toCustomerGid, toOrderGid } from "@/lib/shopify/ids";
 import { normalizeLineItemEdges } from "@/lib/orders/line-items";
+import { shopifyAdminFetch } from "@/lib/shopify/instance";
 
 export class InvoicePdfError extends Error {
   status: number;
@@ -37,42 +45,179 @@ function formatDate(val: any): string {
   return `${d2}/${m}/${y}`;
 }
 
-function mapAddress(addr: any) {
-  if (!addr) return null;
-  return {
-    name:
-      addr.name ||
-      [addr.firstName || addr.first_name, addr.lastName || addr.last_name]
-        .filter(Boolean)
-        .join(" ") ||
-      "",
-    company: addr.company || "",
-    address1: addr.address1 || "",
-    address2: addr.address2 || "",
-    city: addr.city || "",
-    zip: addr.zip || "",
-    province: addr.province || addr.provinceCode || addr.province_code || "",
-    country: addr.country || addr.country_name || addr.countryName || "",
-    countryCode:
-      addr.country_code || addr.countryCode || addr.countryCodeV2 || "",
-  };
+type CustomerAddressProfile = {
+  companyName: string;
+  billing: ReturnType<typeof normalizeInvoiceAddress>;
+  shipping: ReturnType<typeof normalizeInvoiceAddress>;
+};
+
+const INVOICE_ORDER_ADDRESSES_QUERY = `
+  query InvoiceOrderAddresses($id: ID!) {
+    order(id: $id) {
+      billingAddress {
+        firstName lastName company address1 address2 city province provinceCode country countryCodeV2 zip
+      }
+      shippingAddress {
+        firstName lastName company address1 address2 city province provinceCode country countryCodeV2 zip
+      }
+      customer {
+        displayName
+        defaultAddress {
+          firstName lastName company address1 address2 city province provinceCode country countryCodeV2 zip
+        }
+        companyContactProfiles {
+          company {
+            name
+            locations(first: 10) {
+              nodes {
+                name
+                billingAddress { address1 address2 city zoneCode countryCode zip }
+                shippingAddress { address1 address2 city zoneCode countryCode zip }
+              }
+            }
+          }
+        }
+      }
+      purchasingEntity {
+        ... on PurchasingCompany {
+          company { name }
+          location {
+            name
+            billingAddress { address1 address2 city zoneCode countryCode zip }
+            shippingAddress { address1 address2 city zoneCode countryCode zip }
+          }
+        }
+      }
+    }
+  }
+`;
+
+function companyLocationToAddress(loc: any, companyName?: string) {
+  if (!loc) return null;
+  const src = loc.shippingAddress || loc.billingAddress || loc;
+  return normalizeInvoiceAddress({
+    ...src,
+    company: firstNonEmpty(loc.name, companyName, src?.company),
+  });
 }
 
-async function findCustomerCompanyName(
+async function fetchShopifyCustomerAddresses(orderId: string) {
+  const gid = toOrderGid(orderId);
+  if (!gid) return null;
+  try {
+    const response = await shopifyAdminFetch({
+      query: INVOICE_ORDER_ADDRESSES_QUERY,
+      variables: { id: gid },
+    });
+    const node = response?.data?.order;
+    if (!node) return null;
+
+    const purchasing = node.purchasingEntity || {};
+    const companyName = firstNonEmpty(
+      purchasing.company?.name,
+      node.customer?.companyContactProfiles?.[0]?.company?.name,
+    );
+    const location =
+      purchasing.location ||
+      node.customer?.companyContactProfiles?.[0]?.company?.locations?.nodes?.[0];
+
+    return {
+      companyName,
+      billing: firstCustomerAddress(
+        node.billingAddress,
+        companyLocationToAddress(location, companyName),
+        node.customer?.defaultAddress,
+      ),
+      shipping: firstCustomerAddress(
+        node.shippingAddress,
+        companyLocationToAddress(location, companyName),
+        node.customer?.defaultAddress,
+        node.billingAddress,
+      ),
+    };
+  } catch (err) {
+    console.warn("[invoice-pdf] Shopify address fetch failed:", err);
+    return null;
+  }
+}
+
+async function findCustomerAddressProfile(
   customerId?: string | null,
-): Promise<string> {
-  if (!customerId) return "";
+): Promise<CustomerAddressProfile> {
+  const empty: CustomerAddressProfile = {
+    companyName: "",
+    billing: null,
+    shipping: null,
+  };
+  if (!customerId) return empty;
 
   try {
     const { default: prisma } = await import("@/lib/prisma/instance");
+    const gid = toCustomerGid(customerId) || customerId;
     const user = await prisma.user.findFirst({
       where: {
-        OR: [{ id: customerId }, { shopifyCustomerId: customerId }],
+        OR: [
+          { id: customerId },
+          { shopifyCustomerId: customerId },
+          { shopifyCustomerId: gid },
+        ],
       },
-      select: { companyName: true },
+      select: {
+        companyName: true,
+        firstName: true,
+        lastName: true,
+        addressLine1: true,
+        addressLine2: true,
+        city: true,
+        state: true,
+        zip: true,
+        billingAddress: true,
+        shippingAddress: true,
+        companyAddress1: true,
+        companyCity: true,
+        companyState: true,
+        companyZip: true,
+      },
     });
-    const fromPrisma = firstNonEmpty(user?.companyName);
-    if (fromPrisma) return fromPrisma;
+    if (user) {
+      const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
+      const companyAddr = normalizeInvoiceAddress({
+        company: user.companyName,
+        name,
+        address1: user.companyAddress1,
+        city: user.companyCity,
+        province: user.companyState,
+        zip: user.companyZip,
+        country: "United States",
+        countryCode: "US",
+      });
+      const profileAddr = normalizeInvoiceAddress({
+        company: user.companyName,
+        name,
+        address1: user.addressLine1,
+        address2: user.addressLine2,
+        city: user.city,
+        province: user.state,
+        zip: user.zip,
+        country: "United States",
+        countryCode: "US",
+      });
+      return {
+        companyName: firstNonEmpty(user.companyName),
+        billing: firstCustomerAddress(
+          user.billingAddress,
+          companyAddr,
+          profileAddr,
+          user.shippingAddress,
+        ),
+        shipping: firstCustomerAddress(
+          user.shippingAddress,
+          companyAddr,
+          profileAddr,
+          user.billingAddress,
+        ),
+      };
+    }
   } catch {
     /* prisma unavailable */
   }
@@ -85,9 +230,14 @@ async function findCustomerCompanyName(
     })
       .select("companyName")
       .lean();
-    return firstNonEmpty((doc as { companyName?: string } | null)?.companyName);
+    return {
+      ...empty,
+      companyName: firstNonEmpty(
+        (doc as { companyName?: string } | null)?.companyName,
+      ),
+    };
   } catch {
-    return "";
+    return empty;
   }
 }
 
@@ -161,8 +311,8 @@ async function loadOrder(id: string) {
       raw.shipping_lines?.[0]?.price ||
       0,
     taxes: raw.total_tax || raw.totalTaxSet?.shopMoney?.amount || 0,
-    billingAddress: mapAddress(billing),
-    shippingAddress: mapAddress(shipping),
+    billingAddress: normalizeInvoiceAddress(billing),
+    shippingAddress: normalizeInvoiceAddress(shipping),
     customer: raw.customer || null,
     lineItems: { edges: normalizeLineItemEdges(dbOrder) },
     raw,
@@ -193,8 +343,10 @@ export async function generateInvoicePdf(opts: {
 
   console.log("✅ Order fetched from MongoDB:", order.name);
 
-  const customerCompanyName = await findCustomerCompanyName(
-    customerId || order.customer?.id || order.customer?.admin_graphql_api_id,
+  const customerProfile = await findCustomerAddressProfile(
+    order.customer?.id ||
+      order.customer?.admin_graphql_api_id ||
+      customerId,
   );
 
   const orderNum = order.name || `#${order.orderNumber}` || orderId || "-";
@@ -203,8 +355,10 @@ export async function generateInvoicePdf(opts: {
   const currency = order.totalPrice?.currencyCode || "USD";
   const raw = (order.raw || {}) as Record<string, any>;
 
-  const billingAddr = order.billingAddress || order.shippingAddress || null;
-  const shippingAddr = order.shippingAddress || order.billingAddress || null;
+  const customerDefaultAddress =
+    order.customer?.default_address ||
+    order.customer?.defaultAddress ||
+    null;
 
   const itemsList =
     (order.lineItems?.edges as Array<Record<string, any>>) || [];
@@ -260,17 +414,55 @@ export async function generateInvoicePdf(opts: {
   }
 
   const companyName =
-    firstNonEmpty(
+    [
+      customerProfile.companyName,
       order.billingAddress?.company,
       order.shippingAddress?.company,
-      customerCompanyName,
-    ) || "";
+    ]
+      .map((value) => firstNonEmpty(value))
+      .find((value) => value && !isSupplierCompanyName(value)) || "";
 
-  const withCompany = (addr: Record<string, any> | null) =>
-    formatInvoiceAddressLines({
-      ...(addr || {}),
-      company: firstNonEmpty(addr?.company, companyName) || undefined,
-    });
+  let billingAddr = firstCustomerAddress(
+    order.billingAddress,
+    raw.billing_address,
+    raw.billingAddress,
+    customerProfile.billing,
+    customerDefaultAddress,
+    order.shippingAddress,
+    raw.shipping_address,
+    raw.shippingAddress,
+    customerProfile.shipping,
+  );
+  let shippingAddr = firstCustomerAddress(
+    order.shippingAddress,
+    raw.shipping_address,
+    raw.shippingAddress,
+    customerProfile.shipping,
+    customerDefaultAddress,
+    order.billingAddress,
+    raw.billing_address,
+    raw.billingAddress,
+    customerProfile.billing,
+  );
+
+  if (
+    !billingAddr?.address1 ||
+    !shippingAddr?.address1 ||
+    isSupplierAddress(billingAddr) ||
+    isSupplierAddress(shippingAddr)
+  ) {
+    const live = await fetchShopifyCustomerAddresses(
+      String(order.raw?.admin_graphql_api_id || orderId),
+    );
+    if (live) {
+      billingAddr =
+        firstCustomerAddress(live.billing, billingAddr, live.shipping) ||
+        billingAddr;
+      shippingAddr =
+        firstCustomerAddress(live.shipping, shippingAddr, live.billing) ||
+        shippingAddr;
+    }
+  }
 
   const buffer = await buildInvoicePdf({
     orderNumber: String(orderNum),
@@ -279,8 +471,12 @@ export async function generateInvoicePdf(opts: {
     terms: "Net 30",
     currency,
     poNumber: String(order.poNumber || "").trim() || "—",
-    billTo: withCompany(billingAddr),
-    shipTo: withCompany(shippingAddr),
+    billTo: formatInvoiceAddressLines(
+      withCustomerCompany(billingAddr, companyName),
+    ),
+    shipTo: formatInvoiceAddressLines(
+      withCustomerCompany(shippingAddr, companyName),
+    ),
     items,
     subtotal,
     discount: discountAmount,
