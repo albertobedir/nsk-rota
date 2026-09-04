@@ -88,7 +88,13 @@ function toShopifyDraftInput(input: DraftOrderInput | Partial<DraftOrderInput>) 
       }
     : input;
   const { purchasingCompany, ...rest } = prepared;
-  void purchasingCompany;
+  if (
+    purchasingCompany?.companyId &&
+    purchasingCompany?.companyLocationId &&
+    purchasingCompany?.companyContactId
+  ) {
+    return { ...rest, purchasingCompany };
+  }
   return rest;
 }
 

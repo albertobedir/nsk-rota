@@ -206,6 +206,7 @@ export default function BasketPage() {
             originalUntieredPrice: i.originalPrice ?? i.price,
             title: i.title,
           })),
+          shippingAddress: sessionUser?.shippingAddress ?? undefined,
         }),
       });
 

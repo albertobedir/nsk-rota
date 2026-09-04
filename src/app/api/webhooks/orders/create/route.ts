@@ -17,6 +17,8 @@ import {
   noteAlreadyHasPoNumber,
 } from "@/lib/shopify/po-note";
 import { updateOrderNote } from "@/lib/shopify/order";
+import { getCustomerCompany } from "@/lib/shopify/customer-company";
+import { generateInvoicePdf } from "@/lib/pdf/generate-invoice";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,46 +79,26 @@ async function sendAdminInvoiceEmail({
   orderAmount: number;
   currencyCode: string;
 }) {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const adminEmail = process.env.ADMIN_EMAILS; // .env'e ekleyeceksin
+  const adminEmail = process.env.ADMIN_EMAILS;
 
-  if (!baseUrl || !adminEmail) {
-    console.warn("[⚠️ Admin Invoice Email] Missing BASE_URL or ADMIN_EMAIL");
+  if (!adminEmail) {
+    console.warn("[⚠️ Admin Invoice Email] Missing ADMIN_EMAILS");
     return;
   }
 
-  // PDF endpoint'ini çağır
-  const encodedOrderId = encodeURIComponent(orderId);
-  const encodedCustomerId = customerId ? encodeURIComponent(customerId) : null;
-  const pdfUrl = `${baseUrl}/api/pdf?id=${encodedOrderId}${encodedCustomerId ? `&customerId=${encodedCustomerId}` : ""}`;
-
-  console.log("[📄 PDF Fetch] URL:", pdfUrl);
-  console.log("[📄 PDF Fetch] BASE_URL:", baseUrl);
-  console.log("[📄 PDF Fetch] orderId:", orderId);
-  console.log("[📄 PDF Fetch] customerId:", customerId);
+  console.log("[📄 PDF Generate] orderId:", orderId);
+  console.log("[📄 PDF Generate] customerId:", customerId);
 
   let pdfBuffer: Buffer | null = null;
   try {
-    const pdfRes = await fetch(pdfUrl);
-    console.log("[📄 PDF Fetch] Status:", pdfRes.status);
-    console.log(
-      "[📄 PDF Fetch] Content-Type:",
-      pdfRes.headers.get("content-type"),
-    );
-
-    if (!pdfRes.ok) {
-      const errorText = await pdfRes.text();
-      console.error(
-        `[❌ PDF Fetch Failed] Status: ${pdfRes.status}, Body:`,
-        errorText,
-      );
-    } else {
-      const arrayBuffer = await pdfRes.arrayBuffer();
-      pdfBuffer = Buffer.from(arrayBuffer);
-      console.log(`[✅ PDF Generated] Size: ${pdfBuffer.length} bytes`);
-    }
+    const pdf = await generateInvoicePdf({
+      orderId,
+      customerId,
+    });
+    pdfBuffer = pdf.buffer;
+    console.log(`[✅ PDF Generated] Size: ${pdfBuffer.length} bytes`);
   } catch (pdfErr) {
-    console.error("[❌ PDF Fetch Error]", pdfErr);
+    console.error("[❌ PDF Generate Error]", pdfErr);
   }
 
   const transporter = await createVerifiedTransporter();
@@ -436,6 +418,22 @@ export async function POST(req: NextRequest) {
       );
 
       console.log("✅ Order saved to MongoDB:", shopifyId);
+
+      if (customerGid) {
+        try {
+          const companyInfo = await getCustomerCompany(customerGid);
+          console.log("[orders/create] Customer company synced:", {
+            customerGid,
+            companyId: companyInfo?.companyId ?? null,
+            companyName: companyInfo?.companyName ?? null,
+          });
+        } catch (companyErr) {
+          console.warn(
+            "[orders/create] Customer company sync failed:",
+            companyErr,
+          );
+        }
+      }
     } catch (dbErr) {
       // DB hatası webhook'u bloklamamalı
       console.error("❌ MongoDB upsert error:", dbErr);

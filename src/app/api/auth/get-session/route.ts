@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import prisma from "@/lib/prisma/instance";
 import { computeTier } from "@/lib/utils/tier";
+import {
+  getCachedCustomerCompany,
+  toSessionCompanyFields,
+} from "@/lib/shopify/customer-company";
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET ?? "";
 
@@ -90,13 +94,15 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const companyFields = {
-      companyName: user.companyName ?? null,
-      shopifyCompanyId: user.shopifyCompanyId ?? null,
-      companyId: user.shopifyCompanyId ?? null,
-      companyLocationId: null as string | null,
-      companyContactId: null as string | null,
-    };
+    const storedCompany = await getCachedCustomerCompany(shopifyCustomerId);
+    const companyFields = toSessionCompanyFields(storedCompany);
+    if (!companyFields.companyName) {
+      companyFields.companyName = user.companyName ?? null;
+    }
+    if (!companyFields.companyId && user.shopifyCompanyId) {
+      companyFields.companyId = user.shopifyCompanyId;
+      companyFields.shopifyCompanyId = user.shopifyCompanyId;
+    }
 
     const sessionUser = {
       id: user.id,

@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createDraftOrder } from "@/lib/shopify/draft";
 import prisma from "@/lib/prisma/instance";
+import { getCustomerCompany } from "@/lib/shopify/customer-company";
 
 type IncomingLine = {
   merchandiseId?: string;
@@ -13,6 +14,50 @@ type IncomingLine = {
   title?: string;
   customPrice?: number | string;
 };
+
+function firstString(...vals: unknown[]): string {
+  for (const v of vals) {
+    const s = String(v ?? "").trim();
+    if (s && s !== "null" && s !== "undefined") return s;
+  }
+  return "";
+}
+
+function toDraftMailingAddress(
+  src: Record<string, any> | null | undefined,
+  companyName?: string | null,
+) {
+  if (!src || typeof src !== "object") return null;
+  const address1 = firstString(src.address1, src.addressLine1);
+  const city = firstString(src.city);
+  const zip = firstString(src.zip, src.zipCode, src.postalCode);
+  if (!address1 || !city || !zip) return null;
+  return {
+    firstName: firstString(src.firstName, src.first_name) || undefined,
+    lastName: firstString(src.lastName, src.last_name) || undefined,
+    company: firstString(companyName, src.company) || undefined,
+    address1,
+    address2: firstString(src.address2, src.addressLine2) || undefined,
+    city,
+    province:
+      firstString(
+        src.province,
+        src.provinceCode,
+        src.province_code,
+        src.state,
+      ) || undefined,
+    country:
+      firstString(
+        src.country,
+        src.country_name,
+        src.countryName,
+        src.countryCode,
+        src.country_code,
+      ) || "United States",
+    zip,
+    phone: firstString(src.phone) || undefined,
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,22 +104,51 @@ export async function POST(request: NextRequest) {
 
     // ===== STEP 0: Resolve customerId if it's a Prisma ID =====
     let shopifyCustomerId = customerId;
-    if (customerId && !customerId.startsWith("gid://")) {
+    let dbUser: {
+      shopifyCustomerId: string | null;
+      firstName: string | null;
+      lastName: string | null;
+      phone: string | null;
+      addressLine1: string | null;
+      addressLine2: string | null;
+      city: string | null;
+      state: string | null;
+      zip: string | null;
+      shippingAddress: any;
+      billingAddress: any;
+      companyName: string | null;
+    } | null = null;
+    if (customerId) {
       try {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: customerId },
-          select: { shopifyCustomerId: true },
+        dbUser = await prisma.user.findFirst({
+          where: customerId.startsWith("gid://")
+            ? { shopifyCustomerId: customerId }
+            : {
+                OR: [
+                  { id: customerId },
+                  { shopifyCustomerId: customerId },
+                ],
+              },
+          select: {
+            shopifyCustomerId: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            addressLine1: true,
+            addressLine2: true,
+            city: true,
+            state: true,
+            zip: true,
+            shippingAddress: true,
+            billingAddress: true,
+            companyName: true,
+          },
         });
-        if (dbUser?.shopifyCustomerId) {
+        if (!shopifyCustomerId?.startsWith("gid://") && dbUser?.shopifyCustomerId) {
           shopifyCustomerId = dbUser.shopifyCustomerId;
           console.log(
             `[CUSTOMER ID RESOLVED] Prisma ID ${customerId} → Shopify GID ${shopifyCustomerId}`,
           );
-        } else {
-          console.warn(
-            `[CUSTOMER ID] No shopifyCustomerId found for Prisma ID ${customerId}`,
-          );
-          shopifyCustomerId = undefined;
         }
       } catch (e) {
         console.warn(`[CUSTOMER ID RESOLUTION] Failed:`, e);
@@ -381,17 +455,51 @@ export async function POST(request: NextRequest) {
 
     const trimmedPo = typeof poNumber === "string" ? poNumber.trim() : "";
 
+    const companyInfo = shopifyCustomerId
+      ? await getCustomerCompany(shopifyCustomerId)
+      : null;
+    const companyName = companyInfo?.companyName || dbUser?.companyName || null;
+    console.log("[CHECKOUT COMPANY]", {
+      shopifyCustomerId,
+      companyId: companyInfo?.companyId ?? null,
+      companyLocationId: companyInfo?.companyLocationId ?? null,
+      companyContactId: companyInfo?.companyContactId ?? null,
+      companyName,
+    });
+
+    const customerEnteredShipping =
+      toDraftMailingAddress(shippingAddress, companyName) ||
+      toDraftMailingAddress(dbUser?.shippingAddress, companyName) ||
+      toDraftMailingAddress(
+        dbUser
+          ? {
+              firstName: dbUser.firstName,
+              lastName: dbUser.lastName,
+              phone: dbUser.phone,
+              address1: dbUser.addressLine1,
+              address2: dbUser.addressLine2,
+              city: dbUser.city,
+              state: dbUser.state,
+              zip: dbUser.zip,
+            }
+          : null,
+        companyName,
+      ) ||
+      toDraftMailingAddress(dbUser?.billingAddress, companyName);
+
     const input = {
       customerId: shopifyCustomerId ?? undefined, // Shopify GID: gid://shopify/Customer/123
       email: email ?? undefined,
       phone: phone ?? undefined,
       lineItems: items,
-      shippingAddress: shippingAddress
+      purchasingCompany: companyInfo
         ? {
-            ...shippingAddress,
-            company: shippingAddress.company ?? undefined,
+            companyId: companyInfo.companyId,
+            companyLocationId: companyInfo.companyLocationId,
+            companyContactId: companyInfo.companyContactId,
           }
         : undefined,
+      shippingAddress: customerEnteredShipping ?? undefined,
       tags: ["b2b", "custom-pricing"],
       note: shopifyCustomerId
         ? `B2B Order - Custom pricing for ${shopifyCustomerId}`

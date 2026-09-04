@@ -1,7 +1,6 @@
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
-import sharp from "sharp";
 
 const FONT_REGULAR = "Helvetica";
 const FONT_BOLD = "Helvetica-Bold";
@@ -74,10 +73,17 @@ export async function loadLogoPng(): Promise<Buffer | null> {
     path.join(process.cwd(), "public", "logo.svg"),
     path.join(process.cwd(), "public", "logo.webp"),
   ];
+  let sharpMod: typeof import("sharp") | null = null;
+  try {
+    sharpMod = (await import("sharp")).default;
+  } catch (err) {
+    console.warn("[invoice-pdf] sharp unavailable, skipping logo:", err);
+    return null;
+  }
   for (const file of candidates) {
     if (!fs.existsSync(file)) continue;
     try {
-      return await sharp(file).resize({ height: 100 }).png().toBuffer();
+      return await sharpMod(file).resize({ height: 100 }).png().toBuffer();
     } catch {
       /* try next */
     }

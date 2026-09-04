@@ -38,6 +38,43 @@ type PartialCustomerCompany = {
 
 const ORDERING_ROLE_ID = "gid://shopify/CompanyContactRole/5304221999";
 
+const GET_CUSTOMER_COMPANY = `
+  query GetCustomerCompany($customerId: ID!) {
+    customer(id: $customerId) {
+      companyContactProfiles {
+        id
+        isMainContact
+        company {
+          id
+          name
+          locations(first: 1) {
+            nodes { id }
+          }
+        }
+      }
+    }
+  }
+`;
+
+const GET_CUSTOMER_COMPANY_CONTACTS = `
+  query GetCustomerCompanyContacts($customerId: ID!) {
+    customer(id: $customerId) {
+      companyContacts(first: 1) {
+        nodes {
+          id
+          company {
+            id
+            name
+            locations(first: 1) {
+              nodes { id }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 const COMPANY_CREATE = `
   mutation CompanyCreate($input: CompanyCreateInput!) {
     companyCreate(input: $input) {
@@ -103,6 +140,12 @@ export function isCompleteCompanyInfo(
       info?.companyLocationId &&
       info?.companyContactId,
   );
+}
+
+export function toPurchasingCompanyInput(
+  info?: PartialCustomerCompany | null,
+): CustomerCompanyInfo | null {
+  return isCompleteCompanyInfo(info) ? info : null;
 }
 
 export function toSessionCompanyFields(
@@ -360,6 +403,104 @@ async function findStoredCompany(
   return fromMongoDoc(doc);
 }
 
+function parseCompanyFromCustomerPayload(
+  shopifyCustomerId: string,
+  customer: any,
+): CustomerCompanyInfo | null {
+  const profiles = Array.isArray(customer?.companyContactProfiles)
+    ? customer.companyContactProfiles
+    : [];
+  const contacts = Array.isArray(customer?.companyContacts?.nodes)
+    ? customer.companyContacts.nodes
+    : Array.isArray(customer?.companyContacts)
+      ? customer.companyContacts
+      : [];
+  const node =
+    profiles.find((p: any) => p?.isMainContact) ||
+    profiles[0] ||
+    contacts[0];
+  if (!node) return null;
+
+  const companyId = String(node.company?.id || "").trim();
+  const companyName = String(node.company?.name || "").trim();
+  const companyContactId = String(node.id || "").trim();
+  const companyLocationId = String(
+    node.roleAssignments?.nodes?.[0]?.companyLocation?.id ||
+      node.companyLocation?.id ||
+      node.company?.locations?.nodes?.[0]?.id ||
+      "",
+  ).trim();
+
+  if (!companyId || !companyLocationId || !companyContactId) return null;
+
+  return {
+    shopifyCustomerId,
+    companyId,
+    companyLocationId,
+    companyContactId,
+    companyName,
+  };
+}
+
+export async function fetchCustomerCompanyFromShopify(
+  customerId?: string | null,
+): Promise<CustomerCompanyInfo | null> {
+  const shopifyCustomerId = toCustomerGid(customerId);
+  if (!shopifyCustomerId) return null;
+
+  try {
+    const result = await shopifyAdminFetch({
+      query: GET_CUSTOMER_COMPANY,
+      variables: { customerId: shopifyCustomerId },
+    });
+    if (result?.errors?.length) {
+      console.warn(
+        "[customer-company] GetCustomerCompany errors:",
+        result.errors,
+      );
+    }
+    let parsed = parseCompanyFromCustomerPayload(
+      shopifyCustomerId,
+      result?.data?.customer,
+    );
+
+    if (!parsed) {
+      const fallback = await shopifyAdminFetch({
+        query: GET_CUSTOMER_COMPANY_CONTACTS,
+        variables: { customerId: shopifyCustomerId },
+      });
+      parsed = parseCompanyFromCustomerPayload(
+        shopifyCustomerId,
+        fallback?.data?.customer,
+      );
+    }
+    if (parsed) {
+      console.log("[customer-company] Shopify company resolved:", {
+        shopifyCustomerId,
+        companyId: parsed.companyId,
+        companyName: parsed.companyName,
+      });
+    }
+    return parsed;
+  } catch (err) {
+    console.warn("[customer-company] Shopify company fetch failed:", err);
+    return null;
+  }
+}
+
+export async function getCachedCustomerCompany(
+  customerId?: string | null,
+): Promise<PartialCustomerCompany | null> {
+  const shopifyCustomerId = toCustomerGid(customerId);
+  if (!shopifyCustomerId) return null;
+  try {
+    return await findStoredCompany(shopifyCustomerId);
+  } catch (err) {
+    console.warn("[customer-company] cached company lookup failed:", err);
+    return null;
+  }
+}
+
 export async function getCustomerCompany(
   customerId?: string | null,
 ): Promise<CustomerCompanyInfo | null> {
@@ -368,7 +509,19 @@ export async function getCustomerCompany(
 
   try {
     const stored = await findStoredCompany(shopifyCustomerId);
-    return isCompleteCompanyInfo(stored) ? stored : null;
+    if (isCompleteCompanyInfo(stored)) return stored;
+
+    const fromShopify = await fetchCustomerCompanyFromShopify(shopifyCustomerId);
+    if (!fromShopify) {
+      return isCompleteCompanyInfo(stored) ? stored : null;
+    }
+
+    const saved = await saveCustomerCompany({
+      ...stored,
+      ...fromShopify,
+      shopifyCustomerId,
+    });
+    return isCompleteCompanyInfo(saved) ? saved : fromShopify;
   } catch (err) {
     console.warn("[customer-company] getCustomerCompany failed:", err);
     return null;

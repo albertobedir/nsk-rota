@@ -1,4 +1,5 @@
 export type InvoiceAddress = {
+  company?: string;
   address1?: string;
   address2?: string;
   city?: string;
@@ -93,12 +94,13 @@ export function formatInvoiceAddressLines(
   const label = kind === "billing" ? "Billing address" : "Shipping address";
   if (!addr) return [label, "-"];
 
+  const company = clean(addr.company);
   const street = [addr.address1, addr.address2].map(clean).filter(Boolean).join(", ");
   const cityLine = [clean(addr.city), expandUsState(addr.province || ""), clean(addr.zip)]
     .filter(Boolean)
     .join(" ");
   const country = expandCountry(addr.country || "", addr.countryCode || "");
 
-  const lines = [label, street, cityLine, country].filter(Boolean);
+  const lines = [label, company, street, cityLine, country].filter(Boolean);
   return lines.length > 1 ? lines : [label, "-"];
 }

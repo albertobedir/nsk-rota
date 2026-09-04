@@ -10,6 +10,10 @@ import prisma from "@/lib/prisma/instance";
 import { shopifyFetch } from "@/lib/shopify/instance";
 import { createCart, getCart } from "@/lib/shopify/cart";
 import { getShopifyCustomerIdByEmail } from "@/lib/shopify-customer";
+import {
+  getCustomerCompany,
+  toSessionCompanyFields,
+} from "@/lib/shopify/customer-company";
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET!;
@@ -139,13 +143,20 @@ export async function POST(request: NextRequest) {
 
     const shopifyCustomerId =
       user.shopifyCustomerId || shopifyCustomer.id || null;
-    const companyFields = {
-      companyName: user.companyName ?? null,
-      shopifyCompanyId: user.shopifyCompanyId ?? null,
-      companyId: user.shopifyCompanyId ?? null,
-      companyLocationId: null as string | null,
-      companyContactId: null as string | null,
-    };
+    let companyFields = toSessionCompanyFields(null);
+    try {
+      const companyInfo = await getCustomerCompany(shopifyCustomerId);
+      companyFields = toSessionCompanyFields(companyInfo);
+    } catch (err) {
+      console.warn("[login] company lookup failed:", err);
+    }
+    if (!companyFields.companyName) {
+      companyFields.companyName = user.companyName ?? null;
+    }
+    if (!companyFields.companyId && user.shopifyCompanyId) {
+      companyFields.companyId = user.shopifyCompanyId;
+      companyFields.shopifyCompanyId = user.shopifyCompanyId;
+    }
 
     const accessToken = jwt.sign(
       { id: user.id, email: user.email },
