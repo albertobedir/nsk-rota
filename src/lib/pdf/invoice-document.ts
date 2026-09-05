@@ -25,6 +25,7 @@ export type InvoicePdfItem = {
   sku: string;
   customerNo?: string;
   unitPrice: number;
+  originalUnitPrice?: number;
   lineTotal: number;
 };
 
@@ -172,7 +173,7 @@ class InvoiceLayout {
     this.drawFirstPageChrome();
     this.drawTableHeader();
     this.drawItems();
-    this.drawTableTotals();
+    this.y += 14;
     this.drawSummaryAndTotals();
     this.drawPaymentSection();
     this.drawNotes();
@@ -482,14 +483,20 @@ class InvoiceLayout {
     this.y += TABLE_HEADER_H;
   }
 
-  private rowHeight(title: string) {
+  private hasComparePrice(item: InvoicePdfItem) {
+    const original = Number(item.originalUnitPrice || 0);
+    return original - Number(item.unitPrice || 0) > 0.004;
+  }
+
+  private rowHeight(item: InvoicePdfItem) {
     const descH = this.measureHeight(
-      title,
+      item.title || "Item",
       this.cols.desc - 6,
       8,
       MAX_DESC_LINES,
     );
-    return Math.max(22, descH + ROW_PAD * 2);
+    const priceH = this.hasComparePrice(item) ? 26 : this.lineHeight(8);
+    return Math.max(22, descH + ROW_PAD * 2, priceH + ROW_PAD * 2);
   }
 
   private drawItems() {
@@ -509,8 +516,7 @@ class InvoiceLayout {
     }
 
     items.forEach((item, idx) => {
-      const title = item.title || "Item";
-      const h = this.rowHeight(title);
+      const h = this.rowHeight(item);
       this.ensureSpace(h, "items");
       this.drawItemRow(item, idx, h);
       this.y += h;
@@ -530,6 +536,7 @@ class InvoiceLayout {
     const singleH = this.lineHeight(8);
     const midY = this.y + Math.max(ROW_PAD, (h - singleH) / 2);
     const topY = this.y + ROW_PAD;
+    const hasCompare = this.hasComparePrice(item);
 
     const cells: Array<{
       text: string;
@@ -538,6 +545,7 @@ class InvoiceLayout {
       bold?: boolean;
       y: number;
       height: number;
+      skip?: boolean;
     }> = [
       {
         text: String(idx + 1),
@@ -582,6 +590,7 @@ class InvoiceLayout {
         align: "right",
         y: midY,
         height: singleH,
+        skip: hasCompare,
       },
       {
         text: this.formatMoney(item.lineTotal),
@@ -595,82 +604,86 @@ class InvoiceLayout {
 
     let x = MARGIN;
     for (const cell of cells) {
-      this.text(cell.text, x + 3, cell.y, {
-        width: cell.w - 6,
-        height: cell.height,
-        size: 8,
-        bold: cell.bold,
-        align: cell.align ?? "center",
-      });
+      if (!cell.skip) {
+        this.text(cell.text, x + 3, cell.y, {
+          width: cell.w - 6,
+          height: cell.height,
+          size: 8,
+          bold: cell.bold,
+          align: cell.align ?? "center",
+        });
+      }
       x += cell.w;
+    }
+
+    if (hasCompare) {
+      const priceX =
+        MARGIN +
+        this.cols.no +
+        this.cols.orderNo +
+        this.cols.custNo +
+        this.cols.rotaNo +
+        this.cols.desc +
+        this.cols.qty;
+      this.drawCompareUnitPrice(item, priceX, h);
     }
   }
 
-  private drawTableTotals() {
-    const totalQty = this.input.items.reduce(
-      (sum, item) => sum + Number(item.quantity || 0),
-      0,
-    );
-    const rowH = 22;
-    this.ensureSpace(rowH * 2, "items");
+  private drawCompareUnitPrice(item: InvoicePdfItem, x: number, h: number) {
+    const sale = this.formatMoney(item.unitPrice);
+    const original = this.formatMoney(Number(item.originalUnitPrice));
+    const innerW = this.cols.price - 6;
+    const cellX = x + 3;
+    const saleSize = 8;
+    const origSize = 6.5;
+    const saleH = this.lineHeight(saleSize);
+    const origH = this.lineHeight(origSize);
+    const stackH = saleH + origH + 2;
+    const startY = this.y + Math.max(ROW_PAD - 1, (h - stackH) / 2);
 
-    const labelX =
-      MARGIN +
-      this.cols.no +
-      this.cols.orderNo +
-      this.cols.custNo +
-      this.cols.rotaNo;
-    const qtyX = labelX + this.cols.desc;
-    const totalX = qtyX + this.cols.qty + this.cols.price;
+    this.text(sale, cellX, startY, {
+      width: innerW,
+      height: saleH,
+      size: saleSize,
+      bold: true,
+      align: "right",
+    });
 
-    const drawFooterRow = (
-      label: string,
-      qty: string,
-      amount: string | null,
-      fill: boolean,
-    ) => {
-      if (fill) {
-        this.doc.rect(MARGIN, this.y, this.contentW, rowH).fill(LIGHT_BG);
-      }
-      this.doc
-        .rect(MARGIN, this.y, this.contentW, rowH)
-        .strokeColor(DIVIDER)
-        .lineWidth(0.4)
-        .stroke();
-      this.text(label, labelX + 3, this.y + 6, {
-        width: this.cols.desc - 6,
-        height: 12,
-        size: 9,
-        bold: true,
-        align: "right",
-      });
-      this.text(qty, qtyX + 3, this.y + 6, {
-        width: this.cols.qty - 6,
-        height: 12,
-        size: 9,
-        bold: true,
-        align: "center",
-      });
-      if (amount) {
-        this.text(amount, totalX + 3, this.y + 6, {
-          width: this.cols.total - 6,
-          height: 12,
-          size: 9,
-          bold: true,
-          align: "right",
-        });
-      }
-      this.y += rowH;
-    };
+    this.doc.font(FONT_BOLD).fontSize(saleSize);
+    const saleW = Math.min(this.doc.widthOfString(sale), innerW);
+    const saleLineX = cellX + innerW - saleW;
+    this.doc.save();
+    this.doc
+      .strokeColor(TEXT_MUTED)
+      .lineWidth(0.5)
+      .dash(1.2, { space: 1.2 })
+      .moveTo(saleLineX, startY + saleH - 1)
+      .lineTo(saleLineX + saleW, startY + saleH - 1)
+      .stroke();
+    this.doc.restore();
 
-    drawFooterRow(
-      "TOTAL",
-      String(totalQty),
-      this.formatMoney(this.input.subtotal),
-      true,
-    );
-    drawFooterRow("TOTAL DAP", "0", null, false);
-    this.y += 14;
+    const origY = startY + saleH + 1;
+    this.text(original, cellX, origY, {
+      width: innerW,
+      height: origH,
+      size: origSize,
+      color: TEXT_MUTED,
+      align: "right",
+    });
+
+    this.doc.font(FONT_REGULAR).fontSize(origSize);
+    const origW = Math.min(this.doc.widthOfString(original), innerW);
+    const origLineX = cellX + innerW - origW;
+    const strikeY = origY + origH * 0.45;
+    this.doc.save();
+    this.doc
+      .strokeColor(TEXT_MUTED)
+      .lineWidth(0.6)
+      .undash()
+      .moveTo(origLineX, strikeY)
+      .lineTo(origLineX + origW, strikeY)
+      .stroke();
+    this.doc.restore();
   }
 
   private drawSummaryAndTotals() {

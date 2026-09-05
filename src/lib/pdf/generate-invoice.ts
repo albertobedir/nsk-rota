@@ -225,6 +225,7 @@ export async function generateInvoicePdf(opts: {
       sku: String(node?.sku || ""),
       customerNo: "-",
       unitPrice,
+      originalUnitPrice: originalPrice > unitPrice ? originalPrice : undefined,
       lineTotal,
     };
   });
