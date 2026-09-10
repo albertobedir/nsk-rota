@@ -5,6 +5,10 @@ import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongoose/instance";
 import Order from "@/schemas/mongoose/order";
 import { extractNumericId, toOrderGid } from "@/lib/shopify/ids";
+import { syncShopifyOrderById } from "@/lib/shopify/order-webhook";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(
   _req: Request,
@@ -106,6 +110,19 @@ export async function GET(
       order.raw?.lineItems ? "exists" : "missing",
     );
     console.log("=== END MONGO SEARCH ===\n");
+
+    const liveOrderId =
+      extractNumericId(order.shopifyId) ||
+      extractNumericId(order.raw?.id) ||
+      extractNumericId(id);
+    try {
+      const synced = await syncShopifyOrderById(liveOrderId);
+      if (synced?.result) {
+        order = synced.result;
+      }
+    } catch (syncErr) {
+      console.error("Failed to refresh order from Shopify:", syncErr);
+    }
 
     // Return shape expected by the client page (d.data.data.node)
     return NextResponse.json({ ok: true, data: { data: { node: order } } });

@@ -317,6 +317,49 @@ function fulfillmentShipmentKey(f: any): string {
   return key;
 }
 
+function fulfillmentCarrierKey(f: any): string {
+  const key = normalizeKey(
+    firstString(f?.shipment_status, f?.shipmentStatus, f?.displayStatus),
+  );
+  if (
+    !key ||
+    key === "success" ||
+    key === "submitted" ||
+    key === "marked_as_fulfilled"
+  ) {
+    return "";
+  }
+  return key;
+}
+
+const SHIPMENT_RANK: Record<string, number> = {
+  unfulfilled: 0,
+  on_hold: 1,
+  request_declined: 1,
+  in_progress: 2,
+  pending_fulfillment: 2,
+  scheduled: 2,
+  partially_fulfilled: 3,
+  fulfilled: 4,
+  label_printed: 4,
+  label_purchased: 4,
+  confirmed: 5,
+  in_transit: 6,
+  shipped: 6,
+  delayed: 6,
+  failure: 5,
+  not_delivered: 5,
+  out_for_delivery: 7,
+  attempted_delivery: 7,
+  ready_for_pickup: 7,
+  picked_up: 8,
+  delivered: 9,
+};
+
+function shipmentRank(key: string): number {
+  return SHIPMENT_RANK[key] ?? -1;
+}
+
 export function extractOrderTrackings(order: any): OrderTracking[] {
   const fulfillments = fulfillmentRecords(order);
   const rows: OrderTracking[] = fulfillments.flatMap((f: any) => {
@@ -433,8 +476,13 @@ function getOrderFulfillmentKey(order: any): string {
       (!mapped || mapped === "unfulfilled"));
 
   if (notRequired) return "fulfillment_not_required";
-  if (!mapped) return "unfulfilled";
-  return mapped;
+
+  let best = mapped || "unfulfilled";
+  for (const fulfillment of fulfillmentRecords(order)) {
+    const carrier = fulfillmentCarrierKey(fulfillment);
+    if (shipmentRank(carrier) > shipmentRank(best)) best = carrier;
+  }
+  return best;
 }
 
 export function getShipmentStatusKey(order: any): string {

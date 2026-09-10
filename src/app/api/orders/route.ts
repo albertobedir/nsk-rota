@@ -13,6 +13,11 @@ import {
   getOrderStatusInfo,
   parseOrderTags,
 } from "@/lib/orders/status";
+import { extractNumericId } from "@/lib/shopify/ids";
+import {
+  applyShopifyOrderUpdate,
+} from "@/lib/shopify/order-webhook";
+import { fetchShopifyRestOrdersByIds } from "@/lib/shopify/order-rest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +44,48 @@ export async function GET(req: NextRequest) {
     await connectDB();
 
     const query = buildCustomerOrderMongoQuery(identity);
-    const orders = await Order.find(query).sort({ createdAt: -1 }).lean();
+    let orders = await Order.find(query).sort({ createdAt: -1 }).lean();
+
+    try {
+      const refreshIds = orders
+        .filter((order) => {
+          if (order.cancelledAt || order.raw?.cancelled_at) return false;
+          const fulfillment = String(
+            order.fulfillmentStatus || order.raw?.fulfillment_status || "",
+          ).toLowerCase();
+          const shipments = Array.isArray(order.raw?.fulfillments)
+            ? order.raw.fulfillments.map((f: any) =>
+                String(f?.shipment_status || f?.shipmentStatus || "").toLowerCase(),
+              )
+            : [];
+          if (fulfillment === "delivered" || shipments.includes("delivered")) {
+            return false;
+          }
+          return true;
+        })
+        .map(
+          (order) =>
+            extractNumericId(order.shopifyId) ||
+            extractNumericId(
+              typeof order.raw?.id === "string" ||
+                typeof order.raw?.id === "number"
+                ? order.raw.id
+                : null,
+            ),
+        );
+
+      const liveOrders = await fetchShopifyRestOrdersByIds(refreshIds);
+      if (liveOrders.length > 0) {
+        await Promise.all(
+          liveOrders.map((live) =>
+            applyShopifyOrderUpdate(live, { upsert: false }),
+          ),
+        );
+        orders = await Order.find(query).sort({ createdAt: -1 }).lean();
+      }
+    } catch (syncErr) {
+      console.error("Failed to refresh orders from Shopify:", syncErr);
+    }
 
     const mapped = orders.map((order) => {
       const statusInfo = getOrderStatusInfo(order);

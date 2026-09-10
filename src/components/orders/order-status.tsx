@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import {
   isDelivered,
   isPaymentComplete,
+  isShipped,
   type OrderStatusInfo,
   type StatusTone,
 } from "@/lib/orders/status";
@@ -96,13 +97,13 @@ export function OrderProgress({ info }: { info: OrderStatusInfo }) {
     { key: "ordered", label: "Ordered", done: true },
     {
       key: "paid",
-      label: info.paymentLabel,
+      label: "Paid",
       done: isPaymentComplete(info.paymentKey),
     },
     {
       key: "shipped",
       label: "Fulfilled",
-      done: info.shipmentKey === "fulfilled" || isDelivered(info.shipmentKey),
+      done: isShipped(info.shipmentKey),
     },
     {
       key: "delivered",
@@ -111,10 +112,8 @@ export function OrderProgress({ info }: { info: OrderStatusInfo }) {
     },
   ];
 
-  const currentIndex = steps.reduce(
-    (acc, step, index) => (step.done ? index : acc),
-    0,
-  );
+  const firstOpen = steps.findIndex((step) => !step.done);
+  const currentIndex = firstOpen === -1 ? steps.length - 1 : firstOpen;
 
   return (
     <div className="mb-6 rounded-md border border-slate-200 bg-slate-50 px-4 py-4">
@@ -123,8 +122,7 @@ export function OrderProgress({ info }: { info: OrderStatusInfo }) {
       </div>
       <ol className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {steps.map((step, index) => {
-          const active =
-            index === currentIndex && !steps[steps.length - 1].done;
+          const active = !step.done && index === currentIndex;
           return (
             <li key={step.key} className="flex items-center gap-2">
               <span

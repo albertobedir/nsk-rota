@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { maybeRestoreCreditWhenPaid } from "@/lib/shopify/customer-credit";
 import {
+  applyShopifyFulfillmentUpdate,
   applyShopifyOrderUpdate,
+  isShopifyFulfillmentPayload,
   verifyShopifyWebhook,
 } from "@/lib/shopify/order-webhook";
 
@@ -18,6 +20,21 @@ export async function POST(req: NextRequest) {
     }
 
     const orderData = JSON.parse(rawBody);
+
+    if (isShopifyFulfillmentPayload(orderData)) {
+      console.log(
+        "📦 Fulfillment payload on orders/updated — syncing parent order",
+        orderData?.order_id,
+      );
+      const result = await applyShopifyFulfillmentUpdate(orderData);
+      return NextResponse.json({
+        status: "ok",
+        via: "orders/updated",
+        shopifyId: result.shopifyId,
+        skipped: result.skipped,
+        fulfillmentStatus: result.fulfillmentStatus,
+      });
+    }
 
     const shopifyIdHint = orderData.admin_graphql_api_id
       ? String(orderData.admin_graphql_api_id).split("?")[0]

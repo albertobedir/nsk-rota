@@ -4,7 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongoose/instance";
 import Order from "@/schemas/mongoose/order";
 import nodemailer from "nodemailer";
-import { resolveOrderPoNumber } from "@/lib/shopify/order-webhook";
+import {
+  applyShopifyFulfillmentUpdate,
+  isShopifyFulfillmentPayload,
+  resolveOrderPoNumber,
+} from "@/lib/shopify/order-webhook";
 import {
   fetchOrderPaymentDetails,
   markOrderCreditDeducted,
@@ -313,13 +317,20 @@ export async function POST(req: NextRequest) {
       ? String(orderData.admin_graphql_api_id).split("?")[0]
       : `gid://shopify/Order/${orderData.id}`;
 
-    // Guard against fulfillment events being sent to orders/create
-    if (
-      orderData.admin_graphql_api_id?.includes("Fulfillment") ||
-      orderData.kind === "fulfillment"
-    ) {
-      console.log("⚠️ Fulfillment payload — skipping orders/create handler");
-      return NextResponse.json({ status: "ok", skipped: "fulfillment" });
+    // Fulfillment webhooks are sometimes pointed at orders/create.
+    if (isShopifyFulfillmentPayload(orderData)) {
+      console.log(
+        "📦 Fulfillment payload on orders/create — syncing parent order",
+        orderData?.order_id,
+      );
+      const result = await applyShopifyFulfillmentUpdate(orderData);
+      return NextResponse.json({
+        status: "ok",
+        via: "orders/create",
+        shopifyId: result.shopifyId,
+        skipped: result.skipped,
+        fulfillmentStatus: result.fulfillmentStatus,
+      });
     }
 
     try {

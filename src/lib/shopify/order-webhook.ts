@@ -3,6 +3,8 @@ import crypto from "crypto";
 import { NextRequest } from "next/server";
 import { connectDB } from "@/lib/mongoose/instance";
 import Order from "@/schemas/mongoose/order";
+import { extractNumericId } from "@/lib/shopify/ids";
+import { fetchShopifyRestOrder } from "@/lib/shopify/order-rest";
 
 export function verifyShopifyWebhook(req: NextRequest, rawBody: string) {
   const hmacHeader = req.headers.get("X-Shopify-Hmac-Sha256");
@@ -41,6 +43,33 @@ export function resolveOrderPoNumber(orderData: any): string | null {
   return trimmed ? trimmed : null;
 }
 
+function cachedOrderLookupFilter(orderData: any, shopifyId: string) {
+  const numericId =
+    orderData?.id != null
+      ? String(orderData.id)
+      : extractNumericId(shopifyId);
+  const orderNumber = orderData?.order_number
+    ? Number(orderData.order_number)
+    : undefined;
+
+  return {
+    $or: [
+      { shopifyId },
+      ...(numericId
+        ? [
+            { shopifyId: numericId },
+            { shopifyId: `gid://shopify/Order/${numericId}` },
+            { "raw.id": Number(numericId) },
+            { "raw.id": numericId },
+          ]
+        : []),
+      ...(orderNumber && !Number.isNaN(orderNumber)
+        ? [{ orderNumber }]
+        : []),
+    ],
+  };
+}
+
 export async function applyShopifyOrderUpdate(
   orderData: any,
   { upsert }: { upsert: boolean },
@@ -48,7 +77,9 @@ export async function applyShopifyOrderUpdate(
   await connectDB();
 
   const shopifyId = resolveShopifyId(orderData);
-  const existing = await Order.findOne({ shopifyId }).lean();
+  const existing = await Order.findOne(
+    cachedOrderLookupFilter(orderData, shopifyId),
+  ).lean();
   const previousFinancialStatus =
     existing?.financialStatus ??
     (typeof existing?.raw?.financial_status === "string"
@@ -60,7 +91,7 @@ export async function applyShopifyOrderUpdate(
   const trackingNumber = latestFulfillment?.tracking_number ?? undefined;
   const trackingUrl = latestFulfillment?.tracking_url ?? undefined;
   const trackingCompany = latestFulfillment?.tracking_company ?? undefined;
-  const fulfillmentStatus = orderData.fulfillment_status ?? undefined;
+  const fulfillmentStatus = orderData.fulfillment_status ?? "unfulfilled";
   const financialStatus = orderData.financial_status ?? undefined;
   const cancelledAt = orderData.cancelled_at
     ? new Date(orderData.cancelled_at)
@@ -80,14 +111,16 @@ export async function applyShopifyOrderUpdate(
   const poNumber = resolveOrderPoNumber(orderData);
 
   const set: Record<string, any> = {
-    raw: orderData,
+    raw: existing?.raw
+      ? { ...existing.raw, ...orderData }
+      : orderData,
     cancelledAt,
     cancelReason,
+    fulfillmentStatus,
     ...(poNumber && { poNumber }),
     ...(trackingNumber && { trackingNumber }),
     ...(trackingUrl && { trackingUrl }),
     ...(trackingCompany && { trackingCompany }),
-    ...(fulfillmentStatus && { fulfillmentStatus }),
     ...(financialStatus && { financialStatus }),
   };
 
@@ -104,10 +137,10 @@ export async function applyShopifyOrderUpdate(
   }
 
   const result = await Order.findOneAndUpdate(
-    { shopifyId },
+    existing?._id ? { _id: existing._id } : { shopifyId },
     { $set: set },
     { upsert, new: true },
-  );
+  ).lean();
 
   return {
     shopifyId,
@@ -116,5 +149,44 @@ export async function applyShopifyOrderUpdate(
     financialStatus,
     fulfillmentStatus,
     previousFinancialStatus,
+    skipped: undefined as string | undefined,
   };
+}
+
+export async function syncShopifyOrderById(orderId?: string | number | null) {
+  const live = await fetchShopifyRestOrder(orderId);
+  if (!live) {
+    return {
+      shopifyId: undefined as string | undefined,
+      result: null,
+      skipped: "not_found_in_shopify" as const,
+      fulfillmentStatus: undefined as string | undefined,
+    };
+  }
+  return applyShopifyOrderUpdate(live, { upsert: false });
+}
+
+export async function applyShopifyFulfillmentUpdate(fulfillmentData: any) {
+  const orderId = fulfillmentData?.order_id;
+  if (!orderId) {
+    return {
+      shopifyId: undefined as string | undefined,
+      result: null,
+      skipped: "missing_order_id" as const,
+      fulfillmentStatus: undefined as string | undefined,
+    };
+  }
+  return syncShopifyOrderById(orderId);
+}
+
+export function isShopifyFulfillmentPayload(data: any): boolean {
+  const gid = String(data?.admin_graphql_api_id || "");
+  if (gid.includes("/Fulfillment/")) return true;
+  if (data?.kind === "fulfillment") return true;
+  return Boolean(
+    data?.order_id &&
+      !data?.order_number &&
+      !data?.financial_status &&
+      !data?.admin_graphql_api_id?.includes("/Order/"),
+  );
 }
