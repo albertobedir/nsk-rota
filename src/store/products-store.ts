@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { create } from "zustand";
+import { sanitizeSearchTerm } from "@/lib/utils/part-number";
 
 interface ShopifyImage {
   src: string;
@@ -131,9 +132,25 @@ export const useProductsStore = create<ProductState>((set) => ({
       return;
     }
 
+    const sanitizedQuery = String(query)
+      .split(",")
+      .map((s) => sanitizeSearchTerm(s))
+      .filter(Boolean)
+      .join(",");
+
+    if (!sanitizedQuery) {
+      set({
+        products: [],
+        total: 0,
+        searchTerm: "",
+        isLoading: false,
+      });
+      return;
+    }
+
     // include pagination params for search requests so backend can return paged results
     const qs = new URLSearchParams({
-      search: String(query),
+      search: sanitizedQuery,
       page: String(page),
       limit: String(limit),
     });
@@ -147,7 +164,7 @@ export const useProductsStore = create<ProductState>((set) => ({
     set({
       products: json.results ?? [],
       total: json.total ?? 0,
-      searchTerm: query,
+      searchTerm: sanitizedQuery,
       isLoading: false,
     });
   },

@@ -124,16 +124,16 @@ export async function applyShopifyOrderUpdate(
     ...(financialStatus && { financialStatus }),
   };
 
+  const billingAddress = stripNulls(orderData.billing_address);
+  const shippingAddress = stripNulls(orderData.shipping_address);
+  if (billingAddress) set.billingAddress = billingAddress;
+  if (shippingAddress) set.shippingAddress = shippingAddress;
+
   if (upsert) {
     set.shopifyId = shopifyId;
     if (orderNumber && !Number.isNaN(orderNumber)) set.orderNumber = orderNumber;
     if (orderData.name) set.name = orderData.name;
     if (customerGid) set.customerId = customerGid;
-
-    const billingAddress = stripNulls(orderData.billing_address);
-    const shippingAddress = stripNulls(orderData.shipping_address);
-    if (billingAddress) set.billingAddress = billingAddress;
-    if (shippingAddress) set.shippingAddress = shippingAddress;
   }
 
   const result = await Order.findOneAndUpdate(

@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { stripPartSeparators } from "@/lib/utils/part-number";
+import { sanitizeSearchTerm } from "@/lib/utils/part-number";
 import { useProductsStore } from "@/store/products-store";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
@@ -60,7 +60,7 @@ export default function Search() {
     }
 
     if (type === "single") {
-      const val = stripPartSeparators(value.trim());
+      const val = sanitizeSearchTerm(value);
       if (val.length < 4) return;
       if (lastSearchRef.current === val) return;
 
@@ -114,7 +114,7 @@ export default function Search() {
 
           const parts = value
             .split(/[\s,]+/)
-            .map((v) => stripPartSeparators(v.trim()))
+            .map((v) => sanitizeSearchTerm(v))
             .filter(Boolean);
 
           // Get existing tag values for duplicate check
@@ -212,7 +212,7 @@ export default function Search() {
       : "Search by multiple OEM, ROTA or competitor codes.";
   }, [type]);
 
-  const normalizedInput = stripPartSeparators(value.trim());
+  const normalizedInput = sanitizeSearchTerm(value);
   const singleSearchDisabled =
     isSearching || (type === "single" && normalizedInput.length < 4);
 
@@ -292,7 +292,7 @@ export default function Search() {
                   const pasted = e.clipboardData.getData("text");
                   const parts = pasted
                     .split(/[\s,]+/)
-                    .map((v) => stripPartSeparators(v.trim()))
+                    .map((v) => sanitizeSearchTerm(v))
                     .filter(Boolean);
                   if (parts.length === 0) return;
 

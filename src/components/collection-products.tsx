@@ -3,6 +3,11 @@
 
 import { useState } from "react";
 import SingleProdCard from "@/components/single-prod-cart";
+import {
+  partNumberContains,
+  partNumbersEqual,
+  sanitizeSearchTerm,
+} from "@/lib/utils/part-number";
 
 export default function CollectionProducts({
   products,
@@ -89,15 +94,25 @@ export default function CollectionProducts({
 
           // Determine match type based on searchTerm
           const matchType = (() => {
-            const q = (searchTerm ?? "").toString().trim();
-            if (!q) return undefined;
-            const lowerQ = q.toLowerCase();
-            const codeStr = String(code ?? "").toLowerCase();
+            const terms = String(searchTerm ?? "")
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
+            if (terms.length === 0) return undefined;
+            const codeStr = String(code ?? "");
             const titleStr = String(product.raw?.title ?? "").toLowerCase();
 
-            if (codeStr === lowerQ || titleStr === lowerQ)
+            if (terms.some((t) => partNumbersEqual(codeStr, t)))
               return "exact" as const;
-            if (codeStr.includes(lowerQ) || titleStr.includes(lowerQ))
+            if (
+              terms.some((t) => {
+                const n = sanitizeSearchTerm(t).toLowerCase();
+                return (
+                  partNumberContains(codeStr, t) ||
+                  (n.length > 0 && titleStr.includes(n))
+                );
+              })
+            )
               return "partial" as const;
             return undefined;
           })();

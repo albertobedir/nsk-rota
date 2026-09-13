@@ -31,6 +31,11 @@ import BrandModelTypeCombos from "@/components/brand-model-type-combos";
 import { Switch } from "@/components/ui/switch";
 import Image from "next/image";
 import responseJson from "@/static/response.json";
+import {
+  partNumberContains,
+  partNumbersEqual,
+  sanitizeSearchTerm,
+} from "@/lib/utils/part-number";
 // TreeFilter removed for step-by-step select flow
 
 export default function ProductsPage() {
@@ -1015,15 +1020,25 @@ export default function ProductsPage() {
 
               // determine match type based on active searchTerm
               const matchType = (() => {
-                const q = (searchTerm ?? "").toString().trim();
-                if (!q) return undefined;
-                const lowerQ = q.toLowerCase();
-                const codeStr = String(code ?? "").toLowerCase();
+                const terms = String(searchTerm ?? "")
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                if (terms.length === 0) return undefined;
+                const codeStr = String(code ?? "");
                 const titleStr = String(product.raw.title ?? "").toLowerCase();
 
-                if (codeStr === lowerQ || titleStr === lowerQ)
+                if (terms.some((t) => partNumbersEqual(codeStr, t)))
                   return "exact" as const;
-                if (codeStr.includes(lowerQ) || titleStr.includes(lowerQ))
+                if (
+                  terms.some((t) => {
+                    const n = sanitizeSearchTerm(t).toLowerCase();
+                    return (
+                      partNumberContains(codeStr, t) ||
+                      (n.length > 0 && titleStr.includes(n))
+                    );
+                  })
+                )
                   return "partial" as const;
                 return undefined;
               })();

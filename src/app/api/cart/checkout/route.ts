@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
       email,
       phone,
       shippingAddress,
+      billingAddress,
       customerId,
       userTier,
       discountPercentage,
@@ -484,8 +485,11 @@ export async function POST(request: NextRequest) {
             }
           : null,
         companyName,
-      ) ||
-      toDraftMailingAddress(dbUser?.billingAddress, companyName);
+      );
+    const customerEnteredBilling =
+      toDraftMailingAddress(billingAddress, companyName) ||
+      toDraftMailingAddress(dbUser?.billingAddress, companyName) ||
+      customerEnteredShipping;
 
     const input = {
       customerId: shopifyCustomerId ?? undefined, // Shopify GID: gid://shopify/Customer/123
@@ -501,6 +505,7 @@ export async function POST(request: NextRequest) {
           }
         : undefined,
       shippingAddress: customerEnteredShipping ?? undefined,
+      billingAddress: customerEnteredBilling ?? undefined,
       tags: ["b2b", "custom-pricing"],
       note: shopifyCustomerId
         ? `B2B Order - Custom pricing for ${shopifyCustomerId}`

@@ -5,9 +5,36 @@ import { connectDB } from "@/lib/mongoose/instance";
 import {
   escapeRegex,
   partNumberRegexSource,
+  partNumberSimpleRegexSource,
+  sanitizeSearchTerm,
 } from "@/lib/utils/part-number";
 import Product from "@/schemas/mongoose/product";
 import { NextRequest, NextResponse } from "next/server";
+
+function metafieldPartMatch(key: string, pattern: string) {
+  return {
+    "raw.metafields": {
+      $elemMatch: {
+        namespace: "custom",
+        key,
+        value: { $regex: pattern, $options: "i" as const },
+      },
+    },
+  };
+}
+
+/** Simple substring first so long digit queries don't die on backtracking. */
+function partNumberFieldMatches(
+  key: string,
+  simplePattern: string,
+  flexiblePattern: string,
+) {
+  const matches = [metafieldPartMatch(key, simplePattern)];
+  if (flexiblePattern && flexiblePattern !== simplePattern) {
+    matches.push(metafieldPartMatch(key, flexiblePattern));
+  }
+  return matches;
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,77 +116,54 @@ export async function GET(req: NextRequest) {
     if (search) {
       const searchValues = search
         .split(",")
-        .map((s) => s.trim())
+        .map((s) => sanitizeSearchTerm(s))
         .filter(Boolean);
-      const partPatterns = searchValues
+      const simplePatterns = searchValues
+        .map((v) => partNumberSimpleRegexSource(v))
+        .filter(Boolean);
+      const flexiblePatterns = searchValues
         .map((v) => partNumberRegexSource(v))
         .filter(Boolean);
-      const regexArray = partPatterns.map((p) => new RegExp(p, "i"));
-      const combinedPartPattern = partPatterns.map((p) => `(${p})`).join("|");
+      const simplePattern = simplePatterns.map((p) => `(${p})`).join("|");
+      const flexiblePattern = flexiblePatterns.map((p) => `(${p})`).join("|");
       const literalPattern = searchValues
         .map((v) => `(${escapeRegex(v)})`)
         .join("|");
 
-      if (partPatterns.length === 0) {
+      if (!simplePattern) {
         metafieldConditions.push({ _id: { $exists: false } });
       } else {
         metafieldConditions.push({
           $or: [
-            {
-              "raw.metafields": {
-                $elemMatch: {
-                  namespace: "custom",
-                  key: "rota_no",
-                  value: { $in: regexArray },
-                },
-              },
-            },
-            {
-              "raw.metafields": {
-                $elemMatch: {
-                  namespace: "custom",
-                  key: "oem_info",
-                  value: { $regex: combinedPartPattern, $options: "i" },
-                },
-              },
-            },
-            {
-              "raw.metafields": {
-                $elemMatch: {
-                  namespace: "custom",
-                  key: "competitor_info",
-                  value: { $regex: combinedPartPattern, $options: "i" },
-                },
-              },
-            },
-            // ✅ YENİ: applications metafield (BrandDescription, ModelDescription, Model2)
-            {
-              "raw.metafields": {
-                $elemMatch: {
-                  namespace: "custom",
-                  key: "applications",
-                  value: { $regex: literalPattern, $options: "i" },
-                },
-              },
-            },
-            // ✅ YENİ: brand_info metafield
-            {
-              "raw.metafields": {
-                $elemMatch: {
-                  namespace: "custom",
-                  key: "brand_info",
-                  value: { $regex: literalPattern, $options: "i" },
-                },
-              },
-            },
-            // SKU arama (variants.sku = RotaNo)
+            ...partNumberFieldMatches("rota_no", simplePattern, flexiblePattern),
+            ...partNumberFieldMatches("oem_info", simplePattern, flexiblePattern),
+            ...partNumberFieldMatches(
+              "competitor_info",
+              simplePattern,
+              flexiblePattern,
+            ),
+            // applications metafield (BrandDescription, ModelDescription, Model2)
+            metafieldPartMatch("applications", literalPattern),
+            metafieldPartMatch("brand_info", literalPattern),
+            // SKU arama (variants.sku = RotaNo) — simple first, then separator-tolerant
             {
               "raw.variants": {
                 $elemMatch: {
-                  sku: { $regex: combinedPartPattern, $options: "i" },
+                  sku: { $regex: simplePattern, $options: "i" },
                 },
               },
             },
+            ...(flexiblePattern && flexiblePattern !== simplePattern
+              ? [
+                  {
+                    "raw.variants": {
+                      $elemMatch: {
+                        sku: { $regex: flexiblePattern, $options: "i" },
+                      },
+                    },
+                  },
+                ]
+              : []),
             // Title ve handle fallback
             { "raw.title": { $regex: literalPattern, $options: "i" } },
             { "raw.handle": { $regex: literalPattern, $options: "i" } },
@@ -172,24 +176,23 @@ export async function GET(req: NextRequest) {
     if (oem) {
       const oemValues = oem
         .split(",")
-        .map((s) => s.trim())
+        .map((s) => sanitizeSearchTerm(s))
         .filter(Boolean);
 
-      const oemPattern = oemValues
+      const oemSimple = oemValues
+        .map((v) => partNumberSimpleRegexSource(v))
+        .filter(Boolean)
+        .map((p) => `(${p})`)
+        .join("|");
+      const oemFlexible = oemValues
         .map((v) => partNumberRegexSource(v))
         .filter(Boolean)
         .map((p) => `(${p})`)
         .join("|");
 
-      if (oemPattern) {
+      if (oemSimple) {
         metafieldConditions.push({
-          "raw.metafields": {
-            $elemMatch: {
-              namespace: "custom",
-              key: "oem_info",
-              value: { $regex: oemPattern, $options: "i" },
-            },
-          },
+          $or: partNumberFieldMatches("oem_info", oemSimple, oemFlexible),
         });
       }
     }
@@ -240,24 +243,27 @@ export async function GET(req: NextRequest) {
     if (competitor) {
       const competitorValues = competitor
         .split(",")
-        .map((s) => s.trim())
+        .map((s) => sanitizeSearchTerm(s))
         .filter(Boolean);
 
-      const competitorPattern = competitorValues
+      const competitorSimple = competitorValues
+        .map((v) => partNumberSimpleRegexSource(v))
+        .filter(Boolean)
+        .map((p) => `(${p})`)
+        .join("|");
+      const competitorFlexible = competitorValues
         .map((v) => partNumberRegexSource(v))
         .filter(Boolean)
         .map((p) => `(${p})`)
         .join("|");
 
-      if (competitorPattern) {
+      if (competitorSimple) {
         metafieldConditions.push({
-          "raw.metafields": {
-            $elemMatch: {
-              namespace: "custom",
-              key: "competitor_info",
-              value: { $regex: competitorPattern, $options: "i" },
-            },
-          },
+          $or: partNumberFieldMatches(
+            "competitor_info",
+            competitorSimple,
+            competitorFlexible,
+          ),
         });
       }
     }

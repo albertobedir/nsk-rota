@@ -207,6 +207,7 @@ export default function BasketPage() {
             title: i.title,
           })),
           shippingAddress: sessionUser?.shippingAddress ?? undefined,
+          billingAddress: sessionUser?.billingAddress ?? undefined,
         }),
       });
 
