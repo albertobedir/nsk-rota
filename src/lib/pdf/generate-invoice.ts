@@ -22,13 +22,6 @@ function money(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function isManualDiscountApp(app: any): boolean {
-  if (!app || typeof app !== "object") return false;
-  const type = String(app.type || app.discountType || "").toLowerCase();
-  const typename = String(app.__typename || "").toLowerCase();
-  return type === "manual" || typename.includes("manualdiscount");
-}
-
 function discountAppList(raw: Record<string, any>): any[] {
   if (Array.isArray(raw.discount_applications)) return raw.discount_applications;
   if (Array.isArray(raw.discountApplications?.nodes)) {
@@ -36,6 +29,45 @@ function discountAppList(raw: Record<string, any>): any[] {
   }
   if (Array.isArray(raw.discountApplications)) return raw.discountApplications;
   return [];
+}
+
+function discountAppText(app: any): string {
+  return [
+    app?.description,
+    app?.title,
+    app?.code,
+    app?.discountApplication?.description,
+    app?.discountApplication?.title,
+  ]
+    .map((value) => String(value ?? "").toLowerCase())
+    .join(" ");
+}
+
+function isSystemCheckoutDiscount(app: any): boolean {
+  if (!app || typeof app !== "object") return false;
+  const type = String(app.type || app.discountType || "").toLowerCase();
+  if (
+    type === "discount_code" ||
+    type === "automatic" ||
+    type === "script"
+  ) {
+    return true;
+  }
+  const text = discountAppText(app);
+  return (
+    /b2b/.test(text) ||
+    /customer\s*pricing/.test(text) ||
+    /discount\s*code/.test(text) ||
+    /tier/.test(text)
+  );
+}
+
+function isAdminPanelDiscount(app: any): boolean {
+  if (!app || typeof app !== "object") return false;
+  if (isSystemCheckoutDiscount(app)) return false;
+  const type = String(app.type || app.discountType || "").toLowerCase();
+  const typename = String(app.__typename || "").toLowerCase();
+  return type === "manual" || typename.includes("manualdiscount");
 }
 
 function allocationList(item: any): any[] {
@@ -59,30 +91,31 @@ function allocationAmount(alloc: any): number {
   );
 }
 
-function lineManualDiscountAmount(
+function lineAdminDiscountAmount(
   item: any,
-  manualIndexes: Set<number>,
+  adminIndexes: Set<number>,
   apps: any[],
 ): number {
   let total = 0;
   for (const alloc of allocationList(item)) {
-    const idx = alloc?.discount_application_index ?? alloc?.discountApplicationIndex;
+    const idx =
+      alloc?.discount_application_index ?? alloc?.discountApplicationIndex;
     const app =
       alloc?.discountApplication ||
       alloc?.discount_application ||
       (idx != null ? apps[Number(idx)] : null);
-    const matchedByIndex = idx != null && manualIndexes.has(Number(idx));
-    if (matchedByIndex || isManualDiscountApp(app)) {
+    const matchedByIndex = idx != null && adminIndexes.has(Number(idx));
+    if (matchedByIndex || isAdminPanelDiscount(app)) {
       total += allocationAmount(alloc);
     }
   }
   return total;
 }
 
-function manualDiscountFromApps(apps: any[], subtotal: number): number {
+function adminDiscountFromApps(apps: any[], subtotal: number): number {
   let total = 0;
   for (const app of apps) {
-    if (!isManualDiscountApp(app)) continue;
+    if (!isAdminPanelDiscount(app)) continue;
     const valueType = String(
       app.value_type || app.valueType || app.value?.__typename || "",
     ).toLowerCase();
@@ -92,19 +125,17 @@ function manualDiscountFromApps(apps: any[], subtotal: number): number {
       continue;
     }
     total += money(
-      app.value?.amount ??
-        app.value?.shopMoney?.amount ??
-        app.value,
+      app.value?.amount ?? app.value?.shopMoney?.amount ?? app.value,
     );
   }
   return total;
 }
 
-function resolveManualDiscount(raw: Record<string, any>, lineItems: any[]) {
+function resolveAdminDiscount(raw: Record<string, any>, lineItems: any[]) {
   const apps = discountAppList(raw);
-  const manualIndexes = new Set<number>();
+  const adminIndexes = new Set<number>();
   apps.forEach((app, i) => {
-    if (isManualDiscountApp(app)) manualIndexes.add(i);
+    if (isAdminPanelDiscount(app)) adminIndexes.add(i);
   });
 
   const restItems = Array.isArray(raw.line_items) ? raw.line_items : [];
@@ -112,7 +143,7 @@ function resolveManualDiscount(raw: Record<string, any>, lineItems: any[]) {
   let allocated = 0;
 
   const take = (item: any, index: number) => {
-    const amount = lineManualDiscountAmount(item, manualIndexes, apps);
+    const amount = lineAdminDiscountAmount(item, adminIndexes, apps);
     if (amount > 0) {
       perLine.set(index, (perLine.get(index) || 0) + amount);
       allocated += amount;
@@ -358,23 +389,58 @@ export async function generateInvoicePdf(opts: {
     order.shippingAddress,
   );
 
+  const discountRaw: Record<string, any> = liveOrder
+    ? {
+        ...raw,
+        discount_applications:
+          liveOrder.discount_applications ?? raw.discount_applications,
+        line_items: liveOrder.line_items ?? raw.line_items,
+        total_price: liveOrder.total_price ?? raw.total_price,
+        total_tax: liveOrder.total_tax ?? raw.total_tax,
+      }
+    : raw;
+
   const itemsList =
     (order.lineItems?.edges as Array<Record<string, any>>) || [];
-  const { allocated: allocatedManual, perLine, apps } =
-    resolveManualDiscount(raw, itemsList);
+  const { allocated: allocatedAdmin, perLine, apps } = resolveAdminDiscount(
+    discountRaw,
+    itemsList,
+  );
 
   let discountedSubtotal = 0;
+  const restLineItems = Array.isArray(discountRaw.line_items)
+    ? discountRaw.line_items
+    : [];
   const items = itemsList.map((e, idx) => {
     const node = (e?.node || e) as Record<string, any>;
     const qty = Number(node?.quantity ?? node?.current_quantity ?? 1) || 1;
+    const restItem =
+      restLineItems[idx] ||
+      restLineItems.find(
+        (li: any) =>
+          String(li?.sku || "") &&
+          String(li.sku) === String(node?.sku || ""),
+      );
     const originalPrice = money(
-      node?.originalUnitPrice ?? node?.variant?.price?.amount,
+      restItem?.price ??
+        node?.originalUnitPrice ??
+        node?.variant?.price?.amount,
     );
-    const discountedPrice = money(node?.discountedUnitPrice ?? originalPrice);
+    const restDiscounted =
+      restItem && qty > 0 && money(restItem.total_discount) > 0
+        ? (originalPrice * qty - money(restItem.total_discount)) / qty
+        : 0;
+    const discountedPrice = money(
+      restDiscounted ||
+        node?.discountedUnitPrice ||
+        originalPrice,
+    );
+    // Selling price already includes tier + coupon. Add back only extra
+    // Shopify-admin discounts so those stay in the Discount row instead.
     const sellingPrice = discountedPrice > 0 ? discountedPrice : originalPrice;
-    const manualOnLine = perLine.get(idx) || 0;
+    const adminOnLine = perLine.get(idx) || 0;
     const unitPrice =
-      qty > 0 ? sellingPrice + manualOnLine / qty : sellingPrice;
+      qty > 0 ? sellingPrice + adminOnLine / qty : sellingPrice;
     const lineTotal = unitPrice * qty;
     discountedSubtotal += lineTotal;
     return {
@@ -387,31 +453,23 @@ export async function generateInvoicePdf(opts: {
     };
   });
 
-  // Only extra discounts added from Shopify admin appear here.
-  // Tier / catalog / checkout-code discounts stay inside the line prices.
-  let discountAmount = allocatedManual;
+  let discountAmount = allocatedAdmin;
   if (discountAmount < 0.005) {
-    discountAmount = manualDiscountFromApps(apps, discountedSubtotal);
+    discountAmount = adminDiscountFromApps(apps, discountedSubtotal);
   }
   const discountLabel = "Discount";
 
-  const taxes = money(order.taxes);
-  const shipping = money(order.shipping);
-  let subtotal = discountedSubtotal;
-  const impliedTotal = discountedSubtotal + taxes + shipping;
-  const shopifyTotal = money(order.totalPrice?.amount);
-
-  if (
-    discountAmount > 0.004 &&
-    allocatedManual < 0.005 &&
-    shopifyTotal > 0 &&
-    Math.abs(impliedTotal - shopifyTotal) < 0.05
-  ) {
-    subtotal = discountedSubtotal + discountAmount;
-  }
-
-  const grandTotal =
-    shopifyTotal || Math.max(0, subtotal - discountAmount) + taxes + shipping;
+  const taxes = money(liveOrder?.total_tax ?? order.taxes);
+  const shipping = money(
+    liveOrder?.total_shipping_price_set?.shop_money?.amount ?? order.shipping,
+  );
+  const subtotal = discountedSubtotal;
+  const shopifyTotal = money(
+    liveOrder?.total_price ?? order.totalPrice?.amount,
+  );
+  const computedTotal =
+    Math.max(0, subtotal - discountAmount) + taxes + shipping;
+  const grandTotal = shopifyTotal > 0 ? shopifyTotal : computedTotal;
 
   const withCompany = (addr: Record<string, any> | null) =>
     formatInvoiceAddressLines({

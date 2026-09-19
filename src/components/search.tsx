@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { sanitizeSearchTerm } from "@/lib/utils/part-number";
+import { sanitizeSearchTerm, stripPartSeparators } from "@/lib/utils/part-number";
 import { useProductsStore } from "@/store/products-store";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
@@ -60,9 +60,9 @@ export default function Search() {
     }
 
     if (type === "single") {
-      const val = sanitizeSearchTerm(value);
-      if (val.length < 4) return;
-      if (lastSearchRef.current === val) return;
+      const typed = stripPartSeparators(value.trim());
+      if (typed.length < 4) return;
+      const val = sanitizeSearchTerm(value) || typed;
 
       lastSearchRef.current = val;
       setIsSearching(true);
@@ -212,9 +212,9 @@ export default function Search() {
       : "Search by multiple OEM, ROTA or competitor codes.";
   }, [type]);
 
-  const normalizedInput = sanitizeSearchTerm(value);
+  const typedInput = stripPartSeparators(value.trim());
   const singleSearchDisabled =
-    isSearching || (type === "single" && normalizedInput.length < 4);
+    isSearching || (type === "single" && typedInput.length < 4);
 
   return (
     <div className="w-full flex flex-col gap-3">

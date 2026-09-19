@@ -5,7 +5,6 @@ import { connectDB } from "@/lib/mongoose/instance";
 import {
   escapeRegex,
   partNumberRegexSource,
-  partNumberSimpleRegexSource,
   sanitizeSearchTerm,
 } from "@/lib/utils/part-number";
 import Product from "@/schemas/mongoose/product";
@@ -21,19 +20,6 @@ function metafieldPartMatch(key: string, pattern: string) {
       },
     },
   };
-}
-
-/** Simple substring first so long digit queries don't die on backtracking. */
-function partNumberFieldMatches(
-  key: string,
-  simplePattern: string,
-  flexiblePattern: string,
-) {
-  const matches = [metafieldPartMatch(key, simplePattern)];
-  if (flexiblePattern && flexiblePattern !== simplePattern) {
-    matches.push(metafieldPartMatch(key, flexiblePattern));
-  }
-  return matches;
 }
 
 export const runtime = "nodejs";
@@ -118,53 +104,32 @@ export async function GET(req: NextRequest) {
         .split(",")
         .map((s) => sanitizeSearchTerm(s))
         .filter(Boolean);
-      const simplePatterns = searchValues
-        .map((v) => partNumberSimpleRegexSource(v))
-        .filter(Boolean);
-      const flexiblePatterns = searchValues
+      const partPattern = searchValues
         .map((v) => partNumberRegexSource(v))
-        .filter(Boolean);
-      const simplePattern = simplePatterns.map((p) => `(${p})`).join("|");
-      const flexiblePattern = flexiblePatterns.map((p) => `(${p})`).join("|");
+        .filter(Boolean)
+        .map((p) => `(${p})`)
+        .join("|");
       const literalPattern = searchValues
         .map((v) => `(${escapeRegex(v)})`)
         .join("|");
 
-      if (!simplePattern) {
+      if (!partPattern) {
         metafieldConditions.push({ _id: { $exists: false } });
       } else {
         metafieldConditions.push({
           $or: [
-            ...partNumberFieldMatches("rota_no", simplePattern, flexiblePattern),
-            ...partNumberFieldMatches("oem_info", simplePattern, flexiblePattern),
-            ...partNumberFieldMatches(
-              "competitor_info",
-              simplePattern,
-              flexiblePattern,
-            ),
-            // applications metafield (BrandDescription, ModelDescription, Model2)
+            metafieldPartMatch("rota_no", partPattern),
+            metafieldPartMatch("oem_info", partPattern),
+            metafieldPartMatch("competitor_info", partPattern),
             metafieldPartMatch("applications", literalPattern),
             metafieldPartMatch("brand_info", literalPattern),
-            // SKU arama (variants.sku = RotaNo) — simple first, then separator-tolerant
             {
               "raw.variants": {
                 $elemMatch: {
-                  sku: { $regex: simplePattern, $options: "i" },
+                  sku: { $regex: partPattern, $options: "i" },
                 },
               },
             },
-            ...(flexiblePattern && flexiblePattern !== simplePattern
-              ? [
-                  {
-                    "raw.variants": {
-                      $elemMatch: {
-                        sku: { $regex: flexiblePattern, $options: "i" },
-                      },
-                    },
-                  },
-                ]
-              : []),
-            // Title ve handle fallback
             { "raw.title": { $regex: literalPattern, $options: "i" } },
             { "raw.handle": { $regex: literalPattern, $options: "i" } },
           ],
@@ -179,21 +144,14 @@ export async function GET(req: NextRequest) {
         .map((s) => sanitizeSearchTerm(s))
         .filter(Boolean);
 
-      const oemSimple = oemValues
-        .map((v) => partNumberSimpleRegexSource(v))
-        .filter(Boolean)
-        .map((p) => `(${p})`)
-        .join("|");
-      const oemFlexible = oemValues
+      const oemPattern = oemValues
         .map((v) => partNumberRegexSource(v))
         .filter(Boolean)
         .map((p) => `(${p})`)
         .join("|");
 
-      if (oemSimple) {
-        metafieldConditions.push({
-          $or: partNumberFieldMatches("oem_info", oemSimple, oemFlexible),
-        });
+      if (oemPattern) {
+        metafieldConditions.push(metafieldPartMatch("oem_info", oemPattern));
       }
     }
 
@@ -246,25 +204,16 @@ export async function GET(req: NextRequest) {
         .map((s) => sanitizeSearchTerm(s))
         .filter(Boolean);
 
-      const competitorSimple = competitorValues
-        .map((v) => partNumberSimpleRegexSource(v))
-        .filter(Boolean)
-        .map((p) => `(${p})`)
-        .join("|");
-      const competitorFlexible = competitorValues
+      const competitorPattern = competitorValues
         .map((v) => partNumberRegexSource(v))
         .filter(Boolean)
         .map((p) => `(${p})`)
         .join("|");
 
-      if (competitorSimple) {
-        metafieldConditions.push({
-          $or: partNumberFieldMatches(
-            "competitor_info",
-            competitorSimple,
-            competitorFlexible,
-          ),
-        });
+      if (competitorPattern) {
+        metafieldConditions.push(
+          metafieldPartMatch("competitor_info", competitorPattern),
+        );
       }
     }
 

@@ -30,16 +30,6 @@ export function escapeRegex(value: string): string {
 }
 
 /**
- * Fast substring pattern (no optional separators).
- * "123456789" matches "1234567890" and "A1234567890" without backtracking.
- */
-export function partNumberSimpleRegexSource(term: string): string {
-  const stripped = sanitizeSearchTerm(term);
-  if (!stripped) return "";
-  return escapeRegex(stripped);
-}
-
-/**
  * Regex source that matches a part number regardless of dots, dashes, spaces.
  * "0952100" matches "095.2100", "095-2100", "095 2100", etc.
  */
