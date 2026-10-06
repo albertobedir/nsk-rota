@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { Types } from "mongoose";
 import { connectDB } from "@/lib/mongoose/instance";
 import prisma from "@/lib/prisma/instance";
 import { extractNumericId, toCustomerGid, toOrderGid } from "@/lib/shopify/ids";
@@ -300,7 +301,7 @@ export async function markOrderCreditDeducted(params: {
   );
 }
 
-async function unclaimCreditRestore(orderId: unknown) {
+async function unclaimCreditRestore(orderId: Types.ObjectId) {
   await Order.updateOne(
     { _id: orderId, creditRestored: true },
     {
@@ -445,7 +446,13 @@ export async function maybeRestoreCreditWhenPaid(params: {
     "restore",
   );
 
-  if (!result.success) {
+  const restoredRemaining = result.newRemaining;
+  const restoredUsed = result.newUsed;
+  if (
+    !result.success ||
+    restoredRemaining == null ||
+    restoredUsed == null
+  ) {
     console.error("[credit-restore] Shopify credit restore failed:", result);
     await unclaimCreditRestore(claimed._id);
     return { restored: false, reason: "shopify_update_failed", result };
@@ -455,8 +462,8 @@ export async function maybeRestoreCreditWhenPaid(params: {
   try {
     prismaSync = await syncPrismaCreditBalances({
       customerId,
-      creditRemaining: result.newRemaining,
-      creditUsed: result.newUsed,
+      creditRemaining: restoredRemaining,
+      creditUsed: restoredUsed,
     });
     console.log("[credit-restore] Prisma balances synced", prismaSync);
   } catch (err) {
