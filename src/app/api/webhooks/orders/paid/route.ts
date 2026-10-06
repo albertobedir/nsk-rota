@@ -9,11 +9,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  console.log("[orders/paid] request received", {
+    topic: req.headers.get("x-shopify-topic"),
+  });
+
   try {
     const rawBody = await req.text();
 
     const verified = verifyShopifyWebhook(req, rawBody);
     if (!verified) {
+      console.warn("[orders/paid] HMAC verification failed");
       return NextResponse.json({ error: "Invalid HMAC" }, { status: 401 });
     }
 
