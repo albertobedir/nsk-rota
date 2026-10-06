@@ -293,7 +293,7 @@ export async function markOrderCreditDeducted(params: {
         creditDeductedAmount: params.amount,
         creditCurrency: params.currencyCode,
         creditDeductedAt: new Date(),
-        creditRestoreEligible: isOpenFinancialStatus(params.financialStatus),
+        creditRestoreEligible: !isPaidFinancialStatus(params.financialStatus),
         creditRestored: false,
         creditRestoredAt: null,
       },
@@ -311,8 +311,16 @@ async function unclaimCreditRestore(orderId: Types.ObjectId) {
   );
 }
 
-async function findOrderForCreditRestore(shopifyId: string) {
-  const numericId = extractNumericId(shopifyId);
+async function findOrderForCreditRestore(shopifyId: string, orderData?: any) {
+  const numericId =
+    extractNumericId(shopifyId) ||
+    (orderData?.id != null ? String(orderData.id) : null);
+  const orderNumber = orderData?.order_number
+    ? Number(orderData.order_number)
+    : orderData?.name
+      ? Number(String(orderData.name).replace(/^#/, ""))
+      : undefined;
+
   return Order.findOne({
     $or: [
       { shopifyId },
@@ -320,10 +328,21 @@ async function findOrderForCreditRestore(shopifyId: string) {
         ? [
             { shopifyId: numericId },
             { shopifyId: `gid://shopify/Order/${numericId}` },
+            { "raw.id": Number(numericId) },
+            { "raw.id": numericId },
           ]
         : []),
+      ...(orderNumber && !Number.isNaN(orderNumber) ? [{ orderNumber }] : []),
     ],
   });
+}
+
+function creditRestoreSkip(
+  reason: string,
+  details: Record<string, unknown>,
+) {
+  console.log(`[credit-restore] bakiye geri yazilmadi | reason=${reason}`, details);
+  return { restored: false, reason, ...details };
 }
 
 async function syncPrismaCreditBalances(params: {
@@ -365,28 +384,74 @@ export async function maybeRestoreCreditWhenPaid(params: {
   const { shopifyId, orderData, previousFinancialStatus } = params;
   const currentFinancialStatus = orderData?.financial_status;
 
+  const paymentGateways = [
+    ...(Array.isArray(orderData?.payment_gateway_names)
+      ? orderData.payment_gateway_names
+      : []),
+  ];
+
   if (!isPaidFinancialStatus(currentFinancialStatus)) {
-    return { restored: false, reason: "not_paid" };
+    return creditRestoreSkip("not_paid", {
+      shopifyId,
+      order: orderData?.name ?? null,
+      currentFinancialStatus: currentFinancialStatus ?? null,
+      previousFinancialStatus: previousFinancialStatus ?? null,
+      paymentGateways,
+    });
   }
 
   await connectDB();
-  const existing = await findOrderForCreditRestore(shopifyId);
-  if (
-    !existing?.creditDeducted ||
-    !existing.creditRestoreEligible ||
-    existing.creditRestored
-  ) {
-    return {
-      restored: false,
-      reason: existing?.creditRestored ? "already_restored" : "not_eligible",
-    };
+  const existing = await findOrderForCreditRestore(shopifyId, orderData);
+
+  let orderDetails: OrderPaymentDetails | null = null;
+  try {
+    orderDetails = await fetchOrderPaymentDetails(shopifyId);
+  } catch (err) {
+    console.error("[credit-restore] Failed to fetch order payment details:", err);
+  }
+
+  const transactionGateways = (orderDetails?.transactions ?? [])
+    .map((transaction) => transaction.gateway)
+    .filter((gateway): gateway is string => Boolean(gateway));
+  paymentGateways.push(...(orderDetails?.paymentGatewayNames ?? []), ...transactionGateways);
+  const paidWithUseMyCreditResolved = orderUsesMyCredits(paymentGateways);
+
+  const deductedAmount = Number(existing?.creditDeductedAmount);
+  const previousWasAlreadyPaid = isPaidFinancialStatus(previousFinancialStatus);
+  const heldUntilPayment =
+    Boolean(existing?.creditRestoreEligible) ||
+    isOpenFinancialStatus(previousFinancialStatus) ||
+    (paidWithUseMyCreditResolved && !previousWasAlreadyPaid);
+  const snapshot = {
+    shopifyId,
+    order: orderData?.name ?? existing?.name ?? null,
+    currentFinancialStatus,
+    previousFinancialStatus: previousFinancialStatus ?? null,
+    paymentGateways,
+    paidWithUseMyCredit: paidWithUseMyCreditResolved,
+    creditDeducted: Boolean(existing?.creditDeducted),
+    creditRestoreEligible: Boolean(existing?.creditRestoreEligible),
+    creditRestored: Boolean(existing?.creditRestored),
+    creditDeductedAmount: Number.isFinite(deductedAmount) ? deductedAmount : null,
+  };
+
+  if (!existing) {
+    return creditRestoreSkip("order_not_in_mongo", snapshot);
+  }
+  if (!existing.creditDeducted || !Number.isFinite(deductedAmount) || deductedAmount <= 0) {
+    return creditRestoreSkip("credit_not_deducted", snapshot);
+  }
+  if (existing.creditRestored) {
+    return creditRestoreSkip("already_restored", snapshot);
+  }
+  if (!heldUntilPayment) {
+    return creditRestoreSkip("not_a_credit_hold", snapshot);
   }
 
   const claimed = await Order.findOneAndUpdate(
     {
       _id: existing._id,
       creditDeducted: true,
-      creditRestoreEligible: true,
       creditRestored: { $ne: true },
     },
     {
@@ -399,14 +464,7 @@ export async function maybeRestoreCreditWhenPaid(params: {
   );
 
   if (!claimed) {
-    return { restored: false, reason: "already_claimed" };
-  }
-
-  let orderDetails: OrderPaymentDetails | null = null;
-  try {
-    orderDetails = await fetchOrderPaymentDetails(shopifyId);
-  } catch (err) {
-    console.error("[credit-restore] Failed to fetch order payment details:", err);
+    return creditRestoreSkip("already_claimed", snapshot);
   }
 
   const customerId =
@@ -430,13 +488,14 @@ export async function maybeRestoreCreditWhenPaid(params: {
     return { restored: false, reason: "missing_customer_or_amount" };
   }
 
-  console.log("🟢 INVOICE PAID — restoring previously deducted credit", {
+  console.log("[credit-restore] admin paid — restoring deducted credit", {
     shopifyId,
+    order: orderData?.name ?? null,
     customerId,
     amount,
     currencyCode,
     previousFinancialStatus,
-    paymentGateways: orderData?.payment_gateway_names,
+    paymentGateways,
   });
 
   const result = await updateCustomerCredit(
@@ -472,6 +531,10 @@ export async function maybeRestoreCreditWhenPaid(params: {
       err,
     );
   }
+
+  console.log(
+    `ADMIN TARAFINDAN BAKIYE GERI YUKLENDI | order=${orderData?.name ?? shopifyId} | amount=${amount} ${currencyCode} | customer=${customerId} | kalan=${restoredRemaining} | kullanilan=${restoredUsed}`,
+  );
 
   return { restored: true, result, prismaSync };
 }

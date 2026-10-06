@@ -46,15 +46,14 @@ export async function POST(req: NextRequest) {
       await applyShopifyOrderUpdate(orderData, { upsert: false });
 
     if (!result) {
-      console.warn("⚠️ Order not found in DB:", shopifyId);
-      return NextResponse.json({ status: "ok", shopifyId, skipped: "not_found" });
+      console.warn("⚠️ Order not found in DB before credit restore:", shopifyId);
+    } else {
+      console.log("✅ Order updated:", shopifyId, {
+        fulfillmentStatus,
+        financialStatus,
+        cancelledAt,
+      });
     }
-
-    console.log("✅ Order updated:", shopifyId, {
-      fulfillmentStatus,
-      financialStatus,
-      cancelledAt,
-    });
 
     const creditRestore = await maybeRestoreCreditWhenPaid({
       shopifyId,
@@ -62,9 +61,7 @@ export async function POST(req: NextRequest) {
       previousFinancialStatus,
     });
 
-    if (creditRestore.restored) {
-      console.log("🟢 Credit restored after invoice paid:", shopifyId);
-    }
+    console.log("[orders/updated] credit restore result:", shopifyId, creditRestore);
 
     return NextResponse.json({ status: "ok", shopifyId, creditRestore });
   } catch (err) {
