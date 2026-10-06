@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { connectDB } from "@/lib/mongoose/instance";
-import { toCustomerGid, toOrderGid } from "@/lib/shopify/ids";
+import prisma from "@/lib/prisma/instance";
+import { extractNumericId, toCustomerGid, toOrderGid } from "@/lib/shopify/ids";
 import Order from "@/schemas/mongoose/order";
 
 type CreditMode = "deduct" | "restore";
@@ -299,14 +300,60 @@ export async function markOrderCreditDeducted(params: {
   );
 }
 
-async function unclaimCreditRestore(shopifyId: string) {
+async function unclaimCreditRestore(orderId: unknown) {
   await Order.updateOne(
-    { shopifyId, creditRestored: true },
+    { _id: orderId, creditRestored: true },
     {
       $set: { creditRestored: false },
       $unset: { creditRestoredAt: 1 },
     },
   );
+}
+
+async function findOrderForCreditRestore(shopifyId: string) {
+  const numericId = extractNumericId(shopifyId);
+  return Order.findOne({
+    $or: [
+      { shopifyId },
+      ...(numericId
+        ? [
+            { shopifyId: numericId },
+            { shopifyId: `gid://shopify/Order/${numericId}` },
+          ]
+        : []),
+    ],
+  });
+}
+
+async function syncPrismaCreditBalances(params: {
+  customerId: string;
+  creditRemaining: number;
+  creditUsed: number;
+}) {
+  const gid = toCustomerGid(params.customerId);
+  const numeric = extractNumericId(params.customerId);
+  const ids = Array.from(
+    new Set([gid, numeric].filter((value): value is string => Boolean(value))),
+  );
+  if (!ids.length) return { users: 0, customers: 0 };
+
+  const data = {
+    creditRemaining: params.creditRemaining.toFixed(2),
+    creditUsed: params.creditUsed.toFixed(2),
+  };
+
+  const [users, customers] = await Promise.all([
+    prisma.user.updateMany({
+      where: { shopifyCustomerId: { in: ids } },
+      data,
+    }),
+    prisma.customer.updateMany({
+      where: { shopifyId: { in: ids } },
+      data,
+    }),
+  ]);
+
+  return { users: users.count, customers: customers.count };
 }
 
 export async function maybeRestoreCreditWhenPaid(params: {
@@ -317,35 +364,28 @@ export async function maybeRestoreCreditWhenPaid(params: {
   const { shopifyId, orderData, previousFinancialStatus } = params;
   const currentFinancialStatus = orderData?.financial_status;
 
-  if (
-    !isPaidFinancialStatus(currentFinancialStatus) ||
-    !isOpenFinancialStatus(previousFinancialStatus)
-  ) {
-    return { restored: false, reason: "not_pending_to_paid" };
+  if (!isPaidFinancialStatus(currentFinancialStatus)) {
+    return { restored: false, reason: "not_paid" };
   }
 
   await connectDB();
-  const existing = await Order.findOne({ shopifyId });
-  if (!existing || existing.creditRestored) {
-    return { restored: false, reason: "not_eligible" };
-  }
-
-  const createdWithCredits = orderUsesMyCredits(
-    Array.isArray((existing.raw as any)?.payment_gateway_names)
-      ? ((existing.raw as any).payment_gateway_names as string[])
-      : null,
-  );
-  const flaggedEligible =
-    Boolean(existing.creditDeducted) && Boolean(existing.creditRestoreEligible);
-  const legacyEligible = !existing.creditDeducted && createdWithCredits;
-
-  if (!flaggedEligible && !legacyEligible) {
-    return { restored: false, reason: "not_eligible" };
+  const existing = await findOrderForCreditRestore(shopifyId);
+  if (
+    !existing?.creditDeducted ||
+    !existing.creditRestoreEligible ||
+    existing.creditRestored
+  ) {
+    return {
+      restored: false,
+      reason: existing?.creditRestored ? "already_restored" : "not_eligible",
+    };
   }
 
   const claimed = await Order.findOneAndUpdate(
     {
-      shopifyId,
+      _id: existing._id,
+      creditDeducted: true,
+      creditRestoreEligible: true,
       creditRestored: { $ne: true },
     },
     {
@@ -373,20 +413,19 @@ export async function maybeRestoreCreditWhenPaid(params: {
     orderDetails?.customer?.id ||
     toCustomerGid(orderData?.customer?.id);
 
-  const amount = Number(
-    claimed.creditDeductedAmount || orderData?.total_price || 0,
-  );
+  const amount = Number(claimed.creditDeductedAmount);
   const currencyCode = String(
     claimed.creditCurrency || orderData?.currency || "USD",
   );
 
-  if (!customerId || amount <= 0) {
-    console.error("[credit-restore] Missing customer or amount", {
+  if (!customerId || !Number.isFinite(amount) || amount <= 0) {
+    console.error("[credit-restore] Missing customer or deducted amount", {
       shopifyId,
       customerId,
       amount,
+      previousFinancialStatus,
     });
-    await unclaimCreditRestore(shopifyId);
+    await unclaimCreditRestore(claimed._id);
     return { restored: false, reason: "missing_customer_or_amount" };
   }
 
@@ -395,6 +434,7 @@ export async function maybeRestoreCreditWhenPaid(params: {
     customerId,
     amount,
     currencyCode,
+    previousFinancialStatus,
     paymentGateways: orderData?.payment_gateway_names,
   });
 
@@ -407,9 +447,24 @@ export async function maybeRestoreCreditWhenPaid(params: {
 
   if (!result.success) {
     console.error("[credit-restore] Shopify credit restore failed:", result);
-    await unclaimCreditRestore(shopifyId);
+    await unclaimCreditRestore(claimed._id);
     return { restored: false, reason: "shopify_update_failed", result };
   }
 
-  return { restored: true, result };
+  let prismaSync: { users: number; customers: number } | null = null;
+  try {
+    prismaSync = await syncPrismaCreditBalances({
+      customerId,
+      creditRemaining: result.newRemaining,
+      creditUsed: result.newUsed,
+    });
+    console.log("[credit-restore] Prisma balances synced", prismaSync);
+  } catch (err) {
+    console.error(
+      "[credit-restore] Shopify metafield restored, Prisma sync failed:",
+      err,
+    );
+  }
+
+  return { restored: true, result, prismaSync };
 }
