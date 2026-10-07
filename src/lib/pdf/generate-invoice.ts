@@ -174,50 +174,129 @@ function formatDate(val: any): string {
   return `${d2}/${m}/${y}`;
 }
 
+function unwrapAddress(addr: any): any {
+  if (!addr) return null;
+  if (typeof addr === "string") {
+    try {
+      const parsed = JSON.parse(addr);
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof addr !== "object") return null;
+  if (typeof addr.toObject === "function") return addr.toObject();
+  if (addr._doc && typeof addr._doc === "object") return addr._doc;
+  return addr;
+}
+
 function mapAddress(addr: any) {
-  if (!addr || typeof addr !== "object") return null;
+  const src = unwrapAddress(addr);
+  if (!src) return null;
+
+  const formatted = Array.isArray(src.formatted)
+    ? src.formatted.map((line: unknown) => String(line ?? "").trim()).filter(Boolean)
+    : [];
+
   const mapped = {
     name:
-      addr.name ||
-      [addr.firstName || addr.first_name, addr.lastName || addr.last_name]
+      src.name ||
+      [src.firstName || src.first_name, src.lastName || src.last_name]
         .filter(Boolean)
         .join(" ") ||
       "",
-    company: addr.company || addr.companyName || "",
+    company: src.company || src.companyName || "",
     address1:
-      addr.address1 || addr.addressLine1 || addr.line1 || addr.street || "",
-    address2: addr.address2 || addr.addressLine2 || addr.line2 || "",
-    city: addr.city || "",
-    zip: addr.zip || addr.zipCode || addr.postalCode || "",
-    province:
-      addr.province ||
-      addr.provinceCode ||
-      addr.province_code ||
-      addr.zoneCode ||
-      addr.state ||
+      src.address1 ||
+      src.addressLine1 ||
+      src.line1 ||
+      src.street ||
+      formatted[0] ||
       "",
-    country: addr.country || addr.country_name || addr.countryName || "",
+    address2:
+      src.address2 ||
+      src.addressLine2 ||
+      src.line2 ||
+      (formatted.length > 1 ? formatted[1] : "") ||
+      "",
+    city: src.city || "",
+    zip: src.zip || src.zipCode || src.postalCode || "",
+    province:
+      src.province ||
+      src.provinceCode ||
+      src.province_code ||
+      src.zoneCode ||
+      src.state ||
+      "",
+    country: src.country || src.country_name || src.countryName || "",
     countryCode:
-      addr.country_code || addr.countryCode || addr.countryCodeV2 || "",
+      src.country_code || src.countryCode || src.countryCodeV2 || "",
   };
+
   if (
-    !mapped.address1 &&
-    !mapped.city &&
-    !mapped.zip &&
-    !mapped.company &&
-    !mapped.name
+    !String(mapped.address1).trim() &&
+    !String(mapped.city).trim() &&
+    !String(mapped.zip).trim()
   ) {
     return null;
   }
   return mapped;
 }
 
+function addressScore(addr: ReturnType<typeof mapAddress>): number {
+  if (!addr) return 0;
+  return [
+    addr.address1,
+    addr.address2,
+    addr.city,
+    addr.zip,
+    addr.province,
+    addr.company,
+    addr.country,
+  ].filter((value) => String(value || "").trim()).length;
+}
+
 function pickAddress(...candidates: unknown[]) {
+  let best: ReturnType<typeof mapAddress> = null;
+  let bestScore = 0;
   for (const candidate of candidates) {
     const mapped = mapAddress(candidate);
-    if (mapped) return mapped;
+    const score = addressScore(mapped);
+    if (score > bestScore) {
+      best = mapped;
+      bestScore = score;
+    }
   }
-  return null;
+  return best;
+}
+
+function collectAddressCandidates(
+  kind: "billing" | "shipping",
+  liveOrder: any,
+  raw: Record<string, any>,
+  dbOrderAddr: any,
+) {
+  const customer = raw.customer || liveOrder?.customer || {};
+  if (kind === "billing") {
+    return [
+      liveOrder?.billing_address,
+      liveOrder?.billingAddress,
+      raw.billing_address,
+      raw.billingAddress,
+      dbOrderAddr,
+      customer.default_address,
+      customer.defaultAddress,
+    ];
+  }
+  return [
+    liveOrder?.shipping_address,
+    liveOrder?.shippingAddress,
+    raw.shipping_address,
+    raw.shippingAddress,
+    dbOrderAddr,
+    customer.default_address,
+    customer.defaultAddress,
+  ];
 }
 
 async function findCustomerCompanyName(
@@ -321,11 +400,15 @@ async function loadOrder(id: string) {
       raw.billing_address,
       raw.billingAddress,
       dbOrder.billingAddress,
+      raw.customer?.default_address,
+      raw.customer?.defaultAddress,
     ),
     shippingAddress: pickAddress(
       raw.shipping_address,
       raw.shippingAddress,
       dbOrder.shippingAddress,
+      raw.customer?.default_address,
+      raw.customer?.defaultAddress,
     ),
     customer: raw.customer || null,
     lineItems: { edges: normalizeLineItemEdges(dbOrder) },
@@ -376,18 +459,33 @@ export async function generateInvoicePdf(opts: {
     console.warn("[invoice-pdf] live Shopify address fetch failed:", err);
   }
 
-  const billingAddr = pickAddress(
-    liveOrder?.billing_address,
-    raw.billing_address,
-    raw.billingAddress,
-    order.billingAddress,
+  let billingAddr = pickAddress(
+    ...collectAddressCandidates(
+      "billing",
+      liveOrder,
+      raw,
+      order.billingAddress,
+    ),
   );
-  const shippingAddr = pickAddress(
-    liveOrder?.shipping_address,
-    raw.shipping_address,
-    raw.shippingAddress,
-    order.shippingAddress,
+  let shippingAddr = pickAddress(
+    ...collectAddressCandidates(
+      "shipping",
+      liveOrder,
+      raw,
+      order.shippingAddress,
+    ),
   );
+  if (!billingAddr && shippingAddr) billingAddr = shippingAddr;
+  if (!shippingAddr && billingAddr) shippingAddr = billingAddr;
+
+  console.log("[invoice-pdf] addresses", {
+    bill: billingAddr,
+    ship: shippingAddr,
+    liveBilling: Boolean(liveOrder?.billing_address),
+    liveShipping: Boolean(liveOrder?.shipping_address),
+    rawBilling: Boolean(raw.billing_address || raw.billingAddress),
+    rawShipping: Boolean(raw.shipping_address || raw.shippingAddress),
+  });
 
   const discountRaw: Record<string, any> = liveOrder
     ? {

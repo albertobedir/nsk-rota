@@ -126,8 +126,29 @@ export async function applyShopifyOrderUpdate(
 
   const billingAddress = stripNulls(orderData.billing_address);
   const shippingAddress = stripNulls(orderData.shipping_address);
-  if (billingAddress) set.billingAddress = billingAddress;
-  if (shippingAddress) set.shippingAddress = shippingAddress;
+  if (billingAddress && (billingAddress.address1 || billingAddress.city)) {
+    set.billingAddress = billingAddress;
+  }
+  if (shippingAddress && (shippingAddress.address1 || shippingAddress.city)) {
+    set.shippingAddress = shippingAddress;
+  }
+
+  if (existing?.raw && orderData) {
+    if (
+      orderData.billing_address == null &&
+      (existing.raw.billing_address || existing.raw.billingAddress)
+    ) {
+      set.raw.billing_address =
+        existing.raw.billing_address || existing.raw.billingAddress;
+    }
+    if (
+      orderData.shipping_address == null &&
+      (existing.raw.shipping_address || existing.raw.shippingAddress)
+    ) {
+      set.raw.shipping_address =
+        existing.raw.shipping_address || existing.raw.shippingAddress;
+    }
+  }
 
   if (upsert) {
     set.shopifyId = shopifyId;
