@@ -4,8 +4,8 @@
 import { connectDB } from "@/lib/mongoose/instance";
 import {
   escapeRegex,
+  expandSearchTerms,
   partNumberRegexSource,
-  sanitizeSearchTerm,
 } from "@/lib/utils/part-number";
 import Product from "@/schemas/mongoose/product";
 import { NextRequest, NextResponse } from "next/server";
@@ -100,10 +100,9 @@ export async function GET(req: NextRequest) {
 
     // ✅ SEARCH — rota_no, oem_info, competitor_info, applications, brand_info, sku, title, handle
     if (search) {
-      const searchValues = search
-        .split(",")
-        .map((s) => sanitizeSearchTerm(s))
-        .filter(Boolean);
+      const searchValues = [
+        ...new Set(search.split(",").flatMap((s) => expandSearchTerms(s))),
+      ];
       const partPattern = searchValues
         .map((v) => partNumberRegexSource(v))
         .filter(Boolean)
@@ -139,10 +138,9 @@ export async function GET(req: NextRequest) {
 
     // OEM arama
     if (oem) {
-      const oemValues = oem
-        .split(",")
-        .map((s) => sanitizeSearchTerm(s))
-        .filter(Boolean);
+      const oemValues = [
+        ...new Set(oem.split(",").flatMap((s) => expandSearchTerms(s))),
+      ];
 
       const oemPattern = oemValues
         .map((v) => partNumberRegexSource(v))
@@ -199,10 +197,9 @@ export async function GET(req: NextRequest) {
 
     // Competitor arama
     if (competitor) {
-      const competitorValues = competitor
-        .split(",")
-        .map((s) => sanitizeSearchTerm(s))
-        .filter(Boolean);
+      const competitorValues = [
+        ...new Set(competitor.split(",").flatMap((s) => expandSearchTerms(s))),
+      ];
 
       const competitorPattern = competitorValues
         .map((v) => partNumberRegexSource(v))
