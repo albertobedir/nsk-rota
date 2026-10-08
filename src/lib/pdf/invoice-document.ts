@@ -699,14 +699,44 @@ class InvoiceLayout {
   }
 
   private drawPaymentSection() {
-    const blockH = 118;
+    const halfW = (this.contentW - 20) / 2;
+    const labelW = 138;
+    const valueW = Math.max(80, halfW - labelW - 4);
+    const bankRows: [string, string][] = [
+      ["Account Holder Company:", "ROTA North America LLC"],
+      ["Bank:", "JPMorgan Chase Bank, N.A."],
+      ["Bank Address:", "270 Park Avenue, New York, NY 10017, USA"],
+      ["Account #", "610891258"],
+      ["ACH Routing #", "021202337"],
+      ["Wires Routing #", "021000021"],
+      ["Swift Code:", "CHASUS33"],
+    ];
+    const checkAddress =
+      "Check mailing address: 15000 W Airport Blvd, Apt 1627, Sugar Land, TX, 77498, USA";
+    const checkAddrH = this.measureHeight(checkAddress, halfW, 8.5, 3);
+
+    let leftContentH = 16;
+    for (const [, value] of bankRows) {
+      leftContentH += Math.max(14, this.measureHeight(value, valueW, 8.5, 3) + 4);
+    }
+    const rightContentH = 16 + 14 + checkAddrH + 10 + 14 + 14;
+    const titleH = 22;
+    const blockH = titleH + Math.max(leftContentH, rightContentH) + 8;
+
     this.ensureSpace(blockH, "closing");
     this.rule(DIVIDER, 0.8);
     this.y += 10;
 
-    const startY = this.y;
-    const halfW = (this.contentW - 20) / 2;
+    this.text("PAYMENT INSTRUCTIONS", MARGIN, this.y, {
+      width: this.contentW,
+      height: 12,
+      size: 9,
+      bold: true,
+      color: ACCENT,
+    });
+    this.y += titleH;
 
+    const startY = this.y;
     this.text("BANKING DETAILS", MARGIN, startY, {
       width: halfW,
       height: 12,
@@ -715,38 +745,27 @@ class InvoiceLayout {
       color: ACCENT,
     });
 
-    const bankRows: [string, string][] = [
-      ["Name:", "ROTA NORTH AMERICA LLC"],
-      ["Bank:", "CHASE BANK"],
-      ["Account No:", "610891258"],
-      ["Routing No:", "021202337"],
-    ];
     let leftY = startY + 16;
     for (const [label, value] of bankRows) {
+      const valueH = Math.max(12, this.measureHeight(value, valueW, 8.5, 3));
       this.text(label, MARGIN, leftY, {
-        width: 80,
-        height: 12,
+        width: labelW,
+        height: valueH,
         size: 8.5,
         bold: true,
+        ellipsis: false,
       });
-      this.text(value, MARGIN + 82, leftY, {
-        width: halfW - 82,
-        height: 12,
+      this.text(value, MARGIN + labelW + 4, leftY, {
+        width: valueW,
+        height: valueH,
         size: 8.5,
+        ellipsis: false,
       });
-      leftY += 14;
+      leftY += valueH + 4;
     }
 
     const payX = MARGIN + halfW + 20;
     let payY = startY;
-    this.text("PAYMENT INSTRUCTIONS", payX, payY, {
-      width: halfW,
-      height: 12,
-      size: 9,
-      bold: true,
-      color: ACCENT,
-    });
-    payY += 16;
     this.text("PAY BY CHECK", payX, payY, {
       width: halfW,
       height: 12,
@@ -754,26 +773,13 @@ class InvoiceLayout {
       bold: true,
     });
     payY += 14;
-    this.text(
-      "Check mailing address: 14 Hughes Ste B200, Irvine CA 92618",
-      payX,
-      payY,
-      { width: halfW, height: 22, size: 8.5 },
-    );
-    payY += 24;
-    this.text("FOR WIRE TRANSFERS:", payX, payY, {
+    this.text(checkAddress, payX, payY, {
       width: halfW,
-      height: 12,
+      height: checkAddrH + 2,
       size: 8.5,
-      bold: true,
+      ellipsis: false,
     });
-    payY += 14;
-    this.text("Please use routing number 021000021", payX, payY, {
-      width: halfW,
-      height: 12,
-      size: 8.5,
-    });
-    payY += 16;
+    payY += checkAddrH + 10;
     this.text("PAY BY ZELLE", payX, payY, {
       width: halfW,
       height: 12,
