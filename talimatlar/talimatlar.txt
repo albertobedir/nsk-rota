@@ -1,0 +1,5 @@
+nsk-urun-arama-full.json tam liste
+nsk_product_infos.json RotaNo,ProductCode,ProductDescription
+nsk-urun-arama-full.sjon ProductDescription,Brand,Model,Type
+
+ProductCode ile çaprazlama yapılıp nsk-urun-arama-full.json elde edildi
