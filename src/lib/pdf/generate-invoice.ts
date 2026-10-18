@@ -64,13 +64,19 @@ function isManualDiscountApp(app: any): boolean {
   return type === "manual" || typename.includes("manualdiscount");
 }
 
-/** Customer/tier/B2B pricing already lives in the line unit price. */
+/** Line-item custom/customer/tier pricing already lives in the unit price. */
 function isProductPricingDiscount(app: any): boolean {
   const text = discountAppText(app);
+  const title = String(app?.title ?? app?.discountApplication?.title ?? "")
+    .trim()
+    .toLowerCase();
   return (
     /customer\s*pricing/.test(text) ||
     /b2b/.test(text) ||
-    /tier/.test(text)
+    /tier/.test(text) ||
+    title === "custom discount" ||
+    title === "custom" ||
+    /^custom\s*discount$/.test(text.trim())
   );
 }
 
@@ -183,8 +189,8 @@ function resolveManualOrderDiscount(
   }
 
   const label =
-    manualDiscountLabel(manualApps[0]) ||
     firstNonEmpty(invoiceDraft?.description, invoiceDraft?.title) ||
+    manualDiscountLabel(manualApps[0]) ||
     "Discount";
 
   return {
@@ -545,6 +551,9 @@ export async function generateInvoicePdf(opts: {
           liveOrder.discount_applications ?? raw.discount_applications,
         line_items: liveOrder.line_items ?? raw.line_items,
         total_price: liveOrder.total_price ?? raw.total_price,
+        current_subtotal_price:
+          liveOrder.current_subtotal_price ?? raw.current_subtotal_price,
+        subtotal_price: liveOrder.subtotal_price ?? raw.subtotal_price,
         total_tax: liveOrder.total_tax ?? raw.total_tax,
         applied_discount:
           liveOrder.applied_discount ?? raw.applied_discount ?? raw.appliedDiscount,
@@ -553,11 +562,8 @@ export async function generateInvoicePdf(opts: {
 
   const itemsList =
     (order.lineItems?.edges as Array<Record<string, any>>) || [];
-  const {
-    allocated: allocatedManual,
-    perLine,
-    label: manualLabel,
-  } = resolveManualOrderDiscount(discountRaw, itemsList, gqlDiscount);
+  const { allocated: allocatedManual, label: manualLabel } =
+    resolveManualOrderDiscount(discountRaw, itemsList, gqlDiscount);
 
   let discountedSubtotal = 0;
   const restLineItems = Array.isArray(discountRaw.line_items)
@@ -588,9 +594,7 @@ export async function generateInvoicePdf(opts: {
         originalPrice,
     );
     const sellingPrice = discountedPrice > 0 ? discountedPrice : originalPrice;
-    const extraManualOnLine = perLine.get(idx) || 0;
-    const unitPrice =
-      qty > 0 ? sellingPrice + extraManualOnLine / qty : sellingPrice;
+    const unitPrice = sellingPrice;
     const lineTotal = unitPrice * qty;
     discountedSubtotal += lineTotal;
     return {
@@ -603,21 +607,43 @@ export async function generateInvoicePdf(opts: {
     };
   });
 
-  const discountAmount = allocatedManual;
-  const discountLabel = manualLabel || "Discount";
-  console.log("[invoice-pdf] manual discount", {
-    label: discountLabel,
-    amount: discountAmount,
-  });
-
   const taxes = money(liveOrder?.total_tax ?? order.taxes);
   const shipping = money(
     liveOrder?.total_shipping_price_set?.shop_money?.amount ?? order.shipping,
   );
-  const subtotal = discountedSubtotal;
   const shopifyTotal = money(
-    liveOrder?.total_price ?? order.totalPrice?.amount,
+    liveOrder?.current_total_price ??
+      liveOrder?.total_price ??
+      order.totalPrice?.amount,
   );
+  const paidNet = Math.max(0, shopifyTotal - taxes - shipping);
+  let discountAmount = allocatedManual;
+  const discountLabel = manualLabel || "Discount";
+
+  let subtotal = discountedSubtotal;
+  if (discountAmount > 0.004) {
+    const linesAlreadyNet = Math.abs(subtotal - paidNet) < 0.02;
+    const linesBeforeManual =
+      Math.abs(subtotal - (paidNet + discountAmount)) < 0.02;
+    if (linesAlreadyNet && !linesBeforeManual) {
+      const factor = subtotal > 0 ? (paidNet + discountAmount) / subtotal : 1;
+      for (const item of items) {
+        item.unitPrice *= factor;
+        item.lineTotal *= factor;
+      }
+      subtotal = paidNet + discountAmount;
+    } else if (!linesBeforeManual && subtotal > paidNet + 0.02) {
+      discountAmount = Math.max(0, subtotal - paidNet);
+    }
+  }
+
+  console.log("[invoice-pdf] manual discount", {
+    label: discountLabel,
+    amount: discountAmount,
+    subtotal,
+    paidNet,
+  });
+
   const computedTotal =
     Math.max(0, subtotal - discountAmount) + taxes + shipping;
   const grandTotal = shopifyTotal > 0 ? shopifyTotal : computedTotal;

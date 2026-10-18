@@ -25,6 +25,12 @@ const ORDER_MANUAL_DISCOUNT_Q = `
           node {
             sku
             quantity
+            originalUnitPriceSet {
+              shopMoney { amount currencyCode }
+            }
+            discountedUnitPriceSet {
+              shopMoney { amount currencyCode }
+            }
             discountAllocations {
               allocatedAmountSet {
                 shopMoney { amount currencyCode }
