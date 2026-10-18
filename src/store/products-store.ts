@@ -61,6 +61,7 @@ interface ProductState {
     page?: number,
     limit?: number,
   ) => Promise<void>;
+  setSearchTerm: (query: string) => void;
 }
 
 export const useProductsStore = create<ProductState>((set) => ({
@@ -153,6 +154,7 @@ export const useProductsStore = create<ProductState>((set) => ({
       search: sanitizedQuery,
       page: String(page),
       limit: String(limit),
+      batchSize: String(limit),
     });
 
     const res = await fetch(`/api/products/gets?${qs.toString()}`, {
@@ -167,5 +169,14 @@ export const useProductsStore = create<ProductState>((set) => ({
       searchTerm: sanitizedQuery,
       isLoading: false,
     });
+  },
+
+  setSearchTerm: (query) => {
+    const sanitizedQuery = String(query)
+      .split(",")
+      .map((s) => sanitizeSearchTerm(s))
+      .filter(Boolean)
+      .join(",");
+    set({ searchTerm: sanitizedQuery, isLoading: Boolean(sanitizedQuery) });
   },
 }));

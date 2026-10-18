@@ -72,8 +72,9 @@ export function partNumberTokenRegexSource(term: string): string {
 }
 
 /**
- * Reverse direction: shorter codes contained in the query, as complete tokens.
- * Search "abcdefg" can still find product "abcdef" / "bcdefg".
+ * Reverse direction: shorter codes contained in the query.
+ * Prefix + suffix only (covers "abcdef" / "bcdefg" for "abcdefg") —
+ * all middle windows made Mongo scan huge OEM JSON with dozens of regexes.
  */
 export function reverseSearchSubstrings(
   term: string,
@@ -83,33 +84,46 @@ export function reverseSearchSubstrings(
   if (stripped.length <= minLen) return [];
   const out = new Set<string>();
   for (let len = minLen; len < stripped.length; len++) {
-    for (let i = 0; i <= stripped.length - len; i++) {
-      out.add(stripped.slice(i, i + len));
-    }
+    out.add(stripped.slice(0, len));
+    out.add(stripped.slice(stripped.length - len));
   }
   return [...out];
 }
 
+/** Token match without per-character optional separators (much cheaper). */
+export function partNumberTokenLiteralRegexSource(term: string): string {
+  const stripped = sanitizeSearchTerm(term);
+  if (!stripped) return "";
+  return `(^|[^A-Za-z0-9])${escapeRegex(stripped)}([^A-Za-z0-9]|$)`;
+}
+
 /**
  * Mongo patterns for one search term (single or one tag of a multi search).
- * ≤4: exact/token only. ≥5: full term as substring + reverse token substrings.
+ * ≤4: exact/token only. ≥5: full term as substring + prefix/suffix tokens.
  */
 export function mongoPartSearchRegexes(term: string): string[] {
   const full = sanitizeSearchTerm(term);
   if (!full) return [];
 
   if (full.length <= DIRECT_SEARCH_MAX) {
-    return [
-      partNumberExactRegexSource(full),
-      partNumberTokenRegexSource(full),
-    ].filter(Boolean);
+    return [partNumberTokenLiteralRegexSource(full)].filter(Boolean);
   }
 
   const regexes = [partNumberRegexSource(full)];
   for (const sub of reverseSearchSubstrings(full)) {
-    regexes.push(partNumberTokenRegexSource(sub));
+    regexes.push(partNumberTokenLiteralRegexSource(sub));
   }
   return regexes.filter(Boolean);
+}
+
+/** Cheap candidate regexes for large JSON metafields (no reverse windows). */
+export function mongoJsonSearchRegexes(term: string): string[] {
+  const full = sanitizeSearchTerm(term);
+  if (!full) return [];
+  if (full.length <= DIRECT_SEARCH_MAX) {
+    return [partNumberTokenLiteralRegexSource(full)].filter(Boolean);
+  }
+  return [partNumberRegexSource(full)].filter(Boolean);
 }
 
 export function joinRegexAlternation(sources: string[]): string {

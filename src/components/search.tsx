@@ -31,7 +31,7 @@ export default function Search() {
   const [shakingTagId, setShakingTagId] = useState<string | null>(null);
   const router = useRouter();
 
-  const { searchProducts } = useProductsStore();
+  const { setSearchTerm } = useProductsStore();
 
   // Debounce timer ve last search query'i track et
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -65,34 +65,23 @@ export default function Search() {
       const val = sanitizeSearchTerm(value) || typed;
 
       lastSearchRef.current = val;
-      setIsSearching(true);
-
-      try {
-        // ✅ ÖNCE arama yap, SONRA navigate et
-        await searchProducts(val);
-        setValue("");
-        router.push(`/products?isFromSearchComp=false`);
-      } finally {
-        setIsSearching(false);
-      }
+      setSearchTerm(val);
+      setValue("");
+      router.push(`/products?isFromSearchComp=false`);
     } else {
       if (tags.length === 0) return;
 
       const query = tags.map((t) => t.value).join(",");
-      if (lastSearchRef.current === query) return;
+      if (lastSearchRef.current === query) {
+        router.push(`/products?isFromSearchComp=false`);
+        return;
+      }
 
       lastSearchRef.current = query;
-      setIsSearching(true);
-
-      try {
-        // ✅ ÖNCE arama yap, SONRA navigate et
-        await searchProducts(query);
-        router.push(`/products?isFromSearchComp=false`);
-      } finally {
-        setIsSearching(false);
-      }
+      setSearchTerm(query);
+      router.push(`/products?isFromSearchComp=false`);
     }
-  }, [type, value, tags, isSearching, searchProducts, router]);
+  }, [type, value, tags, isSearching, setSearchTerm, router]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -102,10 +91,12 @@ export default function Search() {
       clearTimeout(debounceTimer.current);
     }
 
+    if (type === "single") {
+      handleSearch();
+      return;
+    }
+
     debounceTimer.current = setTimeout(() => {
-      if (type === "single") {
-        handleSearch();
-      } else {
         if (value.trim() !== "") {
           // Max 20 tags - don't add more
           if (tags.length >= 20) {
@@ -157,8 +148,7 @@ export default function Search() {
             setValue("");
           }
         }
-      }
-    }, 300); // Debounce 300ms
+    }, 300);
   };
 
   // Cleanup timer on unmount

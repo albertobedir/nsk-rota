@@ -4,6 +4,7 @@
 import { connectDB } from "@/lib/mongoose/instance";
 import {
   joinRegexAlternation,
+  mongoJsonSearchRegexes,
   mongoPartSearchRegexes,
   partNumberExactRegexSource,
   partNumberRegexSource,
@@ -132,10 +133,16 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // SEARCH — nsk (rota_no/sku), oem_info, competitor_info — bidirectional
+    const isSearchQuery = Boolean(search);
+
+    // SEARCH — nsk (rota_no/sku) gets reverse tokens; OEM JSON only the full term
     if (search) {
+      const terms = search.split(",").map((s) => s.trim()).filter(Boolean);
       const partPattern = joinRegexAlternation(
-        search.split(",").flatMap((s) => mongoPartSearchRegexes(s)),
+        terms.flatMap((s) => mongoPartSearchRegexes(s)),
+      );
+      const jsonPattern = joinRegexAlternation(
+        terms.flatMap((s) => mongoJsonSearchRegexes(s)),
       );
 
       if (!partPattern) {
@@ -144,8 +151,6 @@ export async function GET(req: NextRequest) {
         metafieldConditions.push({
           $or: [
             metafieldPartMatch("rota_no", partPattern),
-            metafieldPartMatch("oem_info", partPattern),
-            metafieldPartMatch("competitor_info", partPattern),
             {
               "raw.variants": {
                 $elemMatch: {
@@ -153,6 +158,12 @@ export async function GET(req: NextRequest) {
                 },
               },
             },
+            ...(jsonPattern
+              ? [
+                  metafieldPartMatch("oem_info", jsonPattern),
+                  metafieldPartMatch("competitor_info", jsonPattern),
+                ]
+              : []),
           ],
         });
       }
@@ -359,19 +370,35 @@ export async function GET(req: NextRequest) {
       finalQuery = {};
     }
 
-    const batchResults = (await Product.find(finalQuery)
-      .sort({ createdAt: -1 })
-      .skip(skipBatch)
-      .limit(batchNum)
-      .lean()) as any[];
+    const fetchLimit = isSearchQuery
+      ? Math.min(batchNum, Math.max(limitNum, 24))
+      : batchNum;
+    const fetchSkip = isSearchQuery
+      ? (pageNum - 1) * limitNum
+      : skipBatch;
 
-    const sliceStart = ((pageNum - 1) * limitNum) % batchNum;
-    const results = batchResults.slice(
-      sliceStart,
-      sliceStart + limitNum,
-    ) as any[];
+    const findQuery = Product.find(finalQuery)
+      .skip(fetchSkip)
+      .limit(isSearchQuery ? limitNum : fetchLimit)
+      .lean();
+    if (!isSearchQuery) {
+      findQuery.sort({ createdAt: -1 });
+    }
 
-    const total = await Product.countDocuments(finalQuery);
+    const [batchResults, total] = await Promise.all([
+      findQuery.exec() as Promise<any[]>,
+      Product.countDocuments(finalQuery),
+    ]);
+
+    const sliceStart = isSearchQuery
+      ? 0
+      : ((pageNum - 1) * limitNum) % batchNum;
+    const results = isSearchQuery
+      ? (batchResults as any[])
+      : (batchResults.slice(
+          sliceStart,
+          sliceStart + limitNum,
+        ) as any[]);
 
     return NextResponse.json({
       ok: true,
