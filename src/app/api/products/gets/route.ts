@@ -5,7 +5,9 @@ import { connectDB } from "@/lib/mongoose/instance";
 import {
   escapeRegex,
   expandSearchTerms,
+  partNumberExactRegexSource,
   partNumberRegexSource,
+  sequentialSearchWindows,
 } from "@/lib/utils/part-number";
 import Product from "@/schemas/mongoose/product";
 import { NextRequest, NextResponse } from "next/server";
@@ -48,6 +50,7 @@ export async function GET(req: NextRequest) {
       search = "",
       shopifyId = "",
       variantId = "",
+      code = "",
       title = "",
       page = "1",
       limit = "50",
@@ -83,6 +86,38 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Exact rota_no / SKU / title token (product detail URLs)
+    if (!shopifyId && !variantId && code) {
+      const exactPattern = partNumberExactRegexSource(code);
+      const tokenPattern = partNumberRegexSource(code);
+      if (exactPattern && tokenPattern) {
+        metafieldConditions.push({
+          $or: [
+            metafieldPartMatch("rota_no", exactPattern),
+            {
+              "raw.variants": {
+                $elemMatch: {
+                  sku: { $regex: exactPattern, $options: "i" },
+                },
+              },
+            },
+            {
+              "raw.title": {
+                $regex: `(^|[^A-Za-z0-9])${tokenPattern}([^A-Za-z0-9]|$)`,
+                $options: "i",
+              },
+            },
+            {
+              "raw.handle": {
+                $regex: `(^|[^A-Za-z0-9])${tokenPattern}([^A-Za-z0-9]|$)`,
+                $options: "i",
+              },
+            },
+          ],
+        });
+      }
+    }
+
     // Title ile exact arama
     if (!shopifyId && !variantId && title) {
       Object.assign(baseQuery, {
@@ -103,7 +138,10 @@ export async function GET(req: NextRequest) {
       const searchValues = [
         ...new Set(search.split(",").flatMap((s) => expandSearchTerms(s))),
       ];
-      const partPattern = searchValues
+      const partWindows = [
+        ...new Set(searchValues.flatMap((v) => sequentialSearchWindows(v))),
+      ];
+      const partPattern = partWindows
         .map((v) => partNumberRegexSource(v))
         .filter(Boolean)
         .map((p) => `(${p})`)
@@ -142,7 +180,9 @@ export async function GET(req: NextRequest) {
         ...new Set(oem.split(",").flatMap((s) => expandSearchTerms(s))),
       ];
 
-      const oemPattern = oemValues
+      const oemPattern = [
+        ...new Set(oemValues.flatMap((v) => sequentialSearchWindows(v))),
+      ]
         .map((v) => partNumberRegexSource(v))
         .filter(Boolean)
         .map((p) => `(${p})`)
@@ -201,7 +241,11 @@ export async function GET(req: NextRequest) {
         ...new Set(competitor.split(",").flatMap((s) => expandSearchTerms(s))),
       ];
 
-      const competitorPattern = competitorValues
+      const competitorPattern = [
+        ...new Set(
+          competitorValues.flatMap((v) => sequentialSearchWindows(v)),
+        ),
+      ]
         .map((v) => partNumberRegexSource(v))
         .filter(Boolean)
         .map((p) => `(${p})`)

@@ -34,7 +34,6 @@ import responseJson from "@/static/response.json";
 import {
   partNumberContains,
   partNumbersEqual,
-  sanitizeSearchTerm,
 } from "@/lib/utils/part-number";
 // TreeFilter removed for step-by-step select flow
 
@@ -1031,13 +1030,11 @@ export default function ProductsPage() {
                 if (terms.some((t) => partNumbersEqual(codeStr, t)))
                   return "exact" as const;
                 if (
-                  terms.some((t) => {
-                    const n = sanitizeSearchTerm(t).toLowerCase();
-                    return (
+                  terms.some(
+                    (t) =>
                       partNumberContains(codeStr, t) ||
-                      (n.length > 0 && titleStr.includes(n))
-                    );
-                  })
+                      partNumberContains(titleStr, t),
+                  )
                 )
                   return "partial" as const;
                 return undefined;

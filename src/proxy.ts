@@ -9,11 +9,7 @@ async function tryRefreshToken(
   refreshToken: string,
 ): Promise<{ accessToken?: string; refreshToken?: string } | null> {
   try {
-    // Normalize base URL: eğer /api ile bitiyorsa kaldır
-    let baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    baseUrl = baseUrl.replace(/\/api\/?$/, "");
-
-    const response = await fetch(`${baseUrl}/api/auth/refresh`, {
+    const response = await fetch(new URL("/api/auth/refresh", req.nextUrl), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -21,7 +21,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { calculateProductPrice } from "@/lib/pricing";
-import { partNumberContains } from "@/lib/utils/part-number";
+import {
+  partNumberContains,
+  productMatchesCode,
+} from "@/lib/utils/part-number";
 import {
   Dialog,
   DialogContent,
@@ -468,42 +471,44 @@ export default function ProductDetailPage() {
     if (!id) return;
 
     async function fetchProduct() {
+      const pickExact = (rows: any[] | undefined) =>
+        (rows ?? []).find((p) => productMatchesCode(p, id)) ?? null;
+
       // Try treat the route param as a Shopify product id first
       const attemptByShopify = await fetch(
-        `/api/products/gets?shopifyId=${id}`,
+        `/api/products/gets?shopifyId=${encodeURIComponent(id)}`,
       );
       const shopifyJson = await attemptByShopify.json().catch(() => null);
       console.log("[product-page] fetchProduct - shopifyId attempt:", {
         id,
         shopifyJson,
       });
-      let found = shopifyJson?.results?.[0] ?? null;
+      let found = pickExact(shopifyJson?.results);
 
       // Fallback: if not found, treat param as variant id and try that
       if (!found) {
         const attemptByVariant = await fetch(
-          `/api/products/gets?variantId=${id}`,
+          `/api/products/gets?variantId=${encodeURIComponent(id)}`,
         );
         const variantJson = await attemptByVariant.json().catch(() => null);
         console.log("[product-page] fetchProduct - variantId attempt:", {
           id,
           variantJson,
         });
-        found = variantJson?.results?.[0] ?? null;
+        found = pickExact(variantJson?.results);
       }
 
-      // Final fallback: keep old behavior and search rota_no (now includes SKU, title, handle)
+      // Exact rota_no / SKU / title — never take a partial search hit
       if (!found) {
-        const attemptByRota = await fetch(`/api/products/gets?search=${id}`);
-        const rotaJson = await attemptByRota.json().catch(() => null);
-        console.log(
-          "[product-page] fetchProduct - search (rota_no/SKU) attempt:",
-          {
-            id,
-            rotaJson,
-          },
+        const attemptByCode = await fetch(
+          `/api/products/gets?code=${encodeURIComponent(id)}`,
         );
-        found = rotaJson?.results?.[0] ?? null;
+        const codeJson = await attemptByCode.json().catch(() => null);
+        console.log("[product-page] fetchProduct - exact code attempt:", {
+          id,
+          codeJson,
+        });
+        found = pickExact(codeJson?.results);
       }
 
       console.log("[product-page] fetchProduct - final result:", { id, found });
