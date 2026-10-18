@@ -45,11 +45,37 @@ function discountAppList(raw: Record<string, any>): any[] {
   return [];
 }
 
+function discountAppText(app: any): string {
+  return [
+    app?.description,
+    app?.title,
+    app?.code,
+    app?.discountApplication?.description,
+    app?.discountApplication?.title,
+  ]
+    .map((value) => String(value ?? "").toLowerCase())
+    .join(" ");
+}
+
 function isManualDiscountApp(app: any): boolean {
   if (!app || typeof app !== "object") return false;
   const type = String(app.type || app.discountType || "").toLowerCase();
   const typename = String(app.__typename || "").toLowerCase();
   return type === "manual" || typename.includes("manualdiscount");
+}
+
+/** Customer/tier/B2B pricing already lives in the line unit price. */
+function isProductPricingDiscount(app: any): boolean {
+  const text = discountAppText(app);
+  return (
+    /customer\s*pricing/.test(text) ||
+    /b2b/.test(text) ||
+    /tier/.test(text)
+  );
+}
+
+function isInvoiceManualDiscount(app: any): boolean {
+  return isManualDiscountApp(app) && !isProductPricingDiscount(app);
 }
 
 function manualDiscountLabel(app: any): string {
@@ -94,7 +120,7 @@ function lineManualDiscountAmount(
       alloc?.discount_application ||
       (idx != null ? apps[Number(idx)] : null);
     const matchedByIndex = idx != null && manualIndexes.has(Number(idx));
-    if (matchedByIndex || isManualDiscountApp(app)) {
+    if (matchedByIndex || isInvoiceManualDiscount(app)) {
       total += allocationAmount(alloc);
     }
   }
@@ -118,10 +144,10 @@ function resolveManualOrderDiscount(
   const restApps = discountAppList(raw);
   const gqlApps = connectionNodes(gql?.discountApplications);
   const apps = restApps.length ? restApps : gqlApps;
-  const manualApps = [...restApps, ...gqlApps].filter(isManualDiscountApp);
+  const manualApps = [...restApps, ...gqlApps].filter(isInvoiceManualDiscount);
   const manualIndexes = new Set<number>();
   apps.forEach((app, i) => {
-    if (isManualDiscountApp(app)) manualIndexes.add(i);
+    if (isInvoiceManualDiscount(app)) manualIndexes.add(i);
   });
 
   const restItems = Array.isArray(raw.line_items) ? raw.line_items : [];
@@ -147,21 +173,25 @@ function resolveManualOrderDiscount(
 
   const draftDiscount =
     gql?.appliedDiscount || raw.appliedDiscount || raw.applied_discount;
-  if (allocated < 0.005 && draftDiscount) {
-    const applied = draftAppliedAmount(draftDiscount);
+  const invoiceDraft =
+    draftDiscount && !isProductPricingDiscount(draftDiscount)
+      ? draftDiscount
+      : null;
+  if (allocated < 0.005 && invoiceDraft) {
+    const applied = draftAppliedAmount(invoiceDraft);
     if (applied > 0.004) allocated = applied;
   }
 
   const label =
     manualDiscountLabel(manualApps[0]) ||
-    firstNonEmpty(draftDiscount?.description, draftDiscount?.title) ||
+    firstNonEmpty(invoiceDraft?.description, invoiceDraft?.title) ||
     "Discount";
 
   return {
     allocated,
     perLine,
     label,
-    hasManual: manualApps.length > 0 || Boolean(draftDiscount),
+    hasManual: manualApps.length > 0 || Boolean(invoiceDraft),
   };
 }
 
@@ -557,12 +587,10 @@ export async function generateInvoicePdf(opts: {
         node?.discountedUnitPrice ||
         originalPrice,
     );
-    // Selling price already includes product/tier discounts. Add back only
-    // the manual order discount so it appears in the Discount row.
     const sellingPrice = discountedPrice > 0 ? discountedPrice : originalPrice;
-    const manualOnLine = perLine.get(idx) || 0;
+    const extraManualOnLine = perLine.get(idx) || 0;
     const unitPrice =
-      qty > 0 ? sellingPrice + manualOnLine / qty : sellingPrice;
+      qty > 0 ? sellingPrice + extraManualOnLine / qty : sellingPrice;
     const lineTotal = unitPrice * qty;
     discountedSubtotal += lineTotal;
     return {
