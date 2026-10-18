@@ -80,7 +80,23 @@ function connectionNodes(conn: any): any[] {
   return [];
 }
 
-export async function fetchShopifyOrderManualDiscount(orderId?: string | number | null) {
+export type ShopifyManualDiscountData =
+  | {
+      kind: "order";
+      discountApplications: any[];
+      lineItems: any[];
+      appliedDiscount?: any;
+    }
+  | {
+      kind: "draft";
+      discountApplications?: any[];
+      lineItems: any[];
+      appliedDiscount: any;
+    };
+
+export async function fetchShopifyOrderManualDiscount(
+  orderId?: string | number | null,
+): Promise<ShopifyManualDiscountData | null> {
   const orderGid = toOrderGid(orderId);
   if (!orderGid) return null;
 
@@ -102,7 +118,9 @@ export async function fetchShopifyOrderManualDiscount(orderId?: string | number 
   }
 }
 
-export async function fetchShopifyDraftManualDiscount(draftId?: string | number | null) {
+export async function fetchShopifyDraftManualDiscount(
+  draftId?: string | number | null,
+): Promise<ShopifyManualDiscountData | null> {
   const numeric = extractNumericId(
     typeof draftId === "number" || typeof draftId === "string" ? draftId : null,
   );

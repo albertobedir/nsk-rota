@@ -10,6 +10,7 @@ import { fetchShopifyRestOrder } from "@/lib/shopify/order-rest";
 import {
   fetchShopifyDraftManualDiscount,
   fetchShopifyOrderManualDiscount,
+  type ShopifyManualDiscountData,
 } from "@/lib/shopify/order";
 
 export class InvoicePdfError extends Error {
@@ -112,12 +113,7 @@ function draftAppliedAmount(applied: any): number {
 function resolveManualOrderDiscount(
   raw: Record<string, any>,
   lineItems: any[],
-  gql?: {
-    kind?: string;
-    discountApplications?: any[];
-    lineItems?: any[];
-    appliedDiscount?: any;
-  } | null,
+  gql?: ShopifyManualDiscountData | null,
 ) {
   const restApps = discountAppList(raw);
   const gqlApps = connectionNodes(gql?.discountApplications);
@@ -476,7 +472,8 @@ export async function generateInvoicePdf(opts: {
     raw.admin_graphql_api_id ||
     raw.id ||
     orderId;
-  let gqlDiscount = await fetchShopifyOrderManualDiscount(shopifyOrderId);
+  let gqlDiscount: ShopifyManualDiscountData | null =
+    await fetchShopifyOrderManualDiscount(shopifyOrderId);
   if (!gqlDiscount) {
     gqlDiscount = await fetchShopifyDraftManualDiscount(
       raw.draft_order_id || raw.draftOrderId || shopifyOrderId,
