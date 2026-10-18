@@ -31,10 +31,7 @@ import BrandModelTypeCombos from "@/components/brand-model-type-combos";
 import { Switch } from "@/components/ui/switch";
 import Image from "next/image";
 import responseJson from "@/static/response.json";
-import {
-  partNumberContains,
-  partNumbersEqual,
-} from "@/lib/utils/part-number";
+import { bestMatchType } from "@/lib/utils/part-number";
 // TreeFilter removed for step-by-step select flow
 
 export default function ProductsPage() {
@@ -1017,27 +1014,12 @@ export default function ProductsPage() {
 
               const shopifyId = product.shopifyId ?? (product.raw as any)?.id;
 
-              // determine match type based on active searchTerm
               const matchType = (() => {
                 const terms = String(searchTerm ?? "")
                   .split(",")
                   .map((s) => s.trim())
                   .filter(Boolean);
-                if (terms.length === 0) return undefined;
-                const codeStr = String(code ?? "");
-                const titleStr = String(product.raw.title ?? "").toLowerCase();
-
-                if (terms.some((t) => partNumbersEqual(codeStr, t)))
-                  return "exact" as const;
-                if (
-                  terms.some(
-                    (t) =>
-                      partNumberContains(codeStr, t) ||
-                      partNumberContains(titleStr, t),
-                  )
-                )
-                  return "partial" as const;
-                return undefined;
+                return bestMatchType([String(code ?? "")], terms);
               })();
 
               const originalPrice = (product as any)?.originalPrice

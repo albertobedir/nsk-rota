@@ -7,6 +7,10 @@ import { formatInvoiceAddressLines } from "@/lib/pdf/invoice-address";
 import { extractNumericId, toCustomerGid, toOrderGid } from "@/lib/shopify/ids";
 import { normalizeLineItemEdges } from "@/lib/orders/line-items";
 import { fetchShopifyRestOrder } from "@/lib/shopify/order-rest";
+import {
+  fetchShopifyDraftManualDiscount,
+  fetchShopifyOrderManualDiscount,
+} from "@/lib/shopify/order";
 
 export class InvoicePdfError extends Error {
   status: number;
@@ -22,52 +26,38 @@ function money(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function discountAppList(raw: Record<string, any>): any[] {
-  if (Array.isArray(raw.discount_applications)) return raw.discount_applications;
-  if (Array.isArray(raw.discountApplications?.nodes)) {
-    return raw.discountApplications.nodes;
+function connectionNodes(conn: any): any[] {
+  if (!conn) return [];
+  if (Array.isArray(conn.nodes)) return conn.nodes;
+  if (Array.isArray(conn.edges)) {
+    return conn.edges.map((e: any) => e?.node).filter(Boolean);
   }
-  if (Array.isArray(raw.discountApplications)) return raw.discountApplications;
+  if (Array.isArray(conn)) return conn;
   return [];
 }
 
-function discountAppText(app: any): string {
-  return [
-    app?.description,
-    app?.title,
-    app?.code,
-    app?.discountApplication?.description,
-    app?.discountApplication?.title,
-  ]
-    .map((value) => String(value ?? "").toLowerCase())
-    .join(" ");
+function discountAppList(raw: Record<string, any>): any[] {
+  const fromRest = connectionNodes(raw.discount_applications);
+  if (fromRest.length) return fromRest;
+  const fromGql = connectionNodes(raw.discountApplications);
+  if (fromGql.length) return fromGql;
+  return [];
 }
 
-function isSystemCheckoutDiscount(app: any): boolean {
+function isManualDiscountApp(app: any): boolean {
   if (!app || typeof app !== "object") return false;
-  const type = String(app.type || app.discountType || "").toLowerCase();
-  if (
-    type === "discount_code" ||
-    type === "automatic" ||
-    type === "script"
-  ) {
-    return true;
-  }
-  const text = discountAppText(app);
-  return (
-    /b2b/.test(text) ||
-    /customer\s*pricing/.test(text) ||
-    /discount\s*code/.test(text) ||
-    /tier/.test(text)
-  );
-}
-
-function isAdminPanelDiscount(app: any): boolean {
-  if (!app || typeof app !== "object") return false;
-  if (isSystemCheckoutDiscount(app)) return false;
   const type = String(app.type || app.discountType || "").toLowerCase();
   const typename = String(app.__typename || "").toLowerCase();
   return type === "manual" || typename.includes("manualdiscount");
+}
+
+function manualDiscountLabel(app: any): string {
+  return firstNonEmpty(
+    app?.description,
+    app?.title,
+    app?.discountApplication?.description,
+    app?.discountApplication?.title,
+  );
 }
 
 function allocationList(item: any): any[] {
@@ -77,9 +67,7 @@ function allocationList(item: any): any[] {
     item?.node?.discountAllocations ||
     item?.node?.discount_allocations ||
     [];
-  if (Array.isArray(src)) return src;
-  if (Array.isArray(src?.nodes)) return src.nodes;
-  return [];
+  return connectionNodes(src);
 }
 
 function allocationAmount(alloc: any): number {
@@ -91,9 +79,9 @@ function allocationAmount(alloc: any): number {
   );
 }
 
-function lineAdminDiscountAmount(
+function lineManualDiscountAmount(
   item: any,
-  adminIndexes: Set<number>,
+  manualIndexes: Set<number>,
   apps: any[],
 ): number {
   let total = 0;
@@ -104,46 +92,49 @@ function lineAdminDiscountAmount(
       alloc?.discountApplication ||
       alloc?.discount_application ||
       (idx != null ? apps[Number(idx)] : null);
-    const matchedByIndex = idx != null && adminIndexes.has(Number(idx));
-    if (matchedByIndex || isAdminPanelDiscount(app)) {
+    const matchedByIndex = idx != null && manualIndexes.has(Number(idx));
+    if (matchedByIndex || isManualDiscountApp(app)) {
       total += allocationAmount(alloc);
     }
   }
   return total;
 }
 
-function adminDiscountFromApps(apps: any[], subtotal: number): number {
-  let total = 0;
-  for (const app of apps) {
-    if (!isAdminPanelDiscount(app)) continue;
-    const valueType = String(
-      app.value_type || app.valueType || app.value?.__typename || "",
-    ).toLowerCase();
-    if (app.value?.percentage != null || valueType.includes("percentage")) {
-      const pct = money(app.value?.percentage ?? app.value);
-      total += subtotal * (pct / 100);
-      continue;
-    }
-    total += money(
-      app.value?.amount ?? app.value?.shopMoney?.amount ?? app.value,
-    );
-  }
-  return total;
+function draftAppliedAmount(applied: any): number {
+  if (!applied) return 0;
+  return money(
+    applied.amountSet?.shopMoney?.amount ??
+      applied.amountV2?.amount ??
+      applied.amount,
+  );
 }
 
-function resolveAdminDiscount(raw: Record<string, any>, lineItems: any[]) {
-  const apps = discountAppList(raw);
-  const adminIndexes = new Set<number>();
+function resolveManualOrderDiscount(
+  raw: Record<string, any>,
+  lineItems: any[],
+  gql?: {
+    kind?: string;
+    discountApplications?: any[];
+    lineItems?: any[];
+    appliedDiscount?: any;
+  } | null,
+) {
+  const restApps = discountAppList(raw);
+  const gqlApps = connectionNodes(gql?.discountApplications);
+  const apps = restApps.length ? restApps : gqlApps;
+  const manualApps = [...restApps, ...gqlApps].filter(isManualDiscountApp);
+  const manualIndexes = new Set<number>();
   apps.forEach((app, i) => {
-    if (isAdminPanelDiscount(app)) adminIndexes.add(i);
+    if (isManualDiscountApp(app)) manualIndexes.add(i);
   });
 
   const restItems = Array.isArray(raw.line_items) ? raw.line_items : [];
+  const gqlItems = connectionNodes(gql?.lineItems);
   const perLine = new Map<number, number>();
   let allocated = 0;
 
   const take = (item: any, index: number) => {
-    const amount = lineAdminDiscountAmount(item, adminIndexes, apps);
+    const amount = lineManualDiscountAmount(item, manualIndexes, apps);
     if (amount > 0) {
       perLine.set(index, (perLine.get(index) || 0) + amount);
       allocated += amount;
@@ -154,8 +145,28 @@ function resolveAdminDiscount(raw: Record<string, any>, lineItems: any[]) {
   if (allocated < 0.005) {
     lineItems.forEach((edge, i) => take(edge?.node || edge, i));
   }
+  if (allocated < 0.005) {
+    gqlItems.forEach(take);
+  }
 
-  return { allocated, perLine, apps };
+  const draftDiscount =
+    gql?.appliedDiscount || raw.appliedDiscount || raw.applied_discount;
+  if (allocated < 0.005 && draftDiscount) {
+    const applied = draftAppliedAmount(draftDiscount);
+    if (applied > 0.004) allocated = applied;
+  }
+
+  const label =
+    manualDiscountLabel(manualApps[0]) ||
+    firstNonEmpty(draftDiscount?.description, draftDiscount?.title) ||
+    "Discount";
+
+  return {
+    allocated,
+    perLine,
+    label,
+    hasManual: manualApps.length > 0 || Boolean(draftDiscount),
+  };
 }
 
 function firstNonEmpty(...vals: unknown[]): string {
@@ -459,6 +470,19 @@ export async function generateInvoicePdf(opts: {
     console.warn("[invoice-pdf] live Shopify address fetch failed:", err);
   }
 
+  const shopifyOrderId =
+    liveOrder?.admin_graphql_api_id ||
+    liveOrder?.id ||
+    raw.admin_graphql_api_id ||
+    raw.id ||
+    orderId;
+  let gqlDiscount = await fetchShopifyOrderManualDiscount(shopifyOrderId);
+  if (!gqlDiscount) {
+    gqlDiscount = await fetchShopifyDraftManualDiscount(
+      raw.draft_order_id || raw.draftOrderId || shopifyOrderId,
+    );
+  }
+
   let billingAddr = pickAddress(
     ...collectAddressCandidates(
       "billing",
@@ -495,15 +519,18 @@ export async function generateInvoicePdf(opts: {
         line_items: liveOrder.line_items ?? raw.line_items,
         total_price: liveOrder.total_price ?? raw.total_price,
         total_tax: liveOrder.total_tax ?? raw.total_tax,
+        applied_discount:
+          liveOrder.applied_discount ?? raw.applied_discount ?? raw.appliedDiscount,
       }
     : raw;
 
   const itemsList =
     (order.lineItems?.edges as Array<Record<string, any>>) || [];
-  const { allocated: allocatedAdmin, perLine, apps } = resolveAdminDiscount(
-    discountRaw,
-    itemsList,
-  );
+  const {
+    allocated: allocatedManual,
+    perLine,
+    label: manualLabel,
+  } = resolveManualOrderDiscount(discountRaw, itemsList, gqlDiscount);
 
   let discountedSubtotal = 0;
   const restLineItems = Array.isArray(discountRaw.line_items)
@@ -533,12 +560,12 @@ export async function generateInvoicePdf(opts: {
         node?.discountedUnitPrice ||
         originalPrice,
     );
-    // Selling price already includes tier + coupon. Add back only extra
-    // Shopify-admin discounts so those stay in the Discount row instead.
+    // Selling price already includes product/tier discounts. Add back only
+    // the manual order discount so it appears in the Discount row.
     const sellingPrice = discountedPrice > 0 ? discountedPrice : originalPrice;
-    const adminOnLine = perLine.get(idx) || 0;
+    const manualOnLine = perLine.get(idx) || 0;
     const unitPrice =
-      qty > 0 ? sellingPrice + adminOnLine / qty : sellingPrice;
+      qty > 0 ? sellingPrice + manualOnLine / qty : sellingPrice;
     const lineTotal = unitPrice * qty;
     discountedSubtotal += lineTotal;
     return {
@@ -551,11 +578,12 @@ export async function generateInvoicePdf(opts: {
     };
   });
 
-  let discountAmount = allocatedAdmin;
-  if (discountAmount < 0.005) {
-    discountAmount = adminDiscountFromApps(apps, discountedSubtotal);
-  }
-  const discountLabel = "Discount";
+  const discountAmount = allocatedManual;
+  const discountLabel = manualLabel || "Discount";
+  console.log("[invoice-pdf] manual discount", {
+    label: discountLabel,
+    amount: discountAmount,
+  });
 
   const taxes = money(liveOrder?.total_tax ?? order.taxes);
   const shipping = money(

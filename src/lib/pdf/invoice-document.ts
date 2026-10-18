@@ -679,7 +679,7 @@ class InvoiceLayout {
 
     totRow("Subtotal", this.formatMoney(this.input.subtotal));
     totRow(
-      "Discount",
+      this.input.discountLabel?.trim() || "Discount",
       discount > 0.004
         ? `-${this.formatMoney(discount)}`
         : this.formatMoney(0),

@@ -1,20 +1,23 @@
-/** Separators commonly found in OEM / competitor part numbers. */
-const PART_SEPARATORS = /[\s,_*#.\-\/]+/g;
-
 /**
  * Bounded separators between characters — used in Mongo/JS regex.
  * `{0,2}` avoids catastrophic backtracking that `*` caused on large metafield JSON.
  */
-const OPTIONAL_SEPARATORS = "[\\s,_*#.\\-\\/]{0,2}";
+const OPTIONAL_SEPARATORS = "[^A-Za-z0-9]{0,2}";
 
 /** Trailing size/revision like d12, A13, D14 on TRW-style numbers. */
 const VARIANT_SUFFIX = /[a-zA-Z]\d{2}$/;
 
-/** Minimum consecutive alphanumeric run for a partial (non-exact) match. */
-export const MIN_PARTIAL_RUN = 5;
+/** Single search: 4 chars or fewer is a direct/exact lookup. */
+export const DIRECT_SEARCH_MAX = 4;
 
+/** Partial (yellow) matching starts at 5 alphanumeric characters. */
+export const PARTIAL_MATCH_MIN = 5;
+
+export const MIN_PARTIAL_RUN = PARTIAL_MATCH_MIN;
+
+/** Same as PHP: preg_replace('~[^A-Za-z0-9]~', '', $term) */
 export function stripPartSeparators(value: string): string {
-  return value.replace(PART_SEPARATORS, "");
+  return value.replace(/[^A-Za-z0-9]/g, "");
 }
 
 /** Ignore manufacturer prefixes/suffixes like A12345 or 12345A. */
@@ -27,7 +30,6 @@ export function stripVariantSuffix(value: string): string {
   return value.replace(VARIANT_SUFFIX, "");
 }
 
-/** Strip punctuation/separators only — letters stay in the search term. */
 export function sanitizeSearchTerm(value: string): string {
   return stripPartSeparators(value.trim());
 }
@@ -36,36 +38,9 @@ export function normalizePartNumber(value: string): string {
   return sanitizeSearchTerm(value).toLowerCase();
 }
 
-/**
- * Full term plus core without the d12/A13 suffix, for Mongo and UI matching.
- */
 export function expandSearchTerms(term: string): string[] {
   const full = sanitizeSearchTerm(term);
-  if (!full) return [];
-  const stem = stripVariantSuffix(full);
-  if (stem && stem !== full && stem.length >= 4) {
-    return [full, stem];
-  }
-  return [full];
-}
-
-/**
- * Full sanitized term plus every window of MIN_PARTIAL_RUN chars.
- * Used so "192876S" can still find "192876" in Mongo.
- */
-export function sequentialSearchWindows(
-  term: string,
-  minLen = MIN_PARTIAL_RUN,
-): string[] {
-  const stripped = sanitizeSearchTerm(term);
-  if (!stripped) return [];
-  if (stripped.length < minLen) return [stripped];
-
-  const windows = new Set<string>([stripped]);
-  for (let i = 0; i <= stripped.length - minLen; i++) {
-    windows.add(stripped.slice(i, i + minLen));
-  }
-  return [...windows];
+  return full ? [full] : [];
 }
 
 export function escapeRegex(value: string): string {
@@ -87,6 +62,108 @@ export function partNumberExactRegexSource(term: string): string {
   const src = partNumberRegexSource(term);
   if (!src) return "";
   return `^\\s*${src}\\s*$`;
+}
+
+/** Number as its own token inside JSON / mixed text. */
+export function partNumberTokenRegexSource(term: string): string {
+  const src = partNumberRegexSource(term);
+  if (!src) return "";
+  return `(^|[^A-Za-z0-9])${src}([^A-Za-z0-9]|$)`;
+}
+
+/**
+ * Reverse direction: shorter codes contained in the query, as complete tokens.
+ * Search "abcdefg" can still find product "abcdef" / "bcdefg".
+ */
+export function reverseSearchSubstrings(
+  term: string,
+  minLen = PARTIAL_MATCH_MIN,
+): string[] {
+  const stripped = sanitizeSearchTerm(term);
+  if (stripped.length <= minLen) return [];
+  const out = new Set<string>();
+  for (let len = minLen; len < stripped.length; len++) {
+    for (let i = 0; i <= stripped.length - len; i++) {
+      out.add(stripped.slice(i, i + len));
+    }
+  }
+  return [...out];
+}
+
+/**
+ * Mongo patterns for one search term (single or one tag of a multi search).
+ * ≤4: exact/token only. ≥5: full term as substring + reverse token substrings.
+ */
+export function mongoPartSearchRegexes(term: string): string[] {
+  const full = sanitizeSearchTerm(term);
+  if (!full) return [];
+
+  if (full.length <= DIRECT_SEARCH_MAX) {
+    return [
+      partNumberExactRegexSource(full),
+      partNumberTokenRegexSource(full),
+    ].filter(Boolean);
+  }
+
+  const regexes = [partNumberRegexSource(full)];
+  for (const sub of reverseSearchSubstrings(full)) {
+    regexes.push(partNumberTokenRegexSource(sub));
+  }
+  return regexes.filter(Boolean);
+}
+
+export function joinRegexAlternation(sources: string[]): string {
+  return sources
+    .filter(Boolean)
+    .map((p) => `(${p})`)
+    .join("|");
+}
+
+export function partNumbersEqual(a: string, b: string): boolean {
+  const na = normalizePartNumber(a);
+  const nb = normalizePartNumber(b);
+  return na.length > 0 && na === nb;
+}
+
+/**
+ * Green = exact, yellow = bidirectional contains, red/null = no match.
+ * Search "abcdefg":
+ *   abcdefg green; abcdefgx / xabcdefg / abcdef / bcdefg yellow; xxxx none.
+ */
+export function classifyPartMatch(
+  value: string,
+  term: string,
+): "exact" | "partial" | null {
+  const v = normalizePartNumber(value);
+  const t = normalizePartNumber(term);
+  if (!v || !t) return null;
+  if (v === t) return "exact";
+  if (t.length <= DIRECT_SEARCH_MAX) return null;
+  if (v.includes(t)) return "partial";
+  if (v.length >= PARTIAL_MATCH_MIN && t.includes(v)) return "partial";
+  return null;
+}
+
+export function partNumberContains(haystack: string, needle: string): boolean {
+  return classifyPartMatch(haystack, needle) != null;
+}
+
+export function bestMatchType(
+  values: Array<string | null | undefined>,
+  terms: string[],
+): "exact" | "partial" | undefined {
+  const fields = values.map((v) => String(v ?? "").trim()).filter(Boolean);
+  if (fields.length === 0 || terms.length === 0) return undefined;
+
+  let partial = false;
+  for (const term of terms) {
+    for (const field of fields) {
+      const match = classifyPartMatch(field, term);
+      if (match === "exact") return "exact";
+      if (match === "partial") partial = true;
+    }
+  }
+  return partial ? "partial" : undefined;
 }
 
 /** True when this catalog row is the product for a URL/search code. */
@@ -122,37 +199,4 @@ export function productMatchesCode(product: any, code: string): boolean {
   if (nHandle.includes(nNeedle)) return true;
 
   return false;
-}
-
-export function partNumbersEqual(a: string, b: string): boolean {
-  const na = normalizePartNumber(a);
-  const nb = normalizePartNumber(b);
-  return na.length > 0 && na === nb;
-}
-
-function hasSequentialRun(
-  haystack: string,
-  needle: string,
-  minLen = MIN_PARTIAL_RUN,
-): boolean {
-  if (!haystack || !needle) return false;
-  if (needle.length >= minLen && haystack.includes(needle)) return true;
-  if (haystack.length >= minLen && needle.includes(haystack)) return true;
-  if (needle.length < minLen || haystack.length < minLen) return false;
-
-  const shorter = needle.length <= haystack.length ? needle : haystack;
-  const longer = needle.length <= haystack.length ? haystack : needle;
-  for (let i = 0; i <= shorter.length - minLen; i++) {
-    if (longer.includes(shorter.slice(i, i + minLen))) return true;
-  }
-  return false;
-}
-
-export function partNumberContains(haystack: string, needle: string): boolean {
-  const h = normalizePartNumber(haystack);
-  const n = normalizePartNumber(needle);
-  if (!h || !n) return false;
-  if (h === n) return true;
-  if (n.length < MIN_PARTIAL_RUN) return h.includes(n);
-  return hasSequentialRun(h, n);
 }

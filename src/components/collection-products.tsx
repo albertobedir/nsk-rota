@@ -3,10 +3,7 @@
 
 import { useState } from "react";
 import SingleProdCard from "@/components/single-prod-cart";
-import {
-  partNumberContains,
-  partNumbersEqual,
-} from "@/lib/utils/part-number";
+import { bestMatchType } from "@/lib/utils/part-number";
 
 export default function CollectionProducts({
   products,
@@ -91,27 +88,12 @@ export default function CollectionProducts({
             product.code ??
             extractRotaNoFromMetafields(product.raw?.metafields);
 
-          // Determine match type based on searchTerm
           const matchType = (() => {
             const terms = String(searchTerm ?? "")
               .split(",")
               .map((s) => s.trim())
               .filter(Boolean);
-            if (terms.length === 0) return undefined;
-            const codeStr = String(code ?? "");
-            const titleStr = String(product.raw?.title ?? "").toLowerCase();
-
-            if (terms.some((t) => partNumbersEqual(codeStr, t)))
-              return "exact" as const;
-            if (
-              terms.some(
-                (t) =>
-                  partNumberContains(codeStr, t) ||
-                  partNumberContains(titleStr, t),
-              )
-            )
-              return "partial" as const;
-            return undefined;
+            return bestMatchType([String(code ?? "")], terms);
           })();
 
           const price = Number(product.raw?.variants?.[0]?.price ?? "0");

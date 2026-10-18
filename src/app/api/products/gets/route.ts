@@ -3,11 +3,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { connectDB } from "@/lib/mongoose/instance";
 import {
-  escapeRegex,
-  expandSearchTerms,
+  joinRegexAlternation,
+  mongoPartSearchRegexes,
   partNumberExactRegexSource,
   partNumberRegexSource,
-  sequentialSearchWindows,
 } from "@/lib/utils/part-number";
 import Product from "@/schemas/mongoose/product";
 import { NextRequest, NextResponse } from "next/server";
@@ -133,22 +132,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // ✅ SEARCH — rota_no, oem_info, competitor_info, applications, brand_info, sku, title, handle
+    // SEARCH — nsk (rota_no/sku), oem_info, competitor_info — bidirectional
     if (search) {
-      const searchValues = [
-        ...new Set(search.split(",").flatMap((s) => expandSearchTerms(s))),
-      ];
-      const partWindows = [
-        ...new Set(searchValues.flatMap((v) => sequentialSearchWindows(v))),
-      ];
-      const partPattern = partWindows
-        .map((v) => partNumberRegexSource(v))
-        .filter(Boolean)
-        .map((p) => `(${p})`)
-        .join("|");
-      const literalPattern = searchValues
-        .map((v) => `(${escapeRegex(v)})`)
-        .join("|");
+      const partPattern = joinRegexAlternation(
+        search.split(",").flatMap((s) => mongoPartSearchRegexes(s)),
+      );
 
       if (!partPattern) {
         metafieldConditions.push({ _id: { $exists: false } });
@@ -158,8 +146,6 @@ export async function GET(req: NextRequest) {
             metafieldPartMatch("rota_no", partPattern),
             metafieldPartMatch("oem_info", partPattern),
             metafieldPartMatch("competitor_info", partPattern),
-            metafieldPartMatch("applications", literalPattern),
-            metafieldPartMatch("brand_info", literalPattern),
             {
               "raw.variants": {
                 $elemMatch: {
@@ -167,8 +153,6 @@ export async function GET(req: NextRequest) {
                 },
               },
             },
-            { "raw.title": { $regex: literalPattern, $options: "i" } },
-            { "raw.handle": { $regex: literalPattern, $options: "i" } },
           ],
         });
       }
@@ -176,17 +160,9 @@ export async function GET(req: NextRequest) {
 
     // OEM arama
     if (oem) {
-      const oemValues = [
-        ...new Set(oem.split(",").flatMap((s) => expandSearchTerms(s))),
-      ];
-
-      const oemPattern = [
-        ...new Set(oemValues.flatMap((v) => sequentialSearchWindows(v))),
-      ]
-        .map((v) => partNumberRegexSource(v))
-        .filter(Boolean)
-        .map((p) => `(${p})`)
-        .join("|");
+      const oemPattern = joinRegexAlternation(
+        oem.split(",").flatMap((s) => mongoPartSearchRegexes(s)),
+      );
 
       if (oemPattern) {
         metafieldConditions.push(metafieldPartMatch("oem_info", oemPattern));
@@ -237,19 +213,9 @@ export async function GET(req: NextRequest) {
 
     // Competitor arama
     if (competitor) {
-      const competitorValues = [
-        ...new Set(competitor.split(",").flatMap((s) => expandSearchTerms(s))),
-      ];
-
-      const competitorPattern = [
-        ...new Set(
-          competitorValues.flatMap((v) => sequentialSearchWindows(v)),
-        ),
-      ]
-        .map((v) => partNumberRegexSource(v))
-        .filter(Boolean)
-        .map((p) => `(${p})`)
-        .join("|");
+      const competitorPattern = joinRegexAlternation(
+        competitor.split(",").flatMap((s) => mongoPartSearchRegexes(s)),
+      );
 
       if (competitorPattern) {
         metafieldConditions.push(
