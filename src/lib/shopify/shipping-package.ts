@@ -1,7 +1,5 @@
 import { connectDB } from "@/lib/mongoose/instance";
-import ShippingPackage, {
-  IShippingPackage,
-} from "@/schemas/mongoose/shipping-package";
+import ShippingPackage from "@/schemas/mongoose/shipping-package";
 
 export type CatalogPackage = {
   code: string;
@@ -37,6 +35,20 @@ export class PackageCodeError extends Error {
   }
 }
 
+const BUILTIN_PACKAGES: CatalogPackage[] = [
+  {
+    code: "Pack001",
+    name: "Pack001",
+    type: "box",
+    length: 15,
+    width: 12,
+    height: 7,
+    dimensionUnit: "cm",
+    emptyWeight: null,
+    weightUnit: null,
+  },
+];
+
 function normalizePackageName(value: string) {
   return String(value ?? "")
     .trim()
@@ -44,39 +56,31 @@ function normalizePackageName(value: string) {
     .toLowerCase();
 }
 
-function toCatalog(doc: IShippingPackage): CatalogPackage {
-  return {
-    code: doc.code,
-    name: doc.name,
-    type: doc.type,
-    length: doc.length,
-    width: doc.width,
-    height: doc.height,
-    dimensionUnit: doc.dimensionUnit,
-    emptyWeight: doc.emptyWeight ?? null,
-    weightUnit: doc.weightUnit ?? null,
-  };
+function matchesCode(pkg: { code: string; name: string }, code: string) {
+  const needle = normalizePackageName(code);
+  return (
+    pkg.code.trim() === code.trim() ||
+    pkg.name.trim() === code.trim() ||
+    normalizePackageName(pkg.code) === needle ||
+    normalizePackageName(pkg.name) === needle
+  );
 }
 
-export async function ensureShippingPackageCatalog() {
-  await connectDB();
-  await ShippingPackage.updateOne(
-    { code: "Pack001" },
-    {
-      $setOnInsert: {
-        code: "Pack001",
-        name: "Pack001",
-        type: "box",
-        length: 15,
-        width: 12,
-        height: 7,
-        dimensionUnit: "cm",
-        emptyWeight: null,
-        weightUnit: null,
-      },
-    },
-    { upsert: true },
-  );
+async function persistBuiltinCatalog() {
+  try {
+    await connectDB();
+    await Promise.all(
+      BUILTIN_PACKAGES.map((pkg) =>
+        ShippingPackage.updateOne(
+          { code: pkg.code },
+          { $setOnInsert: pkg },
+          { upsert: true },
+        ),
+      ),
+    );
+  } catch (err) {
+    console.warn("Kutu kataloğu Mongo'ya yazılamadı:", err);
+  }
 }
 
 export async function resolveCatalogPackage(
@@ -87,25 +91,44 @@ export async function resolveCatalogPackage(
     throw new PackageCodeError("PackageCode boş olamaz");
   }
 
-  await ensureShippingPackageCatalog();
-  const needle = normalizePackageName(code);
-  const docs = await ShippingPackage.find({}).lean();
-  const found = docs.find(
-    (pkg) =>
-      pkg.code.trim() === code ||
-      pkg.name.trim() === code ||
-      normalizePackageName(pkg.code) === needle ||
-      normalizePackageName(pkg.name) === needle,
-  );
+  const builtin = BUILTIN_PACKAGES.find((pkg) => matchesCode(pkg, code));
+  if (builtin) {
+    void persistBuiltinCatalog();
+    return builtin;
+  }
 
-  if (!found) {
-    const known = docs.map((pkg) => pkg.code).join(", ") || "(katalog boş)";
+  try {
+    await persistBuiltinCatalog();
+    const docs = await ShippingPackage.find({}).lean();
+    const found = docs.find((pkg) => matchesCode(pkg, code));
+    if (found) {
+      return {
+        code: found.code,
+        name: found.name,
+        type: found.type,
+        length: found.length,
+        width: found.width,
+        height: found.height,
+        dimensionUnit: found.dimensionUnit,
+        emptyWeight: found.emptyWeight ?? null,
+        weightUnit: found.weightUnit ?? null,
+      };
+    }
+    const known = [
+      ...BUILTIN_PACKAGES.map((pkg) => pkg.code),
+      ...docs.map((pkg) => pkg.code),
+    ]
+      .filter((value, index, all) => all.indexOf(value) === index)
+      .join(", ");
     throw new PackageCodeError(
       `PackageCode "${code}" kutu kataloğunda yok. Kayıtlı kodlar: ${known}`,
     );
+  } catch (err) {
+    if (err instanceof PackageCodeError) throw err;
+    throw new PackageCodeError(
+      `PackageCode "${code}" kutu kataloğunda yok. Kayıtlı kodlar: ${BUILTIN_PACKAGES.map((pkg) => pkg.code).join(", ")}`,
+    );
   }
-
-  return toCatalog(found as IShippingPackage);
 }
 
 export function packageMetafields(pkg: CatalogPackage) {
