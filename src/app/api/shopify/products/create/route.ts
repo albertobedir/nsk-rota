@@ -1,5 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
+import {
+  assignPackageByCode,
+  PackageCodeError,
+  resolveShippingPackage,
+} from "@/lib/shopify/shipping-package";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,6 +82,7 @@ async function updateVariant(
           edges {
             node {
               id
+              inventoryItem { id }
             }
           }
         }
@@ -84,10 +90,12 @@ async function updateVariant(
     }
   `;
   const res = await shopifyGraphQL(query, { id: productId });
-  const variantGid = res.data?.product?.variants?.edges?.[0]?.node?.id;
+  const variantNode = res.data?.product?.variants?.edges?.[0]?.node;
+  const variantGid = variantNode?.id;
   if (!variantGid) throw new Error("Variant ID bulunamadı");
 
   const variantId = variantGid.split("/").pop();
+  const inventoryItemGid = variantNode?.inventoryItem?.id;
 
   // 2. Variant güncelle (REST)
   const updateRes = await shopifyREST(`/variants/${variantId}.json`, "PUT", {
@@ -116,7 +124,14 @@ async function updateVariant(
     }
   }
 
-  return variantId;
+  return {
+    variantId,
+    inventoryItemGid:
+      inventoryItemGid ||
+      (updateRes.variant?.inventory_item_id
+        ? `gid://shopify/InventoryItem/${updateRes.variant.inventory_item_id}`
+        : null),
+  };
 }
 
 // ✅ Yayımla
@@ -308,6 +323,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const requestedPackageCode =
+      body.PackageCode != null && String(body.PackageCode).trim() !== ""
+        ? String(body.PackageCode).trim()
+        : null;
+    const resolvedPackage = requestedPackageCode
+      ? await resolveShippingPackage(requestedPackageCode)
+      : null;
+
     // 1. Publication ve Location ID'leri çek
     const [publicationIds, locationId] = await Promise.all([
       getPublications(),
@@ -319,7 +342,7 @@ export async function POST(req: NextRequest) {
       await createProduct(body);
 
     // 3. Variant güncelle
-    const variantId = await updateVariant(
+    const { variantId, inventoryItemGid } = await updateVariant(
       productId,
       {
         sku: body.RotaNo,
@@ -330,6 +353,20 @@ export async function POST(req: NextRequest) {
       locationId,
     );
 
+    let packageAssignment = null;
+    if (resolvedPackage) {
+      if (!inventoryItemGid) {
+        throw new PackageCodeError(
+          "Kutu bulundu ama varyant inventory item ID alınamadı",
+          500,
+        );
+      }
+      packageAssignment = await assignPackageByCode(
+        inventoryItemGid,
+        resolvedPackage.code,
+      );
+    }
+
     // 4. Yayımla
     await publishProduct(productId, publicationIds);
 
@@ -338,12 +375,14 @@ export async function POST(req: NextRequest) {
       productId,
       variantId,
       handle,
+      package: packageAssignment,
     });
   } catch (err: any) {
     console.error("❌ Product creation error:", err);
+    const status = err instanceof PackageCodeError ? err.status : 500;
     return NextResponse.json(
       { ok: false, error: err.message },
-      { status: 500 },
+      { status },
     );
   }
 }

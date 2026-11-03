@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
+import {
+  assignPackageByCode,
+  PackageCodeError,
+} from "@/lib/shopify/shipping-package";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,6 +85,7 @@ async function findProductByRotaNo(rotaNo: string) {
     productId: edge.product.id,
     variantGid: edge.id,
     variantId: edge.id.split("/").pop(),
+    inventoryItemGid: edge.inventoryItem.id,
     inventoryItemId: edge.inventoryItem.id.split("/").pop(),
     existingMediaIds: edge.product.media.edges.map((e: any) => e.node.id),
   };
@@ -302,8 +307,20 @@ export async function PUT(req: NextRequest) {
     }
 
     // 1. Ürünü bul
-    const { productId, variantId, inventoryItemId, existingMediaIds } =
-      await findProductByRotaNo(rotaNo);
+    const {
+      productId,
+      variantId,
+      inventoryItemId,
+      inventoryItemGid,
+      existingMediaIds,
+    } = await findProductByRotaNo(rotaNo);
+
+    const requestedPackageCode =
+      Object.prototype.hasOwnProperty.call(body, "PackageCode") &&
+      body.PackageCode != null &&
+      String(body.PackageCode).trim() !== ""
+        ? String(body.PackageCode).trim()
+        : null;
 
     // 2. Location ID çek
     const locationId = await getLocationId();
@@ -313,6 +330,14 @@ export async function PUT(req: NextRequest) {
       updateProductCore(productId, body),
       updateVariant(variantId, inventoryItemId, body, locationId),
     ]);
+
+    let packageAssignment = null;
+    if (requestedPackageCode) {
+      packageAssignment = await assignPackageByCode(
+        inventoryItemGid,
+        requestedPackageCode,
+      );
+    }
 
     // 4. Fotoğrafları güncelle (önce sil, sonra ekle)
     if (body.Photos !== undefined) {
@@ -327,12 +352,14 @@ export async function PUT(req: NextRequest) {
       productId,
       variantId,
       rotaNo,
+      package: packageAssignment,
     });
   } catch (err: any) {
     console.error("❌ Product update error:", err);
+    const status = err instanceof PackageCodeError ? err.status : 500;
     return NextResponse.json(
       { ok: false, error: err.message },
-      { status: 500 },
+      { status },
     );
   }
 }

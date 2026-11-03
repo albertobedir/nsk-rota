@@ -96,6 +96,7 @@ Content-Type: application/json
 | Alan           | Tür    | Zorunlu | Açıklama                                        |
 | -------------- | ------ | ------- | ----------------------------------------------- |
 | `RotaNo`       | string | ✅      | Ürün katalog numarası                           |
+| `PackageCode`  | string | ❌      | Shopify Packages ekranındaki kutu adı (`Package name`). Örnek: `Pack001`. Kutu ID gönderilmez. |
 | `ProductEn`    | string | ✅      | Ürün adı (İngilizce)                            |
 | `Price`        | string | ✅      | Fiyat (virgül ile ondalık ayrım, örn: "507,23") |
 | `Weight`       | object | ⚠️      | Ağırlık (kg ve lb)                              |
@@ -121,7 +122,12 @@ Content-Type: application/json
   "ok": true,
   "productId": "gid://shopify/Product/123456789",
   "variantId": "789012",
-  "handle": "v-stay-arm-v-rod-29014564"
+  "handle": "v-stay-arm-v-rod-29014564",
+  "package": {
+    "code": "Pack001",
+    "name": "Pack001",
+    "assigned": true
+  }
 }
 ```
 
@@ -247,6 +253,7 @@ curl -X POST https://your-domain.com/api/shopify/products/create \
   -d '{
     "RotaNo": "29014564",
     "ProductEn": "V Stay Arm (V-Rod)",
+    "PackageCode": "Pack001",
     "Price": "507,23",
     "Weight": {
       "kg": "18,02 kg",
@@ -316,6 +323,7 @@ console.log(data);
 
 ## 📝 Notlar
 
+- **PackageCode:** Shopify Admin > Settings > Shipping and delivery > Packages içindeki **Package name** alanıdır (ör. `Pack001`). İstek ve cevapta kutu ID yoktur; kutu bulunamazsa create/update hata döner. Update isteğinde alan yoksa mevcut kutu değişmez.
 - **Fiyat Formatı:** Virgül (`,`) kullanılmalı, nokta (`.`) değil (Türk formatı)
 - **API Versiyonu:** `2024-10` (Shopify Admin API)
 - **Runtime:** Node.js (Edge Runtime değil)
