@@ -96,7 +96,7 @@ Content-Type: application/json
 | Alan           | Tür    | Zorunlu | Açıklama                                        |
 | -------------- | ------ | ------- | ----------------------------------------------- |
 | `RotaNo`       | string | ✅      | Ürün katalog numarası                           |
-| `PackageCode`  | string | ❌      | Shopify Packages ekranındaki kutu adı (`Package name`). Örnek: `Pack001`. Kutu ID gönderilmez. |
+| `PackageCode`  | string | ❌      | Shopify kutu adı (`Pack001`). İstekte ID yok. Atama, sunucuda doğrulanmış isim–ID kaydı ve `inventoryItemUpdate.measurement.shippingPackageId` ile yapılır. Shopify kutu listesi API'si yoktur; isimden otomatik tarama yapılmaz. |
 | `ProductEn`    | string | ✅      | Ürün adı (İngilizce)                            |
 | `Price`        | string | ✅      | Fiyat (virgül ile ondalık ayrım, örn: "507,23") |
 | `Weight`       | object | ⚠️      | Ağırlık (kg ve lb)                              |
@@ -323,7 +323,7 @@ console.log(data);
 
 ## 📝 Notlar
 
-- **PackageCode:** Shopify Admin > Settings > Shipping and delivery > Packages içindeki **Package name** alanıdır (ör. `Pack001`). İstek ve cevapta kutu ID yoktur; kutu bulunamazsa create/update hata döner. Update isteğinde alan yoksa mevcut kutu değişmez.
+- **PackageCode:** Dışarıdan yalnızca kutu adı gönderilir. Shopify Admin API kayıtlı kutuları listelemez; bu yüzden isimden otomatik eşleştirme yoktur. Gerçek atama `inventoryItemUpdate` + `shippingPackageId` ile yapılır ve sunucuda o ad için doğrulanmış kutu GID'si gerekir. Bu doğrulama yapılmadan toplu aktarım başlatılmamalıdır. Update isteğinde alan yoksa mevcut kutu değişmez.
 - **Fiyat Formatı:** Virgül (`,`) kullanılmalı, nokta (`.`) değil (Türk formatı)
 - **API Versiyonu:** `2024-10` (Shopify Admin API)
 - **Runtime:** Node.js (Edge Runtime değil)
