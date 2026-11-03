@@ -1,28 +1,31 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { connectDB } from "@/lib/mongoose/instance";
+import ShippingPackage, {
+  IShippingPackage,
+} from "@/schemas/mongoose/shipping-package";
 
-/**
- * Shopify Admin GraphQL does not expose a query to list saved packages.
- * Documented assignment (2026-10):
- * inventoryItemUpdate → input.measurement.shippingPackageId
- * https://shopify.dev/docs/api/admin-graphql/2026-10/input-objects/InventoryItemMeasurementInput
- *
- * PackageCode is the Shopify package name. The GID must already be verified
- * in SHOPIFY_SHIPPING_PACKAGES. Name matching against a live Shopify list
- * is not supported.
- */
-const SHOPIFY_STORE = process.env.SHOPIFY_STORE_DOMAIN!;
-const ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!;
-const PACKAGE_API_VERSION = "2026-10";
-
-export type AssignedPackage = {
+export type CatalogPackage = {
   code: string;
   name: string;
-  assigned: true;
+  type: string;
+  length: number;
+  width: number;
+  height: number;
+  dimensionUnit: string;
+  emptyWeight: number | null;
+  weightUnit: string | null;
 };
 
-type VerifiedPackage = {
+export type SavedPackageResult = {
+  code: string;
   name: string;
-  id: string;
+  saved: true;
+  shopifyAssigned: false;
+  dimensions: {
+    length: number;
+    width: number;
+    height: number;
+    unit: string;
+  };
 };
 
 export class PackageCodeError extends Error {
@@ -41,181 +44,108 @@ function normalizePackageName(value: string) {
     .toLowerCase();
 }
 
-function isPackageGid(id: string) {
-  return /^gid:\/\/shopify\/[A-Za-z]*Package\/\d+$/.test(id);
+function toCatalog(doc: IShippingPackage): CatalogPackage {
+  return {
+    code: doc.code,
+    name: doc.name,
+    type: doc.type,
+    length: doc.length,
+    width: doc.width,
+    height: doc.height,
+    dimensionUnit: doc.dimensionUnit,
+    emptyWeight: doc.emptyWeight ?? null,
+    weightUnit: doc.weightUnit ?? null,
+  };
 }
 
-function verifiedPackagesByName(): VerifiedPackage[] {
-  const raw = process.env.SHOPIFY_SHIPPING_PACKAGES?.trim();
-  if (!raw) return [];
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new PackageCodeError(
-      "SHOPIFY_SHIPPING_PACKAGES geçerli JSON değil. Beklenen biçim: {\"Pack001\":\"gid://shopify/DeliveryPackage/123\"}",
-      500,
-    );
-  }
-
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new PackageCodeError(
-      "SHOPIFY_SHIPPING_PACKAGES bir JSON nesnesi olmalı: {\"Pack001\":\"gid://shopify/DeliveryPackage/123\"}",
-      500,
-    );
-  }
-
-  return Object.entries(parsed as Record<string, unknown>)
-    .map(([name, id]) => ({
-      name: String(name).trim(),
-      id: String(id ?? "").trim(),
-    }))
-    .filter((row) => row.name && row.id);
+export async function ensureShippingPackageCatalog() {
+  await connectDB();
+  await ShippingPackage.updateOne(
+    { code: "Pack001" },
+    {
+      $setOnInsert: {
+        code: "Pack001",
+        name: "Pack001",
+        type: "box",
+        length: 15,
+        width: 12,
+        height: 7,
+        dimensionUnit: "cm",
+        emptyWeight: null,
+        weightUnit: null,
+      },
+    },
+    { upsert: true },
+  );
 }
 
-function resolveVerifiedPackage(packageCode: string): VerifiedPackage {
+export async function resolveCatalogPackage(
+  packageCode: string,
+): Promise<CatalogPackage> {
   const code = String(packageCode ?? "").trim();
   if (!code) {
     throw new PackageCodeError("PackageCode boş olamaz");
   }
 
-  const packages = verifiedPackagesByName();
+  await ensureShippingPackageCatalog();
   const needle = normalizePackageName(code);
-  const found =
-    packages.find((pkg) => pkg.name.trim() === code) ||
-    packages.find((pkg) => normalizePackageName(pkg.name) === needle);
+  const docs = await ShippingPackage.find({}).lean();
+  const found = docs.find(
+    (pkg) =>
+      pkg.code.trim() === code ||
+      pkg.name.trim() === code ||
+      normalizePackageName(pkg.code) === needle ||
+      normalizePackageName(pkg.name) === needle,
+  );
 
   if (!found) {
-    const known = packages.map((pkg) => pkg.name);
-    const knownSuffix =
-      known.length > 0
-        ? ` Tanımlı kutu adları: ${known.join(", ")}.`
-        : " Sunucuda doğrulanmış kutu kaydı yok.";
+    const known = docs.map((pkg) => pkg.code).join(", ") || "(katalog boş)";
     throw new PackageCodeError(
-      `PackageCode "${code}" için doğrulanmış kutu ID'si yok. Shopify Admin API kayıtlı kutuları listelemez; isimden otomatik eşleştirme desteklenmiyor.${knownSuffix}`,
-      409,
+      `PackageCode "${code}" kutu kataloğunda yok. Kayıtlı kodlar: ${known}`,
     );
   }
 
-  if (!isPackageGid(found.id)) {
-    throw new PackageCodeError(
-      `PackageCode "${code}" için tanımlı kutu ID geçersiz: "${found.id}". Beklenen: gid://shopify/DeliveryPackage/{sayı}`,
-      500,
-    );
-  }
-
-  return found;
+  return toCatalog(found as IShippingPackage);
 }
 
-async function shopifyGraphQL(
-  query: string,
-  variables?: Record<string, unknown>,
-) {
-  const res = await fetch(
-    `https://${SHOPIFY_STORE}/admin/api/${PACKAGE_API_VERSION}/graphql.json`,
+export function packageMetafields(pkg: CatalogPackage) {
+  return [
     {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": ACCESS_TOKEN,
-      },
-      body: JSON.stringify({ query, variables }),
+      namespace: "custom",
+      key: "package_code",
+      type: "single_line_text_field",
+      value: pkg.code,
     },
-  );
-  const json = await res.json().catch(() => null);
-  if (!res.ok) {
-    const message =
-      typeof json?.errors === "string"
-        ? json.errors
-        : json?.errors
-          ? JSON.stringify(json.errors)
-          : `HTTP ${res.status}`;
-    throw new PackageCodeError(
-      `Shopify inventoryItemUpdate çağrısı başarısız (${PACKAGE_API_VERSION}): ${message}`,
-      502,
-    );
-  }
-  return json;
-}
-
-export async function resolveShippingPackage(packageCode: string) {
-  const pkg = resolveVerifiedPackage(packageCode);
-  return {
-    code: pkg.name,
-    id: pkg.id,
-    name: pkg.name,
-  };
-}
-
-export async function assignShippingPackageToInventoryItem(
-  inventoryItemGid: string,
-  packageId: string,
-) {
-  const id = inventoryItemGid.startsWith("gid://")
-    ? inventoryItemGid
-    : `gid://shopify/InventoryItem/${inventoryItemGid}`;
-
-  const mutation = `
-    mutation inventoryItemUpdate($id: ID!, $input: InventoryItemInput!) {
-      inventoryItemUpdate(id: $id, input: $input) {
-        inventoryItem { id }
-        userErrors { field message }
-      }
-    }
-  `;
-
-  const json = await shopifyGraphQL(mutation, {
-    id,
-    input: {
-      measurement: {
-        shippingPackageId: packageId,
-      },
+    {
+      namespace: "custom",
+      key: "package_info",
+      type: "json",
+      value: JSON.stringify({
+        code: pkg.code,
+        name: pkg.name,
+        type: pkg.type,
+        length: pkg.length,
+        width: pkg.width,
+        height: pkg.height,
+        dimensionUnit: pkg.dimensionUnit,
+        emptyWeight: pkg.emptyWeight,
+        weightUnit: pkg.weightUnit,
+      }),
     },
-  });
-
-  if (json?.errors?.length) {
-    const messages = Array.isArray(json.errors)
-      ? json.errors.map((err: any) => err?.message || JSON.stringify(err)).join("; ")
-      : String(json.errors);
-    throw new PackageCodeError(
-      `Kutu varyanta atanamadı: ${messages}`,
-      502,
-    );
-  }
-
-  const payload = json?.data?.inventoryItemUpdate;
-  const userErrors = payload?.userErrors ?? [];
-  if (userErrors.length > 0) {
-    throw new PackageCodeError(
-      `Kutu varyanta atanamadı: ${userErrors
-        .map((err: any) => err?.message || JSON.stringify(err))
-        .join("; ")}`,
-      502,
-    );
-  }
-  if (!payload?.inventoryItem?.id) {
-    throw new PackageCodeError(
-      "Kutu varyanta atanamadı: inventoryItemUpdate boş döndü",
-      502,
-    );
-  }
-
-  return payload.inventoryItem.id as string;
+  ];
 }
 
-export async function assignPackageByCode(
-  inventoryItemGid: string | number,
-  packageCode: string,
-): Promise<AssignedPackage> {
-  const pkg = resolveVerifiedPackage(packageCode);
-  await assignShippingPackageToInventoryItem(
-    String(inventoryItemGid),
-    pkg.id,
-  );
+export function savedPackageResult(pkg: CatalogPackage): SavedPackageResult {
   return {
-    code: pkg.name,
+    code: pkg.code,
     name: pkg.name,
-    assigned: true,
+    saved: true,
+    shopifyAssigned: false,
+    dimensions: {
+      length: pkg.length,
+      width: pkg.width,
+      height: pkg.height,
+      unit: pkg.dimensionUnit,
+    },
   };
 }

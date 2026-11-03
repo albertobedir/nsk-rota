@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import {
-  assignPackageByCode,
+  CatalogPackage,
   PackageCodeError,
-  resolveShippingPackage,
+  packageMetafields,
+  resolveCatalogPackage,
+  savedPackageResult,
 } from "@/lib/shopify/shipping-package";
 
 export const runtime = "nodejs";
@@ -160,7 +162,7 @@ async function publishProduct(productId: string, publicationIds: string[]) {
 }
 
 // ✅ Ana ürün oluşturma
-async function createProduct(product: any) {
+async function createProduct(product: any, catalogPackage: CatalogPackage | null) {
   const mutation = `
     mutation productCreate($input: ProductInput!, $media: [CreateMediaInput!]) {
       productCreate(input: $input, media: $media) {
@@ -255,6 +257,7 @@ async function createProduct(product: any) {
       type: "json",
       value: JSON.stringify(product.Brands),
     });
+  if (catalogPackage) metafields.push(...packageMetafields(catalogPackage));
 
   // Media (Photos)
   const sortedPhotos =
@@ -327,8 +330,8 @@ export async function POST(req: NextRequest) {
       body.PackageCode != null && String(body.PackageCode).trim() !== ""
         ? String(body.PackageCode).trim()
         : null;
-    const resolvedPackage = requestedPackageCode
-      ? await resolveShippingPackage(requestedPackageCode)
+    const catalogPackage = requestedPackageCode
+      ? await resolveCatalogPackage(requestedPackageCode)
       : null;
 
     // 1. Publication ve Location ID'leri çek
@@ -339,10 +342,10 @@ export async function POST(req: NextRequest) {
 
     // 2. Ürünü oluştur
     const { productId, handle, parsedPrice, weightValue } =
-      await createProduct(body);
+      await createProduct(body, catalogPackage);
 
     // 3. Variant güncelle
-    const { variantId, inventoryItemGid } = await updateVariant(
+    const { variantId } = await updateVariant(
       productId,
       {
         sku: body.RotaNo,
@@ -353,20 +356,6 @@ export async function POST(req: NextRequest) {
       locationId,
     );
 
-    let packageAssignment = null;
-    if (resolvedPackage) {
-      if (!inventoryItemGid) {
-        throw new PackageCodeError(
-          "Kutu bulundu ama varyant inventory item ID alınamadı",
-          500,
-        );
-      }
-      packageAssignment = await assignPackageByCode(
-        inventoryItemGid,
-        resolvedPackage.code,
-      );
-    }
-
     // 4. Yayımla
     await publishProduct(productId, publicationIds);
 
@@ -375,7 +364,7 @@ export async function POST(req: NextRequest) {
       productId,
       variantId,
       handle,
-      package: packageAssignment,
+      package: catalogPackage ? savedPackageResult(catalogPackage) : null,
     });
   } catch (err: any) {
     console.error("❌ Product creation error:", err);

@@ -96,7 +96,7 @@ Content-Type: application/json
 | Alan           | Tür    | Zorunlu | Açıklama                                        |
 | -------------- | ------ | ------- | ----------------------------------------------- |
 | `RotaNo`       | string | ✅      | Ürün katalog numarası                           |
-| `PackageCode`  | string | ❌      | Shopify kutu adı (`Pack001`). İstekte ID yok. Atama, sunucuda doğrulanmış isim–ID kaydı ve `inventoryItemUpdate.measurement.shippingPackageId` ile yapılır. Shopify kutu listesi API'si yoktur; isimden otomatik tarama yapılmaz. |
+| `PackageCode`  | string | ❌      | Kendi kutu kataloğundaki kod (`Pack001`). Shopify kutu ID'si gönderilmez. |
 | `ProductEn`    | string | ✅      | Ürün adı (İngilizce)                            |
 | `Price`        | string | ✅      | Fiyat (virgül ile ondalık ayrım, örn: "507,23") |
 | `Weight`       | object | ⚠️      | Ağırlık (kg ve lb)                              |
@@ -126,7 +126,14 @@ Content-Type: application/json
   "package": {
     "code": "Pack001",
     "name": "Pack001",
-    "assigned": true
+    "saved": true,
+    "shopifyAssigned": false,
+    "dimensions": {
+      "length": 15,
+      "width": 12,
+      "height": 7,
+      "unit": "cm"
+    }
   }
 }
 ```
@@ -323,7 +330,7 @@ console.log(data);
 
 ## 📝 Notlar
 
-- **PackageCode:** Dışarıdan yalnızca kutu adı gönderilir. Shopify Admin API kayıtlı kutuları listelemez; bu yüzden isimden otomatik eşleştirme yoktur. Gerçek atama `inventoryItemUpdate` + `shippingPackageId` ile yapılır ve sunucuda o ad için doğrulanmış kutu GID'si gerekir. Bu doğrulama yapılmadan toplu aktarım başlatılmamalıdır. Update isteğinde alan yoksa mevcut kutu değişmez.
+- **PackageCode:** Ana kaynak kendi kutu kataloğudur (Mongo). `Pack001` (15×12×7 cm kutu) katalogda kayıtlıdır. Kod katalogda yoksa create/update hata verir. Ürüne `custom.package_code` / `custom.package_info` metafield yazılır; bu depo bilgisidir, Shopify **Package when shipped alone** alanını doldurmaz. Cevapta `shopifyAssigned` her zaman `false` olur. Update'te alan yoksa kutu bilgisi değişmez.
 - **Fiyat Formatı:** Virgül (`,`) kullanılmalı, nokta (`.`) değil (Türk formatı)
 - **API Versiyonu:** `2024-10` (Shopify Admin API)
 - **Runtime:** Node.js (Edge Runtime değil)

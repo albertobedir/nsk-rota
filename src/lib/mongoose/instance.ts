@@ -4,6 +4,7 @@ import Order from "@/schemas/mongoose/order";
 import Collection from "@/schemas/mongoose/collection";
 import Customer from "@/schemas/mongoose/customer";
 import PendingRegistration from "@/schemas/mongoose/pending-registration";
+import ShippingPackage from "@/schemas/mongoose/shipping-package";
 
 const MONGO_URL = process.env.MONGO_URL;
 
@@ -82,6 +83,12 @@ export async function connectDB() {
     console.log("✅ pendingRegistrations indexes created!");
   } catch (err) {
     console.error("❌ Failed to create pendingRegistrations indexes:", err);
+  }
+
+  try {
+    await ShippingPackage.collection.createIndex({ code: 1 }, { unique: true });
+  } catch (err) {
+    console.error("❌ Failed to create ShippingPackage indexes:", err);
   }
 
   return cached.conn;

@@ -1,8 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import {
-  assignPackageByCode,
+  CatalogPackage,
   PackageCodeError,
+  packageMetafields,
+  resolveCatalogPackage,
+  savedPackageResult,
 } from "@/lib/shopify/shipping-package";
 
 export const runtime = "nodejs";
@@ -157,7 +160,11 @@ async function addProductMedia(
 }
 
 // ✅ Product update (title, description, tags, vendor, productType, metafields)
-async function updateProductCore(productId: string, product: any) {
+async function updateProductCore(
+  productId: string,
+  product: any,
+  catalogPackage: CatalogPackage | null,
+) {
   const mutation = `
     mutation productUpdate($input: ProductInput!) {
       productUpdate(input: $input) {
@@ -229,6 +236,7 @@ async function updateProductCore(productId: string, product: any) {
       type: "json",
       value: JSON.stringify(product.Brands ?? []),
     },
+    ...(catalogPackage ? packageMetafields(catalogPackage) : []),
   ];
 
   const res = await shopifyGraphQL(mutation, {
@@ -311,7 +319,6 @@ export async function PUT(req: NextRequest) {
       productId,
       variantId,
       inventoryItemId,
-      inventoryItemGid,
       existingMediaIds,
     } = await findProductByRotaNo(rotaNo);
 
@@ -321,23 +328,18 @@ export async function PUT(req: NextRequest) {
       String(body.PackageCode).trim() !== ""
         ? String(body.PackageCode).trim()
         : null;
+    const catalogPackage = requestedPackageCode
+      ? await resolveCatalogPackage(requestedPackageCode)
+      : null;
 
     // 2. Location ID çek
     const locationId = await getLocationId();
 
     // 3. Paralel: product core update + variant update
     await Promise.all([
-      updateProductCore(productId, body),
+      updateProductCore(productId, body, catalogPackage),
       updateVariant(variantId, inventoryItemId, body, locationId),
     ]);
-
-    let packageAssignment = null;
-    if (requestedPackageCode) {
-      packageAssignment = await assignPackageByCode(
-        inventoryItemGid,
-        requestedPackageCode,
-      );
-    }
 
     // 4. Fotoğrafları güncelle (önce sil, sonra ekle)
     if (body.Photos !== undefined) {
@@ -352,7 +354,7 @@ export async function PUT(req: NextRequest) {
       productId,
       variantId,
       rotaNo,
-      package: packageAssignment,
+      package: catalogPackage ? savedPackageResult(catalogPackage) : null,
     });
   } catch (err: any) {
     console.error("❌ Product update error:", err);
