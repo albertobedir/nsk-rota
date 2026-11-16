@@ -19,7 +19,10 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
+import {
+  markProductRequested,
+  submitProductRequest,
+} from "@/lib/submit-product-request";
 import {
   Select,
   SelectContent,
@@ -757,71 +760,34 @@ export default function ProductsPage() {
                                 <SheetFooter>
                                   <div className="flex gap-2">
                                     <Button
-                                      onClick={async () => {
-                                        try {
-                                          const ta = document.getElementById(
-                                            `product-request-message-${term}`,
-                                          ) as HTMLTextAreaElement | null;
-                                          const message = ta
-                                            ? ta.value
-                                            : `I'm looking for ${term}`;
-                                          const resp = await fetch(
-                                            `/api/requests/product`,
+                                      onClick={() => {
+                                        const ta = document.getElementById(
+                                          `product-request-message-${term}`,
+                                        ) as HTMLTextAreaElement | null;
+                                        const message = ta
+                                          ? ta.value
+                                          : `I'm looking for ${term}`;
+                                        const close = document.querySelector(
+                                          '[data-slot="sheet-close"]',
+                                        ) as HTMLElement | null;
+                                        if (close) close.click();
+                                        void (async () => {
+                                          const ok = await submitProductRequest(
                                             {
-                                              method: "POST",
-                                              headers: {
-                                                "Content-Type":
-                                                  "application/json",
-                                              },
-                                              body: JSON.stringify({
-                                                query: term,
-                                                message,
-                                              }),
+                                              query: term,
+                                              message,
                                             },
                                           );
-                                          if (resp.ok) {
-                                            try {
-                                              const list: string[] = JSON.parse(
-                                                localStorage.getItem(
-                                                  REQUESTED_PRODUCTS_KEY,
-                                                ) ?? "[]",
-                                              );
-                                              if (
-                                                !list
-                                                  .map((s) => s.toLowerCase())
-                                                  .includes(term.toLowerCase())
-                                              ) {
-                                                list.push(term);
-                                                localStorage.setItem(
-                                                  REQUESTED_PRODUCTS_KEY,
-                                                  JSON.stringify(list),
-                                                );
-                                              }
-                                              setRequestedTerms(
-                                                (prev) =>
-                                                  new Set([
-                                                    ...prev,
-                                                    term.toLowerCase(),
-                                                  ]),
-                                              );
-                                            } catch {}
-                                            toast.success("Request submitted");
-                                            const close =
-                                              document.querySelector(
-                                                '[data-slot="sheet-close"]',
-                                              ) as HTMLElement | null;
-                                            if (close) close.click();
-                                          } else {
-                                            toast.error(
-                                              "Failed to submit request",
-                                            );
-                                          }
-                                        } catch (e) {
-                                          console.error(e);
-                                          toast.error(
-                                            "Failed to submit request",
+                                          if (!ok) return;
+                                          markProductRequested(term);
+                                          setRequestedTerms(
+                                            (prev) =>
+                                              new Set([
+                                                ...prev,
+                                                term.toLowerCase(),
+                                              ]),
                                           );
-                                        }
+                                        })();
                                       }}
                                     >
                                       Send request
@@ -871,50 +837,23 @@ export default function ProductsPage() {
                   />
                   <div className="flex gap-2 justify-end">
                     <Button
-                      onClick={async () => {
-                        try {
-                          const message = requestMsgRef.current
-                            ? requestMsgRef.current.value
-                            : `I'm looking for ${requestTerm}`;
-                          const resp = await fetch(`/api/requests/product`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              query: requestTerm,
-                              message,
-                            }),
+                      onClick={() => {
+                        const message = requestMsgRef.current
+                          ? requestMsgRef.current.value
+                          : `I'm looking for ${requestTerm}`;
+                        const term = requestTerm;
+                        setShowRequestModal(false);
+                        void (async () => {
+                          const ok = await submitProductRequest({
+                            query: term,
+                            message,
                           });
-                          if (resp.ok) {
-                            try {
-                              const list: string[] = JSON.parse(
-                                localStorage.getItem(REQUESTED_PRODUCTS_KEY) ??
-                                  "[]",
-                              );
-                              if (
-                                !list
-                                  .map((s) => s.toLowerCase())
-                                  .includes(requestTerm.toLowerCase())
-                              ) {
-                                list.push(requestTerm);
-                                localStorage.setItem(
-                                  REQUESTED_PRODUCTS_KEY,
-                                  JSON.stringify(list),
-                                );
-                              }
-                              setRequestedTerms(
-                                (prev) =>
-                                  new Set([...prev, requestTerm.toLowerCase()]),
-                              );
-                            } catch {}
-                            toast.success("Request submitted");
-                            setShowRequestModal(false);
-                          } else {
-                            toast.error("Failed to submit request");
-                          }
-                        } catch (e) {
-                          console.error(e);
-                          toast.error("Failed to submit request");
-                        }
+                          if (!ok) return;
+                          markProductRequested(term);
+                          setRequestedTerms(
+                            (prev) => new Set([...prev, term.toLowerCase()]),
+                          );
+                        })();
                       }}
                     >
                       Send request

@@ -10,7 +10,9 @@ import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { getValidAdminEmails } from "@/lib/email/admin-emails";
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
 
 // 🔥 GLOBAL TRANSPORTER - pool ile connection reuse
 const transporter = nodemailer.createTransport({
@@ -36,6 +38,45 @@ const transporter = nodemailer.createTransport({
   greetingTimeout: 20000,
   socketTimeout: 20000,
 });
+
+async function sendAdminSubscribeEmail(adminEmails: string[], html: string) {
+  const from =
+    process.env.FROM_EMAIL ||
+    process.env.SMTP_FROM ||
+    process.env.SMTP_USER;
+  if (!from) {
+    throw new Error("FROM_EMAIL is not configured");
+  }
+
+  try {
+    for (const adminEmail of adminEmails) {
+      await transporter.sendMail({
+        from,
+        to: adminEmail,
+        subject: "Yeni Üyelik Başvurusu",
+        html,
+      });
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return;
+  } catch (smtpErr) {
+    console.error("Subscribe SMTP failed, trying Resend:", smtpErr);
+  }
+
+  if (!resend) {
+    throw new Error("SMTP failed and RESEND_API_KEY is not configured");
+  }
+
+  const { error } = await resend.emails.send({
+    from,
+    to: adminEmails,
+    subject: "Yeni Üyelik Başvurusu",
+    html,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -71,7 +112,10 @@ export async function POST(req: Request) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: "EMAIL_EXISTS", message: "Bu e-posta zaten kayıtlı." },
+        {
+          error: "EMAIL_EXISTS",
+          message: "This email is already registered. Please sign in.",
+        },
         { status: 409 },
       );
     }
@@ -175,28 +219,17 @@ export async function POST(req: Request) {
       </div>
     `;
 
-    // await resend.emails.send({
-    //   from: "Acme <onboarding@resend.dev>",
-    //   to: adminEmail,
-    //   subject: "Yeni Üyelik Başvurusu",
-    //   html,
-    // });
-
-    // 🔥 Sequential send - concurrent limit aşmamak için
-    for (const adminEmail of adminEmails) {
-      await transporter.sendMail({
-        from: process.env.FROM_EMAIL,
-        to: adminEmail,
-        subject: "Yeni Üyelik Başvurusu",
-        html,
-      });
-
-      // 200ms delay - SMTP stability
-      await new Promise((r) => setTimeout(r, 200));
+    try {
+      await sendAdminSubscribeEmail(adminEmails, html);
+    } catch (mailErr) {
+      console.error(
+        "Subscribe admin email failed after pending registration was saved:",
+        mailErr,
+      );
     }
 
     return NextResponse.json(
-      { message: "Üyelik isteğiniz başarıyla iletildi." },
+      { message: "Your membership request was submitted." },
       { status: 200 },
     );
   } catch (error) {

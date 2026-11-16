@@ -13,10 +13,18 @@ class Auth {
       if (!parsed.success) throw parsed.error;
 
       const response = await Api.post("/auth/subs", parsed.data);
-      if (response.status >= 400) throw response;
+      if (response.status >= 400) {
+        throw new Error(
+          response.data?.message ||
+            (response.status === 409
+              ? "This email is already registered. Please sign in."
+              : "Something went wrong."),
+        );
+      }
       return response.data;
     } catch (error) {
-      return handleAxiosError(error);
+      if (error instanceof Error) throw error;
+      throw handleAxiosError(error);
     }
   };
 

@@ -96,7 +96,7 @@ Content-Type: application/json
 | Alan           | Tür    | Zorunlu | Açıklama                                        |
 | -------------- | ------ | ------- | ----------------------------------------------- |
 | `RotaNo`       | string | ✅      | Ürün katalog numarası                           |
-| `PackageCode`  | string | ❌      | Kendi kutu kataloğundaki kod (`Pack001`). Shopify kutu ID'si gönderilmez. |
+| `PackageCode`  | string | ❌      | Kendi katalog kodumuz (`Pack001`). Shopify **Package when shipped alone** alanını seçmez. |
 | `ProductEn`    | string | ✅      | Ürün adı (İngilizce)                            |
 | `Price`        | string | ✅      | Fiyat (virgül ile ondalık ayrım, örn: "507,23") |
 | `Weight`       | object | ⚠️      | Ağırlık (kg ve lb)                              |
@@ -330,7 +330,7 @@ console.log(data);
 
 ## 📝 Notlar
 
-- **PackageCode:** Ana kaynak kendi kutu kataloğudur (Mongo). `Pack001` (15×12×7 cm kutu) katalogda kayıtlıdır. Kod katalogda yoksa create/update hata verir. Ürüne `custom.package_code` / `custom.package_info` metafield yazılır; bu depo bilgisidir, Shopify **Package when shipped alone** alanını doldurmaz. Cevapta `shopifyAssigned` her zaman `false` olur. Update'te alan yoksa kutu bilgisi değişmez.
+- **PackageCode:** Bu alan Shopify Saved packages listesini okumaz ve **Package when shipped alone** seçimini yapmaz. Yalnızca kendi katalog kaydımızı ve `custom.package_code` / `custom.package_info` metafield’larını yazar. `shopifyAssigned: false` bilinçli yanıttır; gerçek Shopify kutu ataması tamamlanmış sayılmaz. Update’te alan yoksa bu metafield’lar değişmez.
 - **Fiyat Formatı:** Virgül (`,`) kullanılmalı, nokta (`.`) değil (Türk formatı)
 - **API Versiyonu:** `2024-10` (Shopify Admin API)
 - **Runtime:** Node.js (Edge Runtime değil)

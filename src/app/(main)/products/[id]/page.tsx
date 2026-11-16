@@ -20,6 +20,10 @@ import {
 } from "@/components/ui/carousel";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import {
+  markProductRequested,
+  submitProductRequest,
+} from "@/lib/submit-product-request";
 import { calculateProductPrice } from "@/lib/pricing";
 import {
   partNumberContains,
@@ -1533,59 +1537,27 @@ export default function ProductDetailPage() {
 
           <DialogFooter className="flex gap-2 justify-end mt-2">
             <Button
-              onClick={async () => {
-                try {
-                  const ta = document.getElementById(
-                    "stock-request-message",
-                  ) as HTMLTextAreaElement | null;
-                  const message = ta ? ta.value : `I'm looking for ${rotaNo}`;
-                  const requestBody = {
-                    query: rotaNo,
-                    message,
-                    customerName:
-                      `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim(),
-                    customerEmail: user?.email ?? "",
-                    customerPhone: user?.phone ?? "",
-                    customerId: user?.shopifyCustomerId ?? "",
-                  };
-                  console.log(
-                    "📤 [Detail Page] Sending product request:",
-                    requestBody,
-                  );
-                  const resp = await fetch(`/api/requests/product`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(requestBody),
-                  });
-                  const respJson = await resp.json().catch(() => null);
-                  console.log("📥 [Detail Page] Response from API:", respJson);
-                  if (resp.ok) {
-                    try {
-                      const list: string[] = JSON.parse(
-                        localStorage.getItem(REQUESTED_PRODUCTS_KEY) ?? "[]",
-                      );
-                      if (
-                        !list
-                          .map((s) => s.toLowerCase())
-                          .includes(rotaNo.toLowerCase())
-                      ) {
-                        list.push(rotaNo);
-                        localStorage.setItem(
-                          REQUESTED_PRODUCTS_KEY,
-                          JSON.stringify(list),
-                        );
-                      }
-                      setAlreadyRequested(true);
-                    } catch {}
-                    toast.success("Request submitted");
-                    setStockModalOpen(false);
-                  } else {
-                    toast.error("Failed to submit request");
-                  }
-                } catch (e) {
-                  console.error(e);
-                  toast.error("Failed to submit request");
-                }
+              onClick={() => {
+                const ta = document.getElementById(
+                  "stock-request-message",
+                ) as HTMLTextAreaElement | null;
+                const message = ta ? ta.value : `I'm looking for ${rotaNo}`;
+                const requestBody = {
+                  query: rotaNo,
+                  message,
+                  customerName:
+                    `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim(),
+                  customerEmail: user?.email ?? "",
+                  customerPhone: user?.phone ?? "",
+                  customerId: user?.shopifyCustomerId ?? "",
+                };
+                setStockModalOpen(false);
+                void (async () => {
+                  const ok = await submitProductRequest(requestBody);
+                  if (!ok) return;
+                  markProductRequested(rotaNo);
+                  setAlreadyRequested(true);
+                })();
               }}
             >
               Send request
